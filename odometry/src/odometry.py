@@ -10,10 +10,6 @@ from  math import pi
 from aruco_msgs.msg import MarkerArray
 import tf
 
-# Fill in the missing code for the odometry. 
-# The robot moves around in a 1x1 meter square three times. 
-# You can see the setup below. The robot moves along the blue lines.
-
 
 class Odometry:
     def __init__(self):
@@ -68,7 +64,6 @@ class Odometry:
             
     def aruco_callback(self,msg):
         """ aruco callback """
-        #rospy.loginfo('New aruco marker received:\n%s', msg.markers)
         # Take the ArUco marker detections, transform them into the map frame in a node and publish 
         # a TF from the map frame to a /aruco/detectedX frame, where X corresponds to the ID of the marker.
         
