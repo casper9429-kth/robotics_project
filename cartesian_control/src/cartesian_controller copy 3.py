@@ -68,7 +68,7 @@ For more details on the encoder and duty cycle topics refer back to the Kobuki d
 
 class cartesian_controller:
     def __init__(self):
-        self.autotune = False
+        self.autotune = True
         # init a node
         rospy.init_node('cartesian_controller', anonymous = True)
 
@@ -138,12 +138,12 @@ class cartesian_controller:
                 rospy.loginfo("Loaded pid values from file, Kp_v_right: %f, Ki_v_right: %f, Kd_v_right: %f, Kp_v_left: %f, Ki_v_left: %f, Kd_v_left: %f", self.Kp_v_right, self.Ki_v_right, self.Kd_v_right, self.Kp_v_left, self.Ki_v_left, self.Kd_v_left)
         except:
             # Pid
-            self.Kp_v_right = 1.0#0.95
-            self.Ki_v_right = 0.0#0.7
-            self.Kd_v_right = 0.0#0.0
-            self.Kp_v_left =  1.0#1.2
-            self.Ki_v_left =  0.0#0.8
-            self.Kd_v_left =  0.0#0.0
+            self.Kp_v_right = 0.95
+            self.Ki_v_right = 0.7
+            self.Kd_v_right = 0.0
+            self.Kp_v_left =  1.2
+            self.Ki_v_left =  0.8
+            self.Kd_v_left =  0.0
             rospy.loginfo("No pid file found, using default values, Kp_v_right: %f, Ki_v_right: %f, Kd_v_right: %f, Kp_v_left: %f, Ki_v_left: %f, Kd_v_left: %f", self.Kp_v_right, self.Ki_v_right, self.Kd_v_right, self.Kp_v_left, self.Ki_v_left, self.Kd_v_left)
 
 
@@ -159,29 +159,12 @@ class cartesian_controller:
         self.error_list_omega = []
         self.error_list_v = []
 
-
         self.sample_size = 60
         if self.autotune:
-            
-            # Pre tune
-            self.pre_tune(10)
-            
-            # Not worth it , takes to much time. But will explore more local min/max
-            # Hard tune
-            #p = [self.Kp_v_left, self.Ki_v_left, self.Kd_v_left, self.Kp_v_right, self.Ki_v_right, self.Kd_v_right]
-            #self.twiddle(p,0.2,5,0.7,2)
-            
-            # Soft tune
-            p = [self.Kp_v_left, self.Ki_v_left, self.Kd_v_left, self.Kp_v_right, self.Ki_v_right, self.Kd_v_right]
-            self.twiddle(p,0.1,5)
-
-
-            # Super soft tune
-            p = [self.Kp_v_left, self.Ki_v_left, self.Kd_v_left, self.Kp_v_right, self.Ki_v_right, self.Kd_v_right]
-            self.twiddle(p,0.1,3,0.05,0)
-
-            
-            
+            self.pre_tune()
+            #p1 = [self.Kp_v_left, self.Ki_v_left, self.Kd_v_left]
+            #p2 = [self.Kp_v_right, self.Ki_v_right, self.Kd_v_right]
+            #self.twiddle(p1,p2,0.2)
             # save pid values into json file
             pid = defaultdict()
             pid['Kp_v_right'] = self.Kp_v_right
@@ -198,97 +181,7 @@ class cartesian_controller:
         else: 
             self.run()
 
-
-    def run(self,iteration=10): 
-        """
-        Main loop of the node
-        * transforms desired velocity to desired wheel velocity
-        * publishes duty cycle message to /motor/duty_cycles with wheel velocities
-        * gets wheel velocities from encoder feedback and PI control
-        """
-
-        # check if desired speed is to high and warns user
-        if self.v_left_des > 0.5 or self.v_right_des > 0.5:
-            rospy.loginfo("Desired speed for wheel is too high, max is 0.5 m/s for realiable operation")
-
-        # Create duty cycle message object
-        # create inital duty cycle message object, will be used to publish to duty cycle topic
-        duty_cycle_msg = DutyCycles()
-        duty_cycle_msg.duty_cycle_left = 0.0
-        duty_cycle_msg.duty_cycle_right = 0.0
-
-
-        # main loop
-        t = 0#rospy.get_time()
-        
-        self.integral_left = 0.0
-        self.integral_right = 0.0
-        self.derivative_left = []
-        self.derivative_right = []        
-        
-        while not rospy.is_shutdown(): # insted of while True, makes sure ros dies when supposed to
-
-            
-            if t <5: # Sleep
-                self.omega_des = 0.0#np.random.uniform(-0.3,0.3) 
-                self.v_des = 0.0#np.random.uniform(0.1,0.5)
-            
-            t += 1                
-            
-            # Outerloop pid
-            
-            # Edge case tp stop robot and not get oscillations from PI control. Used when no new twist message is received or when desired speed is 0 
-            if ((rospy.get_time() - self.time_twist  ) > 0.5):
-                duty_cycle_msg.duty_cycle_left = 0.0
-                duty_cycle_msg.duty_cycle_right = 0.0
-                self.duty_cycle_pub.publish(duty_cycle_msg)
-                self.integral_left = 0.0 # reset integral in pi control 
-                self.integral_right = 0.0 # reset integral in pi control
-                self.derivative_left = []
-                self.derivative_right = []        
-                self.r.sleep()
-                continue
-
-            
-            
-            # Calculate desired wheel velocity
-            self.v_left_des,self.v_right_des = self.transform_v_omega_to_v_left_v_right(self.v_des, self.omega_des)
-
-            # calulate omega 
-            v_enco,omega_enco = self.transform_v_left_v_right_to_v_omega(self.v_left_enco, self.v_right_enco)
-
-            # Calculate omega error and append to list
-            self.error_list_omega.append(self.omega_des - omega_enco)
-            self.error_list_v.append(self.v_des - v_enco)
-
-
-            self.error_list_v_left.append(self.v_left_des - self.v_left_enco)
-            self.error_list_v_right.append(self.v_right_des - self.v_right_enco)
-            
-            if self.v_des == 0 and self.omega_des == 0 and self.v_left_enco < 0.05 and self.v_right_enco < 0.05:
-                duty_cycle_msg.duty_cycle_left = 0
-                duty_cycle_msg.duty_cycle_right = 0
-                self.integral_left = 0.0
-                self.integral_right = 0.0
-                self.derivative_left = []
-                self.derivative_right = []
-
-            else:
-                duty_cycle_msg.duty_cycle_left = self.PID_left(self.v_left_des, self.v_left_enco)
-                duty_cycle_msg.duty_cycle_right = self.PID_right(self.v_right_des, self.v_right_enco)
-
-
-
-            self.duty_cycle_pub.publish(duty_cycle_msg)
-        
-        
-
-            # sleep
-            self.r.sleep()
-            
-
-
-    def pre_tune(self,iteration=10): 
+    def pre_tune(self):
         """
         Main loop of the node
         * transforms desired velocity to desired wheel velocity
@@ -319,7 +212,7 @@ class cartesian_controller:
 
 
 
-            if (len(self.PID_v_right_list) > iteration) and (len(self.PID_v_left_list) > iteration):
+            if len(self.PID_v_right_list) > 20 and len(self.PID_v_left_list) > 20:
                 omega_sorted = sorted(self.PID_list, key=lambda x: x[2])[0]
                 
                 
@@ -330,8 +223,12 @@ class cartesian_controller:
                 self.Ki_v_right = omega_sorted[1][1]
                 self.Kd_v_right = omega_sorted[1][2]
                 
+                #self.Kp_v_left,self.Ki_v_left,self.Kd_v_left = sorted(self.PID_v_left_list, key=lambda x: x[3])[0][0:3]
+                #self.Kp_v_right,self.Ki_v_right,self.Kd_v_right = sorted(self.PID_v_right_list, key=lambda x: x[3])[0][0:3]
                 rospy.loginfo("Kp_left: %s, Ki_left: %s, Kd_left: %s", self.Kp_v_left,self.Ki_v_left,self.Kd_v_left)
                 rospy.loginfo("Kp_right: %s, Ki_right: %s, Kd_right: %s", self.Kp_v_right,self.Ki_v_right,self.Kd_v_right)
+                #rospy.loginfo("Error right: %f", sorted(self.PID_v_right_list, key=lambda x: x[3])[0][3])
+                #rospy.loginfo("Error left: %f", sorted(self.PID_v_left_list, key=lambda x: x[3])[0][3])
 
                 
                 return
@@ -342,14 +239,14 @@ class cartesian_controller:
 
             elif t < 35: # Run forward
                 self.omega_des = 0.0#np.random.uniform(-0.5,0.5)
-                self.v_des = 0.5#np.random.uniform(0.1,0.5)
+                self.v_des = 0.25#np.random.uniform(0.1,0.5)
 
             elif t<40:
                 self.omega_des = 0.0
                 self.v_des = 0.0
             elif t < 70: # Run forward
                 self.omega_des = 0.0#np.random.uniform(-0.5,0.5)
-                self.v_des = -0.5#np.random.uniform(0.1,0.5)
+                self.v_des = -0.25#np.random.uniform(0.1,0.5)
 
             elif t<75:
                 self.omega_des = 0.0
@@ -389,18 +286,12 @@ class cartesian_controller:
             self.error_list_omega.append(self.omega_des - omega_enco)
             self.error_list_v.append(self.v_des - v_enco)
 
-
             self.error_list_v_left.append(self.v_left_des - self.v_left_enco)
             self.error_list_v_right.append(self.v_right_des - self.v_right_enco)
             
             if self.v_des == 0 and self.omega_des == 0 and self.v_left_enco < 0.05 and self.v_right_enco < 0.05:
                 duty_cycle_msg.duty_cycle_left = 0
                 duty_cycle_msg.duty_cycle_right = 0
-                self.integral_left = 0.0
-                self.integral_right = 0.0
-                self.derivative_left = []
-                self.derivative_right = []
-
             else:
                 duty_cycle_msg.duty_cycle_left = self.PID_left(self.v_left_des, self.v_left_enco)
                 duty_cycle_msg.duty_cycle_right = self.PID_right(self.v_right_des, self.v_right_enco)
@@ -415,16 +306,13 @@ class cartesian_controller:
             self.r.sleep()
             
 
-    def twiddle_run(self,p):
+    def twiddle_run(self,p1,p2):
         """
         Main loop of the node
         * transforms desired velocity to desired wheel velocity
         * publishes duty cycle message to /motor/duty_cycles with wheel velocities
         * gets wheel velocities from encoder feedback and PI control
         """
-
-        p1 = p[0:3]
-        p2 = p[3:6]
 
         # check if desired speed is to high and warns user
         if self.v_left_des > 0.5 or self.v_right_des > 0.5:
@@ -436,14 +324,9 @@ class cartesian_controller:
         duty_cycle_msg.duty_cycle_left = 0.0
         duty_cycle_msg.duty_cycle_right = 0.0
 
-        # Reset pid
-        self.derivative_left = []
-        self.derivative_right = []
-        self.integral_left = 0
-        self.integral_right = 0
+
         error_list_v_left = []
         error_list_v_right = []
-
 
         # main loop
         t = 0
@@ -457,34 +340,30 @@ class cartesian_controller:
                 self.omega_des = 0.0#np.random.uniform(-0.3,0.3) 
                 self.v_des = 0.0#np.random.uniform(0.1,0.5)
 
-            elif t < 45: # Run forward
+            elif t < 35: # Run forward
                 self.omega_des = 0#np.random.uniform(-0.5,0.5)
                 self.v_des = 0.5#np.random.uniform(0.1,0.5)
 
-            elif t<50:
+            elif t<40:
                 self.omega_des = 0.0
                 self.v_des = 0.0
-            elif t < 90: # Run forward
+            elif t < 70: # Run forward
                 self.omega_des = 0#np.random.uniform(-0.5,0.5)
                 self.v_des = -0.5#np.random.uniform(0.1,0.5)
 
-            elif t<95:
+            elif t<75:
                 self.omega_des = 0.0
                 self.v_des = 0.0
 
             else:
                 # calc sqrt mean error
-                
-                omega_sqrt_error = 2*(np.sqrt(np.mean(np.square(self.error_list_omega))))
-                v_sqrt_error = (np.sqrt(np.mean(np.square(self.error_list_v))))
-                pid_1 = [self.Kp_v_left,self.Ki_v_left,self.Kd_v_left]
-                pid_2 = [self.Kp_v_right,self.Ki_v_right,self.Kd_v_right]
-                self.error_list_omega = []
-                self.error_list_v = []
-                error_tot = np.sqrt((omega_sqrt_error**2 + v_sqrt_error**2)/2)
-                
-                
-                return error_tot
+                self.derivative_left = []
+                self.derivative_right = []
+                self.integral_left = 0
+                self.integral_right = 0
+                sqrt_mean_error_v_left = np.sqrt(np.mean(error_list_v_left))
+                sqrt_mean_error_v_right = np.sqrt(np.mean(error_list_v_right))
+                return sqrt_mean_error_v_left,sqrt_mean_error_v_right
             
             t += 1                
 
@@ -499,24 +378,9 @@ class cartesian_controller:
             error_list_v_left.append((self.v_left_des - self.v_left_enco)**2)
             error_list_v_right.append((self.v_right_des - self.v_right_enco)**2)
             
-            # calulate omega 
-            v_enco,omega_enco = self.transform_v_left_v_right_to_v_omega(self.v_left_enco, self.v_right_enco)
-
-            # Calculate omega error and append to list
-            self.error_list_omega.append(self.omega_des - omega_enco)
-            self.error_list_v.append(self.v_des - v_enco)
-
-            
-            
-            
-            if self.v_des == 0 and self.omega_des == 0 and self.v_left_enco < 0.05 and self.v_right_enco < 0.05:
+            if self.v_des == 0 and self.omega_des == 0:
                 duty_cycle_msg.duty_cycle_left = 0
                 duty_cycle_msg.duty_cycle_right = 0
-                self.integral_left = 0.0
-                self.integral_right = 0.0
-                self.derivative_left = []
-                self.derivative_right = []
-
             else:
                 duty_cycle_msg.duty_cycle_left = self.PID_left(self.v_left_des, self.v_left_enco,p1)
                 duty_cycle_msg.duty_cycle_right = self.PID_right(self.v_right_des, self.v_right_enco,p2)
@@ -528,64 +392,68 @@ class cartesian_controller:
             # sleep
             self.r.sleep()    
         
-    def twiddle(self, p, tol=0.1, iter_out = 10,dp_val = 0.1,aggresive = 0):
-        """
-        Implements the twiddle algorithm for tuning the PID controllers, optimes for indirect control of the robot omega and v
-        aggresive = 0: low aggresive, 1: medium aggresive, 2: high aggresive
-        dp_val = 0.1: initial value for dp. Higher value will make the algorithm more aggresive
-        default values will make a semi fine tune of the PID controllers
-        """
-        dp = [dp_val for i in range(0,6)]#[0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
-
-        if aggresive == 0:
-            low_c = 0.95
-            high_c = 1.05
-        elif aggresive == 1:
-            low_c = 0.9
-            high_c = 1.1
-        elif aggresive == 2:
-            low_c = 0.8
-            high_c = 1.2
-
-
-        best_error = self.twiddle_run(p)
-        best_p = p
+    def twiddle(self, p1,p2, tol=0.1, iter_out = 5,dp1 = None, dp2 = None):
+        if dp1 == None:
+            dp1 = [0.3, 0.3, 0.3]
+        if dp2 == None:
+            dp2 = [0.3, 0.3, 0.3]
+        best_error1, best_error2 = self.twiddle_run(p1,p2)
+        best_p1 = p1
+        best_p2 = p2
         count = -1
-        while np.mean(dp)*3 > tol and count < iter_out:
+        while (sum(dp1) > tol or sum(dp2) > tol) and count < iter_out:
             count += 1
-            for i in range(len(p)):
-                p[i] += dp[i]
-                error = self.twiddle_run(p)
-                rospy.loginfo("twiddle error: %f", error)
+            for i in range(len(p1)):
+                p1[i] += dp1[i]
+                p2[i] += dp2[i]
+                error1, error2 = self.twiddle_run(p1,p2)
+                rospy.loginfo("twiddle error 1: %f, error 2: %f, p1: %s, p2: %s ", error1, error2,p1,p2)
 
-                if error < best_error:
-                    best_error = error
-                    best_p = p
-                    dp[i] *= high_c
+                if error1 < best_error1:
+                    best_error1 = error1
+                    best_p1 = p1
+                    dp1[i] *= 1.05
                     rospy.loginfo("twiddle for state 1 improved")
                 else:
-                    p[i] -= 2 * dp[i]
-                    error = self.twiddle_run(p)
-                    rospy.loginfo("twiddle error 1: %f", error)
+                    p1[i] -= 2 * dp1[i]
+                    error1, _ = self.twiddle_run(p1,p2)
+                    rospy.loginfo("twiddle error 1: %f", error1)
 
-                    if error < best_error:
-                        best_error = error
-                        best_p = p
-                        dp[i] *= high_c
+                    if error1 < best_error1:
+                        best_error1 = error1
+                        best_p1 = p1
+                        dp1[i] *= 1.05
                     else:
-                        p[i] += dp[i]
-                        dp[i] *= low_c
+                        p1[i] += dp1[i]
+                        dp1[i] *= 0.95
 
+                if error2 < best_error2:
+                    best_error2 = error2
+                    best_p2 = p2
+                    dp2[i] *= 1.05
+                    rospy.loginfo("twiddle for state 2 improved")
+                else:
+                    p2[i] -= 2 * dp2[i]
+                    _, error2 = self.twiddle_run(p1,p2)
+                    rospy.loginfo("twiddle error 2: %f", error2)
 
-        p = best_p
-        self.Kp_v_left = p[0]
-        self.Ki_v_left = p[1]
-        self.Kd_v_left = p[2]
-        self.Kp_v_right = p[3]
-        self.Ki_v_right = p[4]
-        self.Kd_v_right = p[5]
+                    if error2 < best_error2:
+                        best_error2 = error2
+                        best_p2 = p2
+                        dp2[i] *= 1.05
+                    else:
+                        p2[i] += dp2[i]
+                        dp2[i] *= 0.95
+        p1 = best_p1
+        p2 = best_p2
+        self.Kp_v_left = p1[0]
+        self.Ki_v_left = p1[1]
+        self.Kd_v_left = p1[2]
+        self.Kp_v_right = p2[0]
+        self.Ki_v_right = p2[1]
+        self.Kd_v_right = p2[2]
         rospy.loginfo("Twiddle finish, Kp1: %f, Ki1: %f, Kd1: %f, Kp2: %f, Ki2: %f, Kd2: %f", self.Kp_v_left,self.Ki_v_left,self.Kd_v_left,self.Kp_v_right,self.Ki_v_right,self.Kd_v_right)
-        rospy.loginfo("Twiddle finish, best error: %f", best_error)
+        rospy.loginfo("Twiddle finish, best error1: %f, best error2: %f", best_error1, best_error2)
         return 
 
     def auto_tune_v_left(self,error):
@@ -660,6 +528,75 @@ class cartesian_controller:
         # Print new tuning parameters
 
         print("New v_right PID tuning parameters: Kp = {}, Ki = {}, Kd = {}".format(self.Kp_v_right, self.Ki_v_right, self.Kd_v_right))
+            
+    def run(self):
+        """
+        Main loop of the node
+        * transforms desired velocity to desired wheel velocity
+        * publishes duty cycle message to /motor/duty_cycles with wheel velocities
+        * gets wheel velocities from encoder feedback and PI control
+        """
+
+        # check if desired speed is to high and warns user
+        if self.v_left_des > 0.5 or self.v_right_des > 0.5:
+            rospy.loginfo("Desired speed for wheel is too high, max is 0.5 m/s for realiable operation")
+
+        # Create duty cycle message object
+        # create inital duty cycle message object, will be used to publish to duty cycle topic
+        duty_cycle_msg = DutyCycles()
+        duty_cycle_msg.duty_cycle_left = 0.0
+        duty_cycle_msg.duty_cycle_right = 0.0
+
+        # Clean derivative list
+        self.integral_left = 0.0
+        self.integral_right = 0.0
+        self.derivative_left = []
+        self.derivative_right = []        
+
+        # main loop
+        while not rospy.is_shutdown(): # insted of while True, makes sure ros dies when supposed to
+
+
+
+            # Edge case tp stop robot and not get oscillations from PI control. Used when no new twist message is received or when desired speed is 0 
+            if self.v_des == 0 and self.omega_des == 0 or ((rospy.get_time() - self.time_twist  ) > 0.5):
+                duty_cycle_msg.duty_cycle_left = 0.0
+                duty_cycle_msg.duty_cycle_right = 0.0
+                self.duty_cycle_pub.publish(duty_cycle_msg)
+                self.integral_left = 0.0 # reset integral in pi control 
+                self.integral_right = 0.0 # reset integral in pi control
+                self.r.sleep()
+                continue
+
+
+
+            # Outerloop pid
+            
+            # Get current velocity and omega from encoders
+            
+            # Calculate desired wheel velocity
+            self.v_left_des,self.v_right_des = self.transform_v_omega_to_v_left_v_right(self.v_des, self.omega_des)
+                
+            duty_cycle_msg.duty_cycle_left = self.PID_left(self.v_left_des, self.v_left_enco)
+            duty_cycle_msg.duty_cycle_right = self.PID_right(self.v_right_des, self.v_right_enco)
+
+            self.duty_cycle_pub.publish(duty_cycle_msg)
+        
+        
+            # Debugging
+            #rospy.loginfo("LEFT : Des %s Acc %s Pub %s", self.v_left_des, self.v_left_enco, self.duty_cycle_msg.duty_cycle_left)
+            #rospy.loginfo("RIGHT : Des %s Acc %s Pub %s", self.v_right_des, self.v_right_enco, self.duty_cycle_msg.duty_cycle_right)
+            #rospy.loginfo("Desired: Omega %s V %s", self.omega_des, self.v_des)
+            #rospy.loginfo("Achived: Omega %s V %s", omega_enco,v_enco)
+
+            # sleep
+            self.r.sleep()
+
+    
+
+
+
+
     def transform_v_omega_to_v_left_v_right(self, v, omega):
         """Transforms the desired linear and angular velocity to the desired wheel velocities, angular velocity is in rad/s, speed in m/s"""
         # v = (v_left + v_right) / 2
@@ -779,8 +716,8 @@ class cartesian_controller:
         self.v_left_enco = v_left
 
         # append integral
-        #self.integral_right = self.integral_right + (self.v_right_des - self.v_right_enco)
-        #self.integral_left = self.integral_left + (self.v_left_des - self.v_left_enco)
+        self.integral_right = self.integral_right + (self.v_right_des - self.v_right_enco)
+        self.integral_left = self.integral_left + (self.v_left_des - self.v_left_enco)
         
 
         #rospy.loginfo("Received encoder values: %s %s", v_left, v_right)
@@ -792,8 +729,6 @@ class cartesian_controller:
         # save in internal var
         self.v_des = 0.5#data.linear.x
         self.omega_des = 0.0#data.angular.z
-        # Write that code that every 10 secs chnages speeds and direction
-        
         
         # Debug
         #rospy.loginfo("Received twist values: %s %s", data.linear.x, data.angular.z)
@@ -804,5 +739,3 @@ class cartesian_controller:
 
 if __name__ == '__main__':
     new_obj = cartesian_controller()
-    
-    
