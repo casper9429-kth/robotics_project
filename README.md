@@ -1,18 +1,34 @@
 # Project Sleepy
 
-## Installing on your computer
+## Installing on Your Computer
+### Prepare your catkin workspace.
+Move to your catkin workspace directory and clean it out:
+
+```
+cd dd2419_ws
+catkin clean
+```
+
+Delete the src folder.
+
 ### Clone the repository to your computer.
-Move to an empty catkin workspace directory and run
 
-```git clone <project adress> src```.
+Clone the project repository (= all the code) into your workspace's ``src`` folder:
 
-Replace \<project adress\> with the project adress you find by clicking the green button on the main project page with '\<\> Code' written on it and choosing either https or ssh depending on which you prefer.
+```
+git clone <project adress> src
+```
+
+Replace \<project adress\> with the project adress you find by clicking the green button on the main project page with '\<\> Code' written on it and choose https (or ssh if you know what you are doing).
+
 ### Install dependencies
-After you have cloned the repo to your computer, run the following command to install all the dependencies:
+After you have cloned the repo to your computer, install all the missing dependencies:
 
-```rosdep install --from-paths src --ignore-src -r -y```
+```
+rosdep install --from-paths src --ignore-src -r -y
+```
 
-If you don't do this step you'll get some error when trying to build the imu-package.
+If you don't do this step you'll probably get an error when trying to build the imu package.
 
 ### Build
-Run ``catkin build`` and all that yazz.
+Done! Everything should be installed and ready for you to build the packages with catkin.
