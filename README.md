@@ -32,3 +32,10 @@ If you don't do this step you'll probably get an error when trying to build the 
 
 ### Build
 Done! Everything should be installed and ready for you to build the packages with catkin.
+
+## Useful Command Line Tools
+
+```
+alias s="source ~/dd2419_ws/devel/setup.bash"
+alias cb="cd ~/dd2419_ws;catkin build;cd -;source ~/dd2419_ws/devel/setup.bash"
+```
