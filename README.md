@@ -13,7 +13,7 @@ Delete the src folder.
 
 ### Clone the repository to your computer.
 
-Clone the project repository (= all the code) into your workspace's ``src`` folder:
+Clone the project repository (= all the code) into your workspace's ``src`` folder (the new ``src`` folder will be created for you):
 
 ```
 git clone <project adress> src
