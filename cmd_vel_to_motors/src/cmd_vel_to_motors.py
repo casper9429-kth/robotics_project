@@ -68,6 +68,11 @@ class cmd_vel_to_motors:
             # Convert the desired linear and angular velocity to the desired wheel velocities
             v_left, v_right = self.transform_v_omega_to_v_left_v_right(self.linear_velocity, self.angular_velocity)
 
+            # Limit the duty cycle to be between -1 and 1
+            if np.abs(v_left) > 1 or np.abs(v_right) > 1:
+                v_left = v_left / np.abs(v_left)
+                v_right = v_right / np.abs(v_right)
+
             # Update the duty cycle message
             self.duty_cycle_msg.duty_cycle_left = v_left
             self.duty_cycle_msg.duty_cycle_right = v_right

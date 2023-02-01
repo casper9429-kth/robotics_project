@@ -2,7 +2,7 @@
 <launch>
 
 	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
-    <include file="$(find teleop)/launch/teleop.launch" />
+    <include file="$(find teleop_twist_joy)/launch/teleop.launch" />
 
 	<!-- run the motors -->
 	<!-- <node pkg="robp_boot_camp_motors" type="motors_node" name="motors_node">
@@ -10,7 +10,7 @@
 		<remap from="/kobuki_motors/encoders" to="/kobuki/encoders" />
 	</node> -->
 
-    <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors"/>
+    <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
 
 	<!-- run rviz -->
 	<!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/part3.rviz" /> -->
