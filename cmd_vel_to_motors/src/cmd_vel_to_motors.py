@@ -92,6 +92,13 @@ class cmd_vel_to_motors:
 
 
 
+    def transform_v_left_v_right_to_v_omega(self, v_left, v_right):
+        """Transforms the desired wheel velocities to the desired linear and angular velocity, angular velocity is in rad/s, speed in m/s"""
+        v = (v_left + v_right) / 2
+        omega = (v_right - v_left) / self.base
+        return v, omega
+
+
 
 if __name__ == '__main__':
     new_object = cmd_vel_to_motors()
