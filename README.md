@@ -26,9 +26,18 @@ After you have cloned the repo to your computer, install all the missing depende
 
 ```
 rosdep install --from-paths src --ignore-src -r -y
+sudo apt --fix-broken install
 ```
 
-If you don't do this step you'll probably get an error when trying to build the imu package.
+It will ask you to enter password for secure boot twice, use password ``robotrobot`` both times.
+
+You have to use tab to highlight the ``ok`` and enter to click it, because the mouse won't work.
+
+```
+rosdep install --from-paths src --ignore-src -r -y
+```
+
+If you don't do this step you'll probably get an error when trying to build the packages.
 
 ### Build
 Done! Everything should be installed and ready for you to build the packages with catkin.
