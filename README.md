@@ -48,3 +48,37 @@ Done! Everything should be installed and ready for you to build the packages wit
 alias s="source ~/dd2419_ws/devel/setup.bash"
 alias cb="cd ~/dd2419_ws;catkin build;cd -;source ~/dd2419_ws/devel/setup.bash"
 ```
+
+## VPN
+why do we need this?
+
+run in terminal:
+
+```
+curl -s https://install.zerotier.com | sudo bash
+```
+
+save the ZeroTier address at end of output
+
+go to https://www.zerotier.com/ and click login
+
+login using google (click the button)
+
+email: robot.is.sleepy@gmail.com
+password: WeAreGoingToMakeIt
+
+click sleepy network
+
+go to
+Settings -> Advanced -> Manually Add Member
+enter your ZeroTier address and click submit
+
+scroll down to Members (under Settings) and add a name to your computer (the one with your ZeroTier address).
+
+Everything is set up!
+
+To connect to the network run (last part is the Network ID)
+```
+sudo zerotier-cli join 9bee8941b5443912
+```
+
