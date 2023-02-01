@@ -44,10 +44,25 @@ Done! Everything should be installed and ready for you to build the packages wit
 
 ## Useful Command Line Tools
 
+Put this in your ~/.bashrc:
+
+### Catkin
+
 ```
 alias s="source ~/dd2419_ws/devel/setup.bash"
 alias cb="cd ~/dd2419_ws;catkin build;cd -;source ~/dd2419_ws/devel/setup.bash"
 ```
+
+This gives you two useful bash shortcuts. Check out the ``alias`` command if you don't know how it works. The ``cb`` command can be run anywhere on your computer and will run catkin build and source the setup.bash file without changing your directory. If your catkin workspace is not called ``dd2419_ws`` just switch it out to your workspace's name.
+
+### ZeroTier
+
+```
+alias vc="sudo zerotier-cli join 9bee8941b5443912"
+alias vd="sudo zerotier-cli leave 9bee8941b5443912"
+```
+
+These let you connect and disconnect quickly to the ZeroTier VPN.
 
 ## VPN
 why do we need this?
@@ -65,6 +80,7 @@ go to https://www.zerotier.com/ and click login
 login using google (click the button)
 
 email: robot.is.sleepy@gmail.com
+
 password: WeAreGoingToMakeIt
 
 click sleepy network
@@ -78,6 +94,7 @@ scroll down to Members (under Settings) and add a name to your computer (the one
 Everything is set up!
 
 To connect to the network run (last part is the Network ID)
+
 ```
 sudo zerotier-cli join 9bee8941b5443912
 ```
