@@ -13,6 +13,9 @@
 	<!-- run the motors -->
     <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
 
+	<!-- run the arm_camera -->
+	<node name="arm_camera" pkg="arm_camera" type="arm_camera.py" output='screen'/>
+
 	<!-- run odometry -->
 	<node name="odometry" pkg="odometry" type="odometry.py" output='screen'/>
 
