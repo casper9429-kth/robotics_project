@@ -16,7 +16,11 @@ class CameraNode:
 
     def start(self):
         rospy.init_node(self.node_name)
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(6)
+        
+        cap.device_id()
+        # Set camera device properties
+                
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             rospy.loginfo("Publishing image")
