@@ -55,7 +55,58 @@ alias cb="cd ~/dd2419_ws;catkin build;cd -;source ~/dd2419_ws/devel/setup.bash"
 
 This gives you two useful bash shortcuts. Check out the ``alias`` command if you don't know how it works. The ``cb`` command can be run anywhere on your computer and will run catkin build and source the setup.bash file without changing your directory. If your catkin workspace is not called ``dd2419_ws`` just switch it out to your workspace's name.
 
-### ZeroTier
+### Connect to the robot
+
+Go into wifi settings and connect to the wifi network ``sleepy``
+
+The password is ``sleepy25``
+
+You should know have access to the robot. Its IP address is 10.42.0.1
+
+You should also have connection to internet. But it will be slow because the robot has a bad network card.
+
+
+
+
+
+### Moonlight (Remote Acess to the robot)
+
+Make sure you have snap installed, should be installed by default.
+
+open terminal and run:
+
+```
+sudo snap install moonlight
+```
+
+From now on, every time you want to connect to the robot, run in terminal:
+
+```
+moonlight
+```
+
+If you are connected to the wifi network ``sleepy``:
+
+A screen named ``robot`` should appear, click it.
+Otherwise push the ``+`` button and write in ``10.42.0.1`` and click ``Add``
+
+First time you connect you will have to enter a pin, the pin is ``1234``
+
+If it is the first time you do this it will give you a pin, write it down. Ask somebody how already have connection to the robot 
+or connect to the robot with a cable to a monitor.
+
+Go to web browser and go to ``https://localhost:47990/pin`` .
+Put in the pin you got on your computer and click ``send``.
+
+From know on you can connect to the robot by running ``moonlight`` in terminal. And clicking the screen with the name robot.
+
+For our purpose, it is recommended to go to the settings tab in moonlight on your computer, it is the gear icon in the top right corner.
+Add pin the two upper boxes ``capture keyboard shortcust`` and ``and optimize mouse for remote desktop``.
+
+If it is to slow and laggy, go into the settings tab in moonlight on your computer, it is the gear icon in the top right corner. And lower the frame rate and/or the resolution. This shouldn't be needed if you are connected to the robot through the sleepy wifi network.
+
+
+### ZeroTier (Optional)
 
 ```
 alias vc="sudo zerotier-cli join 9bee8941b5443912"
@@ -64,8 +115,8 @@ alias vd="sudo zerotier-cli leave 9bee8941b5443912"
 
 These let you connect and disconnect quickly to the ZeroTier VPN.
 
-## VPN
-why do we need this?
+## VPN (Optional)
+If you want to access the robot from a remote location or you and the robot is in a really locked down wan, you can use zerotier to create a VPN tunnel to it and access it. This is optional and not needed for the project.
 
 run in terminal:
 
