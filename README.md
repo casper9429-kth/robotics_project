@@ -38,6 +38,9 @@ git clone <project adress> src
 
 Replace \<project adress\> with the project adress you find by clicking the green button on the main project page with '\<\> Code' written on it and choose https (or ssh if you know what you are doing).
 
+When trying to clone with https, you will need to login. Github does not accept anymore the classic authentication, you need to use a token instead of your password. To generate a new token : profile > settings > developper settings > token(classic) > generate new token (classic). Then name it, select an expiration date and the authorizations you want and click on generate. Save that token somewhere, you won't be able to see it again.
+An anternative is to use ssh instead of https.
+
 ### Install dependencies
 After you have cloned the repo to your computer, install all the missing dependencies:
 
