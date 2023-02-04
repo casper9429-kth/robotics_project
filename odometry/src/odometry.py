@@ -101,46 +101,8 @@ class Odometry:
         # Publish transform to tf broadcaster init in __init__
         self.br.sendTransform(t)
     
-    def calc_translation_speed_encoder(self, encoder_data):
-        """
-        Calculates the translation speed of the wheels in m/s
-        input: raw encoder data
-        returns v_left, v_right [m/s]
-        """
-        tic_spd_left = encoder_data.delta_encoder_left / encoder_data.delta_time_left
-        tic_spd_right = encoder_data.delta_encoder_right / encoder_data.delta_time_right
-        
-        # m/tics 
-        self.wheel_r
-        circ = 2*self.wheel_r*pi
-        tics = self.ticks_per_rev
-        m_tic = circ/tics 
-        
-        # tic/s * m/tic = m/s
-        v_left = tic_spd_left * m_tic*1000
-        v_right = tic_spd_right * m_tic*1000 
-
-        # save in internal var
-        return v_left, v_right
 
 
-    def calc_robot_v_omega_encoder(self,encoder_data):
-        """
-        Calculates the robot linear and angular velocity in m/s and rad/s        
-        """
-        v_left, v_right = self.calc_translation_speed_encoder(encoder_data)
-        v, omega = self.transform_v_left_v_right_to_v_omega(v_left, v_right)
-        return v, omega
-    
-            
-    def transform_v_left_v_right_to_v_omega(self, v_left, v_right):
-        """Transform v_left and v_right to v and omega"""
-        # v = (v_left + v_right) / 2
-        # omega = (v_right - v_left) / b
-        
-        v = (v_left + v_right) / 2
-        omega = (v_right - v_left) / (self.base)
-        return v, omega
 
 
 
