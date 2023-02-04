@@ -11,15 +11,15 @@ class CameraNode:
         # Initialize the node
         self.node_name = "arm_camera"
         self.bridge = CvBridge()
-        self.image_pub = rospy.Publisher("/camera/image", Image, queue_size=1)
+        self.image_pub = rospy.Publisher("/arm_camera/image", Image, queue_size=1)
         
     def find_camera(self):
         """ Find the camera device """
-        for i in range(10):
+        for i in range(100):
             cap = cv2.VideoCapture(i)
             if cap.isOpened():
                 rospy.loginfo("Camera found on port %d", i)
-                return i
+                #return i
         rospy.loginfo("No camera found")
         return None
     
@@ -35,7 +35,6 @@ class CameraNode:
                 
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
-            rospy.loginfo("Publishing image")
             ret, frame = cap.read()
             if ret:
                 try:
