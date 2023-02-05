@@ -24,7 +24,6 @@ class CameraNode:
                 
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
-            rospy.loginfo("Publishing image")
             ret, frame = cap.read()
             if ret:
                 try:
