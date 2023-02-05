@@ -25,6 +25,7 @@ Replace \<project adress\> with the project adress you find by clicking the gree
 After you have cloned the repo to your computer, install all the missing dependencies:
 
 ```
+sudo apt-get install v4l-utils
 rosdep install --from-paths src --ignore-src -r -y
 sudo apt --fix-broken install
 ```
