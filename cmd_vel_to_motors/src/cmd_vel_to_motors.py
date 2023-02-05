@@ -57,7 +57,7 @@ class cmd_vel_to_motors:
         It then updates the internal variables that are used to publish the duty cycle message
         """
         self.linear_velocity = msg.linear.x
-        self.angular_velocity = msg.angular.z
+        self.angular_velocity = msg.angular.z*5
 
     
     def run(self):

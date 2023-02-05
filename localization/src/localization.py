@@ -65,12 +65,25 @@ class Localization:
         self.base = 0.3 
 
         # Create rate var
-        self.dt = 0.01
+        self.dt = 0.04
         self.rate = rospy.Rate(1/self.dt)
 
+        # Uncertainty parameters
+        self.P_init = 1.0        
+        self.std_omega = 0.01
+        self.R = np.eye(3)*0.01
         
+        # Init a tf broadcaster
+        self.br = tf2_ros.TransformBroadcaster()
 
-
+        # Init a tf listener
+        self.listener = tf.TransformListener()
+    
+        # Save new returned values from callbacks
+        self.omega_control_list = []
+        self.omega_imu_list = []
+        self.omega_enco_list = []
+        self.theta_imu_list = []
         
         # Run loop
         self.ukf_estimate()    
@@ -79,32 +92,81 @@ class Localization:
     def ukf_estimate(self):
         """
         Use UKF and IMU, encoder, control data to estimate state as long as ROS is running.
-        Continuously save result to self.x, self.y, self.theta, self.v, self.omega.
+        Continuously save result to self.v, self.omega.
         """
         rospy.loginfo("ukf_estimate")
         
         # Initialize the UKF state and state covariance matrix
-        x = np.array([self.v, self.omega,self.theta])
-        P = np.eye(3)*0.001
+        x = np.array([self.omega,self.theta])
+        P = np.eye(2)*self.P_init
         
         while not rospy.is_shutdown():
+            
+            # Get the impults form all sensors and empty the lists
+            if self.omega_control_list:
+                omega_control = np.mean(self.omega_control_list)
+                self.omega_control_list = [omega_control]
+            else:
+                omega_control = 0
+    
+            if self.omega_imu_list:        
+                omega_imu = np.mean(self.omega_imu_list)
+                self.omega_imu_list = [omega_imu]
+            else:
+                omega_imu = 0
+
+            if self.omega_enco_list:
+                omega_enco = np.mean(self.omega_enco_list)
+                self.omega_enco_list = [omega_enco]
+            else:
+                omega_enco = 0
+
+            if self.theta_imu_list:
+                theta_imu = np.mean(self.theta_imu_list)
+                self.theta_imu_list = [theta_imu]
+            else:
+                theta_imu = 0
+
             # Predict the next state of the robot
-            x, P = self.predict_state(x, P, self.v_control, self.omega_control)
+            x, P = self.predict_state(x, P, omega_control)
             
             # Get the measurement updates from the encoders and IMU
-            z = np.array([self.v_enco, self.omega_enco, self.omega_imu,self.theta_imu])
+            z = np.array([omega_imu,omega_enco,theta_imu])
             
             # Update the state estimate using the measurement updates
             x, P = self.update_state(x, P, z)
             
             # Save the updated state estimate
-            self.v, self.omega,self.theta = x[0], x[1], x[2]
+            self.omega,self.theta = x[0], x[1]
             
-            rospy.loginfo("theta: %f, v: %f, omega: %f", self.theta, self.v, self.omega)
+            # Print the state estimate
+            rospy.loginfo("theta: %f,  omega: %f", self.theta,  self.omega)
+            self.publish_state(self.theta)
+
+        
             
             self.rate.sleep()
             
-    def predict_state(self, x, P, v_control, omega_control):
+            
+    def publish_state(self,yaw):
+            t = TransformStamped()
+            t.header.frame_id = "odom"
+            t.child_frame_id = "test_link"
+                    # Add new x, y and yaw to transform, first cart then rot
+            t.header.stamp = rospy.Time.now()
+            t.transform.translation.x = self.x
+            t.transform.translation.y = self.y
+            t.transform.translation.z = 0.0 # z is always 0
+            q = tf_conversions.transformations.quaternion_from_euler(0, 0, yaw) # transform yaw to quaternion
+            t.transform.rotation.x = q[0]
+            t.transform.rotation.y = q[1]
+            t.transform.rotation.z = q[2]
+            t.transform.rotation.w = q[3]
+
+            # Publish transform to tf broadcaster init in __init__
+            self.br.sendTransform(t)
+    
+    def predict_state(self, x, P, omega_control):
         """
         Predict the next state of the robot based on the control inputs and current state.
         """
@@ -112,44 +174,41 @@ class Localization:
         n = x.shape[0]
 
         # Process noise standard deviation
-        std_v = 0.1
-        std_omega = 0.1
+        std_omega = self.std_omega
 
         # Control input
-        u = np.array([v_control, omega_control])
+        u = np.array([omega_control])
 
         # Generate sigma points
         W, X = self.generate_sigma_points(x, P)
 
         # Propagate sigma points through the process model
         for i in range(2 * n + 1):
-            X[:, i] = self.process_model(X[:, i], u, std_v, std_omega)
+            X[:, i] = self.process_model(X[:, i], u, std_omega)
 
         # Recalculate the mean and covariance of the predicted state
         x_pred = X[:,i]*W[i]
         P_pred = np.zeros((n, n))
 
         for i in range(2 * n + 1):
-            #P_pred[i,i] = #W[i]* np.outer(X[:, i] - x_pred, X[:, i] - x_pred)
             P_pred +=  W[i]* np.outer(X[:, i] - x_pred, X[:, i] - x_pred)
 
         return x_pred, P_pred
         
-    def process_model(self, x, u, std_v, std_omega):
+    def process_model(self, x, u, std_omega):
         """
         Model the motion of the robot based on the control inputs and previous state.
         """
         # Unpack the state and control inputs
-        v_prev,omega_prev,theta_prev = x
-        v, omega = u
+        omega_prev,theta_prev = x
+        omega = u[0]
 
         # Update the state using the robot's kinematics
         theta = theta_prev + omega * self.dt
-        v = v_prev + np.random.normal(0, std_v)
         omega = omega_prev + np.random.normal(0, std_omega)
         
         # Pack the updated state
-        x = np.array([v, omega,theta])
+        x = np.array([omega,theta])
         
         return x
         
@@ -159,8 +218,10 @@ class Localization:
         m = z.shape[0]
 
         # Measurement noise covariance
-        R = np.eye(m)*0.1
 
+        R = self.R
+
+        
         # Generate sigma points
         W, X = self.generate_sigma_points(x, P)
 
@@ -188,6 +249,7 @@ class Localization:
         x = x + np.dot(K, z - z_hat)
 
         P = P - np.dot(K, P_zz) @ K.T
+        
         return x, P
 
 
@@ -198,17 +260,25 @@ class Localization:
         X = np.zeros((n, 2 * n + 1))
 
         # Set the weights for the sigma points
-        W[0] = 1/n#np.power(n, -1)
+        W[0] = 1.0/n#np.power(n, -1)
         W[1:] = np.power(2.0 * n, -1)
 
         # Generate the sigma points
-        input_matrix = n*P + 0.1*np.eye(n)
-        U = np.linalg.cholesky(input_matrix)
+        c = 0
+        input_matrix = n*P 
 
+        while True:
+            try:
+                U = np.linalg.cholesky(input_matrix + 0.05*np.eye(n)*c)
+                break
+            except:
+                c += 1
+                
         X[:, 0] = x
         for i in range(n):
             X[:, i + 1] = x + U[i, :]
             X[:, i + n + 1] = x - U[i, :]
+
         return W, X
 
     def encoder_callback(self, msg):
@@ -227,27 +297,25 @@ class Localization:
         
         self.v_enco = v
         self.omega_enco = omega
-        self.encoder_callback_list.append({'t':t, 'v':self.v_enco, 'omega':self.omega_enco})
-        
+        #self.encoder_callback_list.append({'t':t, 'v':self.v_enco, 'omega':self.omega_enco})
+        self.omega_enco_list.append(self.omega_enco)
         
         
     def measurement_model(self, x):
             """
             Transforms the state estimate into a measurement space
             """
-            v = x[0]
-            omega = x[1]
-            theta = x[2]
+            omega = x[0]
+            theta = x[1]
 
             # Calculate the encoder readings
-            v_enco = v
             omega_enco = omega
 
             # Calculate the IMU readings
             omega_imu = omega
             theta_imu = theta
 
-            return np.array([v_enco, omega_enco, omega_imu, theta_imu])
+            return np.array([omega_enco, omega_imu, theta_imu])
 
 
     def control_callback(self, msg):        
@@ -260,7 +328,8 @@ class Localization:
         v_left = msg.duty_cycle_left
         v_right = msg.duty_cycle_right
         self.v_control, self.omega_control = self.transform_v_left_v_right_to_v_omega(v_left, v_right)
-        self.control_callback_list.append({'t':t, 'v':self.v_control, 'omega':self.omega_control})
+        #self.control_callback_list.append({'t':t, 'v':self.v_control, 'omega':self.omega_control})
+        self.omega_control_list.append(self.omega_control)
         
     def imu_callback(self, msg):
         """
@@ -283,14 +352,16 @@ class Localization:
         self.theta_imu = euler[2]
         
         ## anuglar velocity
-        self.omega_imu = msg.angular_velocity.z
+        self.omega_imu = -msg.angular_velocity.z
         
         ## linear acceleration
         self.imu_acc_x = msg.linear_acceleration.x
         self.imu_acc_y = msg.linear_acceleration.y
 
-        self.imu_callback_list.append({'t': t, 'theta': self.theta_imu, 'omega': self.omega_imu, 'acc_x': self.imu_acc_x, 'acc_y': self.imu_acc_y})
-
+        #self.imu_callback_list.append({'t': t, 'theta': self.theta_imu, 'omega': self.omega_imu, 'acc_x': self.imu_acc_x, 'acc_y': self.imu_acc_y})
+        #rospy.loginfo("IMU callback %s", self.imu_callback_list[-1])
+        self.omega_imu_list.append(self.omega_imu)
+        self.theta_imu_list.append(self.theta_imu)
 
     def transform_v_omega_to_v_left_v_right(self, v, omega):
         """Transforms the desired linear and angular velocity to the desired wheel velocities, angular velocity is in rad/s, speed in m/s"""
