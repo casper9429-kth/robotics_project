@@ -178,3 +178,4 @@ These let you connect and disconnect quickly to the ZeroTier VPN.
 
 1. [ARM Documentation](https://drive.google.com/drive/folders/11wl0ss4zelJUnhpM2iadch4rDxFnV4dg?usp=sharing)
 2. [Orientation Sensor Fusion](http://wiki.ros.org/imu_filter_madgwick)
+3. [Localization](https://roverrobotics.com/blogs/guides/fusing-imu-encoders-with-ros-robot-localization)
