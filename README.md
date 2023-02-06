@@ -174,6 +174,10 @@ alias vd="sudo zerotier-cli leave 9bee8941b5443912"
 
 These let you connect and disconnect quickly to the ZeroTier VPN.
 
+## Useful commands
+
+1. Filter rosbag: ``rosbag play --clock --pause test_filter.bag``
+
 ## Useful Links
 
 
