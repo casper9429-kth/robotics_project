@@ -15,6 +15,6 @@
   </node>
 
   <node pkg="nodelet" type="nodelet" name="ImuFilterNodelet" args="load imu_filter_madgwick/ImuFilterNodelet $(arg manager)" output="screen">
-    <param name="use_mag" value="true"/>
+    <param name="use_mag" value="false"/>
   </node>
 </launch>
