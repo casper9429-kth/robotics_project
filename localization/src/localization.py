@@ -1,23 +1,25 @@
 #!/usr/bin/env python
 import rospy
 from geometry_msgs.msg import TransformStamped
-from geometry_msgs.msg import PoseStamped
 from robp_msgs.msg import Encoders
 from robp_msgs.msg import DutyCycles
 import tf_conversions
 import tf2_ros
-import math
 from  math import pi
-from aruco_msgs.msg import MarkerArray
 import tf
 from sensor_msgs.msg import Imu
-from geometry_msgs.msg import Twist
 import numpy as np
 
 
 
 class Localization:
     def __init__(self):
+        """
+        This node might in the future be used to fuse the encoders, imu and control data to estimate the state of the robot.
+        Right now it needs more polishing.
+        
+        
+        """
         # Initialize node
         rospy.loginfo('Initializing localization node')
         rospy.init_node('localization')

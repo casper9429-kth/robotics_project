@@ -7,12 +7,15 @@ import tf2_ros
 import math
 from  math import pi
 import tf
-
+from sensor_msgs.msg import Imu
 
 class Odometry:
     def __init__(self):
         """
-        Uses the encoders to calculate v,w and from that the pose of the robot.
+        This node uses the encoders to calculate the v of the robot and fuses it with the angle from the imu.
+        It then updates the odometry.
+        It doesn't use any EKF or UKF explicitly.
+        But it uses the imu to correct the odometry, which might be considered as a form of EKF.        
         """
         # Initialize node
         rospy.loginfo('Initializing odometry node')
@@ -21,6 +24,11 @@ class Odometry:
         # Create subscriber to encoders
         self.sub_goal = rospy.Subscriber('/motor/encoders', Encoders, self.encoder_callback)
 
+        # Create subscriber to imu/data
+        self.sub_imu = rospy.Subscriber('/imu/data', Imu, self.imu_callback)
+
+    
+        
         # Robot parameters
         self.ticks_per_rev = 3072
         self.wheel_r = 0.04921
@@ -34,7 +42,7 @@ class Odometry:
         self.x = 0
         self.y = 0
         self.yaw = 0
-
+        
         # Init a tf broadcaster
         self.br = tf2_ros.TransformBroadcaster()
 
@@ -42,8 +50,22 @@ class Odometry:
         self.listener = tf.TransformListener()
         
 
+    def imu_callback(self,msg):
+        """
+        Encoder callback
+        When a new encoder message is received, the odometry is updated
+        """
     
-
+        # Get orientation in quaternion
+        q = msg.orientation
+        
+        # Convert quaternion to euler
+        roll, pitch, yaw = tf.transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])
+    
+        # Update yaw
+        self.yaw = -yaw
+    
+    
     def encoder_callback(self,msg):
         """
         Encoder callback
@@ -70,7 +92,7 @@ class Odometry:
         # Calculate new x, y and yaw
         self.x = self.x + D * math.cos(self.yaw)
         self.y = self.y + D * math.sin(self.yaw)
-        self.yaw = self.yaw + D_theta
+        #self.yaw = self.yaw + D_theta
         
         # Add new x, y and yaw to transform, first cart then rot
         t.header.stamp = rospy.Time.now()
