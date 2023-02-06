@@ -13,6 +13,11 @@ class Node_name():
         # Publisher
         # self.message_pub = rospy.Publisher("topic", type, queue_size=10)
 
+
+        # Publisher
+        # self.message_pub = rospy.Publisher("topic", type, queue_size=10)
+
+
         # Define rate
         self.update_rate = 10 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
