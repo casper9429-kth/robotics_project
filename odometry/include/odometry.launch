@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<launch>
+
+    <!-- Three alternatives: -->
+    <!-- 1. Use odom from encoders using odometry.py -->
+    <!-- 2. Use EKF, imu, and odom from encoders using robot_localization -->
+    <!-- 3. Use imu for orientation, v from encoders for velocity: Use these two to calculate odometry -->
+
+    <!-- Uncomment the one you want to use, and comment the ones you don't want to use-->
+
+
+    <!-- 1. -->
+	<node name="odometry" pkg="odometry" type="odometry.py" output='screen'/>
+    
+    <!-- 2. -->
+    <node name="wheel_enco_to_odom_msg" pkg="odometry" type="wheel_enco_to_odom_msg.py" output='screen'/>
+    <include file="$(find robot_localization)/launch/imu_enco_odom.launch" />
+
+    <!-- 3. -->
+    <!-- Not Implemented yet -->
+
+</launch>
