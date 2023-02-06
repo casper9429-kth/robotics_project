@@ -4,6 +4,9 @@
 	<!-- Include phidgets-->
 	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
 
+	<!-- Include imu_tools -->
+	<include file="$(find imu_filter_madgwick)/launch/imu_filter_madgwick.launch" />
+
 	<!-- Include teleop_twist_joy -->
     <include file="$(find teleop_twist_joy)/launch/teleop.launch" />
 
@@ -17,7 +20,7 @@
 	<node name="arm_camera" pkg="arm_camera" type="arm_camera.py" output='screen'/>
 
 	<!-- run localization -->
-	<node name="localization" pkg="localization" type="localization.py" output='screen'/>
+	<!-- <node name="localization" pkg="localization" type="localization.py" output='screen'/> -->
 
 	<!-- run odometry -->
 	<node name="odometry" pkg="odometry" type="odometry.py" output='screen'/>

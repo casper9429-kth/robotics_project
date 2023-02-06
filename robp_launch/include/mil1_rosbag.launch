@@ -1,8 +1,9 @@
 <?xml version="1.0"?>
 <launch>
+	<param name="/use_sim_time" value="true" />
 
 	<!-- Include phidgets-->
-	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
+	<!-- <include file="$(find robp_phidgets)/launch/phidgets.launch" /> -->
 
 	<!-- Include teleop_twist_joy -->
     <!-- <include file="$(find teleop_twist_joy)/launch/teleop.launch" /> -->
@@ -11,7 +12,7 @@
 	<!-- <include file="$(find robp_launch)/include/rs_camera.launch" /> -->
 
 	<!-- run the motors -->
-    <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
+    <!-- <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/> -->
 
 	<!-- run the arm_camera -->
 	<!-- <node name="arm_camera" pkg="arm_camera" type="arm_camera.py" output='screen'/> -->
