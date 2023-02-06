@@ -48,6 +48,7 @@ After you have cloned the repo to your computer, install all the missing depende
 sudo apt-get install v4l-utils
 rosdep install --from-paths src --ignore-src -r -y
 sudo apt --fix-broken install
+```
 
 It will ask you to enter password for secure boot twice, use password ``robotrobot`` both times.
 
