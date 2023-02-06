@@ -20,9 +20,6 @@ class Odometry:
         # Create subscriber to encoders
         self.sub_goal = rospy.Subscriber('/motor/encoders', Encoders, self.encoder_callback)
 
-        # Create a subscriber to the aruco markers
-        self.sub_aruco = rospy.Subscriber('/aruco/markers', MarkerArray, self.aruco_callback)
-
         # Robot parameters
         self.ticks_per_rev = 3072
         self.wheel_r = 0.04921
@@ -60,60 +57,7 @@ class Odometry:
             
             self.rate.sleep()
 
-
-            
-    def aruco_callback(self,msg):
-        """ aruco callback """
-        # Take the ArUco marker detections, transform them into the map frame in a node and publish 
-        # a TF from the map frame to a /aruco/detectedX frame, where X corresponds to the ID of the marker.
-        
-        # The camera is mounted 0.08987m forward, 0.0175m left, and 0.10456m up with respect to the robot. 
-        # Note that the camera coordinate system is such that z is along the optical axis (i.e., forward) and y is pointing down.
-        
-
-
-        for marker in msg.markers:
-            from_frame = "camera_link"
-            to_frame = "map"
-            
-            # Define pose stamp and transform to map
-            ps = PoseStamped()
-            ps.header.stamp = marker.header.stamp
-            ps.header.frame_id = from_frame
-            ps.pose.position.x = marker.pose.pose.position.x
-            ps.pose.position.y = marker.pose.pose.position.y
-            ps.pose.position.z = marker.pose.pose.position.z
-            roll,pitch,yaw = tf_conversions.transformations.euler_from_quaternion([marker.pose.pose.orientation.x,marker.pose.pose.orientation.y,marker.pose.pose.orientation.z,marker.pose.pose.orientation.w])
-            roll = roll - pi/2 
-            pitch = pitch 
-            yaw = yaw - pi/2           
-            q = tf_conversions.transformations.quaternion_from_euler(roll,pitch,yaw)
-            ps.pose.orientation.x = q[0]
-            ps.pose.orientation.y = q[1]
-            ps.pose.orientation.z = q[2]
-            ps.pose.orientation.w = q[3]
-
-            self.listener.waitForTransform(from_frame, to_frame,marker.header.stamp,rospy.Duration(4.0) )#rospy.Time(), rospy.Duration(4.0))
-            ps_map = self.listener.transformPose("map",ps)
-
-            # publish the transform ps_map to the map frame
-            t = TransformStamped()
-            t.header.frame_id = "map"
-            t.child_frame_id = "aruco/detected" + str(marker.id)
-            t.header.stamp = marker.header.stamp
-            t.transform.translation.x = ps_map.pose.position.x
-            t.transform.translation.y = ps_map.pose.position.y
-            t.transform.translation.z = ps_map.pose.position.z
-            t.transform.rotation.x = ps_map.pose.orientation.x
-            t.transform.rotation.y = ps_map.pose.orientation.y
-            t.transform.rotation.z = ps_map.pose.orientation.z
-            t.transform.rotation.w = ps_map.pose.orientation.w
-            self.br.sendTransform(t)
-            
-            
-            
-
-
+    
 
     def encoder_callback(self,msg):
         """
@@ -157,46 +101,8 @@ class Odometry:
         # Publish transform to tf broadcaster init in __init__
         self.br.sendTransform(t)
     
-    def calc_translation_speed_encoder(self, encoder_data):
-        """
-        Calculates the translation speed of the wheels in m/s
-        input: raw encoder data
-        returns v_left, v_right [m/s]
-        """
-        tic_spd_left = encoder_data.delta_encoder_left / encoder_data.delta_time_left
-        tic_spd_right = encoder_data.delta_encoder_right / encoder_data.delta_time_right
-        
-        # m/tics 
-        self.wheel_r
-        circ = 2*self.wheel_r*pi
-        tics = self.ticks_per_rev
-        m_tic = circ/tics 
-        
-        # tic/s * m/tic = m/s
-        v_left = tic_spd_left * m_tic*1000
-        v_right = tic_spd_right * m_tic*1000 
-
-        # save in internal var
-        return v_left, v_right
 
 
-    def calc_robot_v_omega_encoder(self,encoder_data):
-        """
-        Calculates the robot linear and angular velocity in m/s and rad/s        
-        """
-        v_left, v_right = self.calc_translation_speed_encoder(encoder_data)
-        v, omega = self.transform_v_left_v_right_to_v_omega(v_left, v_right)
-        return v, omega
-    
-            
-    def transform_v_left_v_right_to_v_omega(self, v_left, v_right):
-        """Transform v_left and v_right to v and omega"""
-        # v = (v_left + v_right) / 2
-        # omega = (v_right - v_left) / b
-        
-        v = (v_left + v_right) / 2
-        omega = (v_right - v_left) / (self.base)
-        return v, omega
 
 
 
