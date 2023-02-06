@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 import rospy
 from geometry_msgs.msg import TransformStamped
-from geometry_msgs.msg import PoseStamped
 from robp_msgs.msg import Encoders
 import tf_conversions
 import tf2_ros
 import math
 from  math import pi
-from aruco_msgs.msg import MarkerArray
 import tf
 
 
@@ -40,22 +38,6 @@ class Odometry:
         # Init a tf listener
         self.listener = tf.TransformListener()
         
-        # Run loop
-        self.run()
-                
-
-
-    def run(self):
-        """
-        Main loop
-        """
-        # Run loop
-        rospy.loginfo('Running odometry node main loop')
-        
-        
-        while not rospy.is_shutdown():
-            
-            self.rate.sleep()
 
     
 
@@ -108,3 +90,4 @@ class Odometry:
 
 if __name__ == '__main__':
     new_odometry = Odometry()
+    rospy.spin()
