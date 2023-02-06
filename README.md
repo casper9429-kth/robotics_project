@@ -176,7 +176,8 @@ These let you connect and disconnect quickly to the ZeroTier VPN.
 
 ## Useful commands
 
-1. Filter rosbag: ``rosbag play --clock --pause test_filter.bag``
+1. Filter rosbag: ``rosbag filter <rosbag_to_filter>.bag <rosbag_without_tf>.bag "topic != '/tf'"``
+2. Launch rosbag : ``rosbag play --clock --pause <rosbag_filename>.bag`` 
 
 ## Useful Links
 
