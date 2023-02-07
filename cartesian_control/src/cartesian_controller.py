@@ -8,7 +8,22 @@ import numpy as np
 
 class cartesian_controller:
     def __init__(self):
+        """
+        Controller for the robots v, omega (DRAFT) \\
+        Recives desired v, omega from /motor_controller/twist topic \\
+        Gets encoder feedback from /motor/encoders topic \\
         
+        Uses one of 3 main loops to control the robot: \\
+        1. No pid control, just transforms desired velocity to desired wheel velocity \\
+        2. PID control for each wheel seperatly \\
+        3. PID control for v and omega \\
+        
+        Publishes duty cycle message to /motor/duty_cycles topic with wheel velocities \\
+        
+        call obj.run() to with no pid control \\
+        call obj.run_vl_vr() to run pid control for each wheel seperatly \\
+        call obj.run_v_omega() to run pid control for v and omega \\
+        """
         # init a node
         rospy.init_node('cartesian_controller', anonymous = True)
 
@@ -85,13 +100,6 @@ class cartesian_controller:
         
 
 
-
-
-
-        # choose if to pid each wheel seperatly, to pid v and omega or not to pid at all
-        self.run() # no pid
-        #self.run_vl_vr() # pid each wheel seperatly based on encoder feedback
-        #self.run_v_omega() # pid v and omega based on encoder feedback
 
 
     def run(self):
@@ -423,7 +431,12 @@ class cartesian_controller:
 
 if __name__ == '__main__':
     # Initialize the node and name it.
-    new_obj = cartesian_controller()
+    controller = cartesian_controller()
+
+    # choose if to pid each wheel seperatly, to pid v and omega or not to pid at all
+    controller.run() # no pid
+    #controller.run_vl_vr() # pid each wheel seperatly based on encoder feedback
+    #controller.run_v_omega() # pid v and omega based on encoder feedback
 
     
     
