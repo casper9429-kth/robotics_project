@@ -170,11 +170,9 @@ class cmd_vel_to_motors:
         """
         K_P_r = 0.6
         K_P_l = 0.6  
-
         #K_I
         K_I_r = 0.001
         K_I_l = 0.001
-
         #K_D
         K_D_r = 0.0
         K_D_l = 0.0

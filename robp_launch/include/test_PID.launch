@@ -4,6 +4,10 @@
 	<!-- Include phidgets-->
 	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
 
+	<!-- run the path tracker -->
+	<node name="path_tracker" pkg="path_planner" type="path_tracker.py" output='screen'/>
+
+
 	<!-- run the motors -->
     <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
 
