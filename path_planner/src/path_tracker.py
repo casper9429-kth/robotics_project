@@ -1,22 +1,24 @@
+#!/usr/bin/env python3
 import rospy
 import math
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist
 import tf2_ros
 import tf2_geometry_msgs
 
-# Får in poses från path_planner och gör om till robotens frame 
 # Recives poses from path_planner and transforms them to the robot frame
-# 
+
 class path_tracker:
     def __init__(self):
         rospy.init_node('path_tracker')
+        print('path_tracker node initalized')
         self.path = []
         self.rate = rospy.Rate(10)
         # subscribers
         self.path_sub = rospy.Subscriber('/path', PoseStamped, self.path_callback)
         self.transform_sub = rospy.Subscriber('/transform', TransformStamped, self.transform_callback)
         self.robot_frame = 'base_link'
-
+        print('Subscribers initalized')
+        
         #publishers
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
@@ -24,6 +26,7 @@ class path_tracker:
         self.br = tf2_ros.TransformBroadcaster()
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
+        print('Tf2 stuff initialized')
 
     def path_callback(self, msg):
         self.path.append(msg)
