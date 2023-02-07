@@ -38,10 +38,14 @@ git clone <project adress> src
 
 Replace \<project adress\> with the project adress you find by clicking the green button on the main project page with '\<\> Code' written on it and choose https (or ssh if you know what you are doing).
 
+When trying to clone with https, you will need to login. Github does not accept anymore the classic authentication, you need to use a token instead of your password. To generate a new token : profile > settings > developper settings > token(classic) > generate new token (classic). Then name it, select an expiration date and the authorizations you want and click on generate. Save that token somewhere, you won't be able to see it again.
+An anternative is to use ssh instead of https.
+
 ### Install dependencies
 After you have cloned the repo to your computer, install all the missing dependencies:
 
 ```
+sudo apt-get install v4l-utils
 rosdep install --from-paths src --ignore-src -r -y
 sudo apt --fix-broken install
 ```
@@ -170,7 +174,14 @@ alias vd="sudo zerotier-cli leave 9bee8941b5443912"
 
 These let you connect and disconnect quickly to the ZeroTier VPN.
 
+## Useful commands
+
+1. Filter rosbag: ``rosbag filter <rosbag_to_filter>.bag <rosbag_without_tf>.bag "topic != '/tf'"``
+2. Launch rosbag : ``rosbag play --clock --pause <rosbag_filename>.bag`` 
+
 ## Useful Links
 
 
 1. [ARM Documentation](https://drive.google.com/drive/folders/11wl0ss4zelJUnhpM2iadch4rDxFnV4dg?usp=sharing)
+2. [Orientation Sensor Fusion](http://wiki.ros.org/imu_filter_madgwick)
+3. [Localization](https://roverrobotics.com/blogs/guides/fusing-imu-encoders-with-ros-robot-localization)

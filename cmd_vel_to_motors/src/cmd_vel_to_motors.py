@@ -112,7 +112,7 @@ class cmd_vel_to_motors:
         It then updates the internal variables that are used to publish the duty cycle message
         """
         self.linear_velocity = msg.linear.x
-        self.angular_velocity = msg.angular.z
+        self.angular_velocity = msg.angular.z*5
 
     
     def run(self):
@@ -142,8 +142,8 @@ class cmd_vel_to_motors:
 
     def transform_v_omega_to_v_left_v_right(self, v, omega):
         """Transforms the desired linear and angular velocity to the desired wheel velocities, angular velocity is in rad/s, speed in m/s"""
-        v_right = v + self.base * omega
-        v_left = v - self.base * omega
+        v_right = (2*v + self.base * omega)/2
+        v_left = (2*v - self.base * omega)/2
         return v_left, v_right
 
 
