@@ -88,13 +88,18 @@ class cartesian_controller:
 
 
 
-        # choose if to pid each wheel seperatly or to pid v and omega
+        # choose if to pid each wheel seperatly, to pid v and omega or not to pid at all
         self.run() # no pid
-        #self.run_v_omega() # pid v and omega
-        #self.run_vl_vr() # pid each wheel seperatly based 
+        #self.run_vl_vr() # pid each wheel seperatly based on encoder feedback
+        #self.run_v_omega() # pid v and omega based on encoder feedback
 
 
     def run(self):
+        """
+        Main loop of the node, alt 1
+        No pid control, just transforms desired velocity to desired wheel velocity
+        And publishes duty cycle message to /motor/duty_cycles with wheel velocities 
+        """
         
         
         # Create duty cycle message object
@@ -126,8 +131,8 @@ class cartesian_controller:
 
     def run_vl_vr(self):
         """
-        Main loop of the node
-        * transforms desired velocity to desired wheel velocity
+        Main loop of the node, alt 2
+        * transforms desired v,omega to desired wheel velocity
         * gets wheel velocities from encoder feedback and PID control for each wheel seperatly
         * publishes duty cycle message to /motor/duty_cycles with wheel velocities
         """
@@ -184,10 +189,11 @@ class cartesian_controller:
 
     def run_v_omega(self):
         """
-        Main loop of the node
-        * transforms desired velocity to desired wheel velocity
+        Main loop of the node, alt 3
+        * transforms encoder feedback to desired v and omega
+        * PID control of v and omega
+        * transform pid v and omega to pid vl and vr
         * publishes duty cycle message to /motor/duty_cycles with wheel velocities
-        * gets wheel velocities from encoder feedback and PI control
         """
 
         # Create duty cycle message object
