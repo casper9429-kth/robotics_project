@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import rospy
 from robp_msgs.msg import DutyCycles
 from robp_msgs.msg import Encoders
@@ -10,12 +9,68 @@ import scipy
 import json
 import os
 from collections import defaultdict
+# def of used msgs types
 
-class autotune:
+# DutyCycles
+#Header header
+# Value should be in [-1, 1]
+#float64 duty_cycle_left
+# Value should be in [-1, 1]
+#float64 duty_cycle_right
+
+# Encoders
+#Header header
+# Total number of ticks
+#int64 encoder_left
+#int64 encoder_right
+# Ticks since last message
+#int32 delta_encoder_left
+#int32 delta_encoder_right
+# Time since last message
+#float64 delta_time_left
+#float64 delta_time_right
+
+# Twist
+#Header header
+# Linear velocity in m/s
+#float64 linear.x
+# Linear velocity in m/s
+#float64 linear.y
+# Linear velocity in m/s
+#float64 linear.z
+# Angular velocity in rad/s
+#float64 angular.x
+# Angular velocity in rad/s
+#float64 angular.y
+# Angular velocity in rad/s
+#float64 angular.z
+
+"""
+Your cartesian_controller node should subscribe to the following topics:
+/motor_controller/twist (message type: geometry_msgs/Twist): in this topic, the controller will receive the linear and angular velocity at which we wish to move the robot (expressed in the base frame of the robot). The message is a 6D twist (3D for linear velocity and 3D for angular velocity) but since we are controlling the robot in a 2D plane you only need to use one component of the linear velocity (the x-component) and one component of the angular velocity (the z-component). Using the kinematics equations for differential mobile robot configurations, one can then calculate the individual contributions of each wheel (in terms of angular velocity) to achieve the desired twist. To view the complete twist message definition run in a terminal:
+rosmsg show geometry_msgs/Twist
+/motor/encoders (message type: robp_msgs/Encoders): through this topic, the controller will receive the encoder feedback signals for estimating the angular velocity of the wheels.
+Your node should publish to the following topic:
+/motor/duty_cycles (message type: robp/DutyCycles): duty cycle signal for controlling the power fed to the motors.
+For more details on the encoder and duty cycle topics refer back to the Kobuki description page.
+"""
+
+
+# ticks per rev: 360
+# Wheel radius (r): 0.0352 m
+# Base (b): 0.23 m
+
+
+# step 1
+# 1. write spd 1 to /motor/duty_cycles
+# 2. read encoders
+# 3. read motor_controller_twist
+
+class cartesian_controller:
     def __init__(self):
         self.autotune = False
         # init a node
-        rospy.init_node('autotune', anonymous = True)
+        rospy.init_node('cartesian_controller', anonymous = True)
 
         self.pid_path = os.path.join(os.path.expanduser('~'), 'dd2419_ws', 'pid.json')
         # init a sleep rate
@@ -29,7 +84,9 @@ class autotune:
         # used to read encoder values 
         self.encoders_sub = rospy.Subscriber('/motor/encoders', Encoders, self.callback_encoders)
 
-
+        # init a subscriber to the /motor_controller/twist topic
+        # used to read twist values or the robot
+        self.twist_sub = rospy.Subscriber('/motor_controller/twist', Twist, self.callback_twist)
 
         # ticks per rev: 360
         # Wheel radius (r): 0.0352 m
@@ -67,7 +124,7 @@ class autotune:
 
 
         # Time since last twist message
-        #self.time_twist = rospy.get_time()
+        self.time_twist = rospy.get_time()
 
         try:        
             with open(self.pid_path,"r") as json_file:
@@ -174,23 +231,23 @@ class autotune:
             
             if t <5: # Sleep
                 self.omega_des = 0.0#np.random.uniform(-0.3,0.3) 
-                self.v_des = 0.5#np.random.uniform(0.1,0.5)
+                self.v_des = 0.0#np.random.uniform(0.1,0.5)
             
             t += 1                
             
             # Outerloop pid
             
             # Edge case tp stop robot and not get oscillations from PI control. Used when no new twist message is received or when desired speed is 0 
-            #if ((rospy.get_time() - self.time_twist  ) > 0.5):
-            #    duty_cycle_msg.duty_cycle_left = 0.0
-            #    duty_cycle_msg.duty_cycle_right = 0.0
-            #    self.duty_cycle_pub.publish(duty_cycle_msg)
-            #    self.integral_left = 0.0 # reset integral in pi control 
-            #    self.integral_right = 0.0 # reset integral in pi control
-            #    self.derivative_left = []
-            #    self.derivative_right = []        
-            #    self.r.sleep()
-            #    continue
+            if ((rospy.get_time() - self.time_twist  ) > 0.5):
+                duty_cycle_msg.duty_cycle_left = 0.0
+                duty_cycle_msg.duty_cycle_right = 0.0
+                self.duty_cycle_pub.publish(duty_cycle_msg)
+                self.integral_left = 0.0 # reset integral in pi control 
+                self.integral_right = 0.0 # reset integral in pi control
+                self.derivative_left = []
+                self.derivative_right = []        
+                self.r.sleep()
+                continue
 
             
             
@@ -232,7 +289,12 @@ class autotune:
 
 
     def pre_tune(self,iteration=10): 
-        """Code to do a pre tune using ziegler nichols method"""
+        """
+        Main loop of the node
+        * transforms desired velocity to desired wheel velocity
+        * publishes duty cycle message to /motor/duty_cycles with wheel velocities
+        * gets wheel velocities from encoder feedback and PI control
+        """
 
         # check if desired speed is to high and warns user
         if self.v_left_des > 0.5 or self.v_right_des > 0.5:
@@ -245,6 +307,7 @@ class autotune:
         duty_cycle_msg.duty_cycle_right = 0.0
 
 
+        # main loop
         t = 0#rospy.get_time()
         
         self.integral_left = 0.0
@@ -312,6 +375,8 @@ class autotune:
             
             t += 1                
 
+            # Outerloop pid
+            
             
             
             # Calculate desired wheel velocity
@@ -352,7 +417,10 @@ class autotune:
 
     def twiddle_run(self,p):
         """
-        This function is run by the twiddle algorithm to find the best PID parameters
+        Main loop of the node
+        * transforms desired velocity to desired wheel velocity
+        * publishes duty cycle message to /motor/duty_cycles with wheel velocities
+        * gets wheel velocities from encoder feedback and PI control
         """
 
         p1 = p[0:3]
@@ -521,7 +589,7 @@ class autotune:
         return 
 
     def auto_tune_v_left(self,error):
-        """Continously tune v_left PID using Ziegler-Nichols method, used by Ziegler-Nichols method"""
+        """Continously tune v_left PID using Ziegler-Nichols method"""
         # Calculate error for each sample
         # Check if enough samples have been collected
         if len(self.error_list_v_left) < self.sample_size:
@@ -556,9 +624,11 @@ class autotune:
 
         print("New v_left PID tuning parameters: Kp = {}, Ki = {}, Kd = {}".format(self.Kp_v_left, self.Ki_v_left, self.Kd_v_left))
 
+
     def auto_tune_v_right(self,error):
-        """Auto tune v_right PID using Ziegler-Nichols method"""
+        """Continously tune v_right PID using Ziegler-Nichols method"""
         # Calculate error for each sample
+        # Check if enough samples have been collected
         if len(self.error_list_v_right) < self.sample_size:
             return 
         # Calculate the oscillation period
@@ -592,6 +662,7 @@ class autotune:
         print("New v_right PID tuning parameters: Kp = {}, Ki = {}, Kd = {}".format(self.Kp_v_right, self.Ki_v_right, self.Kd_v_right))
     def transform_v_omega_to_v_left_v_right(self, v, omega):
         """Transforms the desired linear and angular velocity to the desired wheel velocities, angular velocity is in rad/s, speed in m/s"""
+        
         v_right = v + self.base * omega
         v_left = v - self.base * omega
         return v_left, v_right
@@ -664,7 +735,6 @@ class autotune:
         if y < -1:
             y = -1
 
-
         return y
     
     def transform_v_left_v_right_to_v_omega(self, v_left, v_right):
@@ -703,15 +773,17 @@ class autotune:
         self.v_left_enco = v_left
 
         
-
+    def callback_twist(self,data):        
+        # set time stamp
+        self.time_twist = rospy.get_time()
         
-        
-        
-        
-
+        # save in internal var
+        self.v_des = 0.5#data.linear.x
+        self.omega_des = 0.0#data.angular.z
+        # Write that code that every 10 secs chnages speeds and direction
 
 
 if __name__ == '__main__':
-    new_obj = autotune()
+    new_obj = cartesian_controller()
     
     
