@@ -197,7 +197,6 @@ def vels(speed, turn):
 
 if __name__=="__main__":
     settings = saveTerminalSettings()
-
     rospy.init_node('teleop_twist_keyboard')
 
     speed = rospy.get_param("~speed", 0.5)
