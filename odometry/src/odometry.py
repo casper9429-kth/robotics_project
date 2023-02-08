@@ -40,24 +40,9 @@ class Odometry:
         # Init a tf listener
         self.listener = tf.TransformListener()
         
-        # Run loop
-        self.run()
+     
                 
 
-
-    def run(self):
-        """
-        Main loop
-        """
-        # Run loop
-        rospy.loginfo('Running odometry node main loop')
-        
-        
-        while not rospy.is_shutdown():
-            
-            self.rate.sleep()
-
-    
 
     def encoder_callback(self,msg):
         """
@@ -108,3 +93,4 @@ class Odometry:
 
 if __name__ == '__main__':
     new_odometry = Odometry()
+    rospy.spin()
