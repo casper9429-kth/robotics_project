@@ -7,13 +7,12 @@ from rospy import Service
 
 
 class JointState:
-    def __init__(self, joint1=0, joint2=0, joint3=0, joint4=0, joint5=0, gripper=0):
+    def __init__(self, joint1=0, joint2=0, joint3=0, joint4=0, joint5=0):
         self.joint1 = joint1
         self.joint2 = joint2
         self.joint3 = joint3
         self.joint4 = joint4
         self.joint5 = joint5
-        self.gripper = gripper
 
 
 class Arm():
@@ -21,7 +20,7 @@ class Arm():
         """ Services for controlling the arm. """
         rospy.init_node('arm')
         
-        # Publisher
+        # Publishers
         self.joint1_pub = rospy.Publisher("/joint1_controller/command_duration", CommandDuration, queue_size=10)
         self.joint2_pub = rospy.Publisher("/joint2_controller/command_duration", CommandDuration, queue_size=10)
         self.joint3_pub = rospy.Publisher("/joint3_controller/command_duration", CommandDuration, queue_size=10)
@@ -29,10 +28,12 @@ class Arm():
         self.joint5_pub = rospy.Publisher("/joint5_controller/command_duration", CommandDuration, queue_size=10)
         self.gripper_pub = rospy.Publisher("/r_joint_controller/command_duration", CommandDuration, queue_size=10)
 
-        self.initial_position_service = Service('arm/initial', Trigger, self.initial_service_callback)
-        self.prepare_pick_up_service = Service('arm/prepare_pick_up', Trigger, self.prepare_pick_up_service_callback)
-        self.pick_up_service = Service('arm/pick_up', Trigger, self.pick_up_service_callback)
-        self.hold_service = Service('arm/hold', Trigger, self.hold_service_callback)
+        # Services
+        self.initial_position_service = Service('arm/poses/initial', Trigger, self.initial_service_callback)
+        self.prepare_pick_up_service = Service('arm/poses/prepare_to_pick_up', Trigger, self.prepare_to_pick_up_service_callback)
+        # self.pick_up_service = Service('arm/pick_up', TODO, self.pick_up_service_callback)
+        self.open_gripper_service = Service('arm/poses/open_gripper', Trigger, self.open_gripper_service_callback)
+        self.close_gripper_service = Service('arm/poses/close_gripper', Trigger, self.close_gripper_service_callback)
 
         # Define rate
         self.update_rate = 10 # [Hz]
@@ -44,10 +45,11 @@ class Arm():
         # self.br = tf2_ros.TransformBroadcaster()
         # self.listner = tf2_ros.TransformListener(self.tf_buffer)
 
-        # Parameters HERE
+        # Parameters
 
         # Duration of the motion
-        self.duration = 2000 # [ms]
+        self.joint_duration = 2000 # [ms]
+        self.gripper_duration = 1000 # [ms]
 
         # gripper
         self.gripper_open = -1.5
@@ -55,72 +57,65 @@ class Arm():
         self.gripper_close_cube = -0.0
 
         # joints initial position
-        self.joints_initial = JointState(gripper=self.gripper_open)
+        self.joints_initial = JointState()
 
         # joints pick up
-        self.joints_prepare_pick_up = JointState(0, -1, -0.8, -1.3, -0.2, self.gripper_open)
-        self.joints_pick_up_cube = JointState(0, -1, -0.8, -1.3, -0.2, self.gripper_close_cube)
-        self.joints_pick_up_sphere = JointState(0, -1, -0.8, -1.3, -0.2, self.gripper_close_sphere)
-
-        # joints hold
-        self.joints_hold_cube = JointState(gripper=self.gripper_close_cube)
-        self.joints_hold_sphere = JointState(gripper=self.gripper_close_sphere)
-
-        # Variables HERE
-        self.target_joints = self.joints_initial
+        self.joints_prepare_pick_up = JointState(0, -1, -0.8, -1.3, -0.2)
 
     ###### All your callbacks here ######
 
     def initial_service_callback(self, req):
         """ Callback function for the initial position service. """
-        self.target_joints = self.joints_initial
-        self.publish()
+        self.publish_joints(self.joints_initial)
         return TriggerResponse(True, 'Initial')
     
-    def prepare_pick_up_service_callback(self, req): 
-        """ Callback function for the prepare pick up service. """
-        self.target_joints = self.joints_prepare_pick_up
-        self.publish()
-        return TriggerResponse(True, 'Prepare pick up')
+    def prepare_to_pick_up_service_callback(self, req): 
+        """ Callback function for the prepare to pick up service. """
+        self.publish_joints(self.joints_prepare_pick_up)
+        return TriggerResponse(True, 'Preparing to pick up')
 
     def pick_up_service_callback(self, req):
         """ Callback function for the prepare pick up service. """
-        type = 'cube'
-        if type == 'cube':
-            self.target_joints = self.joints_pick_up_cube
-            self.publish()
+        object_type = 'cube'
+        if object_type == 'cube':
+            self.publish_joints(self.joints_pick_up_cube)
             return TriggerResponse(True, 'Pick up cube')
-        elif type == 'sphere':
-            self.target_joints = self.joints_pick_up_sphere
-            self.publish()
-            return TriggerResponse(True, 'Pick up sphere')
+        elif object_type == 'sphere':
+            self.publish_joints(self.joints_pick_up_sphere)
+            return TriggerResponse(True, 'Picked up sphere')
         else:
-            return TriggerResponse(False, 'Type must be either "cube" or "sphere".')
+            return TriggerResponse(False, 'object_type must be either "cube" or "sphere".')
         
-    def hold_service_callback(self, req):
-        """ Callback function for the prepare pick up service. """
-        type = 'cube'
-        if type == 'cube':
-            self.target_joints = self.joints_hold_cube
-            self.publish()
-            return TriggerResponse(True, 'Hold cube')
-        elif type == 'sphere':
-            self.target_joints = self.joints_hold_sphere
-            self.publish()
-            return TriggerResponse(True, 'Hold sphere')
+    def open_gripper_service_callback(self, req):
+        """ Callback function for the close gripper service. """
+        self.publish_gripper(self.gripper_open)
+        return TriggerResponse(True, 'Opened gripper')
+    
+    def close_gripper_service_callback(self, req):
+        """ Callback function for the close gripper service."""
+        object_type = 'cube'
+        if object_type == 'cube':
+            self.publish_gripper(self.gripper_close_cube)
+            return TriggerResponse(True, 'Closed gripper')
+        elif object_type == 'sphere':
+            self.publish_gripper(self.gripper_close_sphere)
+            return TriggerResponse(True, 'Closed gripper')
         else:
-            return TriggerResponse(False, 'Type must be either "cube" or "sphere".')
+            return TriggerResponse(False, 'object_type must be either "cube" or "sphere".')
         
     ###### All your other methods here #######
 
-    def publish(self):
+    def publish_joints(self, joints):
         """ Publishes the current joint states. """
-        self.joint1_pub.publish(CommandDuration(data=self.target_joints.joint1, duration=self.duration))
-        self.joint2_pub.publish(CommandDuration(data=self.target_joints.joint2, duration=self.duration))
-        self.joint3_pub.publish(CommandDuration(data=self.target_joints.joint3, duration=self.duration))
-        self.joint4_pub.publish(CommandDuration(data=self.target_joints.joint4, duration=self.duration))
-        self.joint5_pub.publish(CommandDuration(data=self.target_joints.joint5, duration=self.duration))
-        self.gripper_pub.publish(CommandDuration(data=self.target_joints.gripper, duration=self.duration))
+        self.joint1_pub.publish(CommandDuration(data=joints.joint1, duration=self.joint_duration))
+        self.joint2_pub.publish(CommandDuration(data=joints.joint2, duration=self.joint_duration))
+        self.joint3_pub.publish(CommandDuration(data=joints.joint3, duration=self.joint_duration))
+        self.joint4_pub.publish(CommandDuration(data=joints.joint4, duration=self.joint_duration))
+        self.joint5_pub.publish(CommandDuration(data=joints.joint5, duration=self.joint_duration))
+    
+    def publish_gripper(self, gripper):
+        """ Publishes the current gripper state. """
+        self.gripper_pub.publish(CommandDuration(data=gripper, duration=self.gripper_duration))
 
     def main(self): # Do main stuff here    
         """
