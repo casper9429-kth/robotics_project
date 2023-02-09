@@ -16,9 +16,9 @@ class JointState:
         self.gripper = gripper
 
 
-class Yeet():
+class Arm():
     def __init__(self) -> None:
-        """ Yeets a cube. """
+        """ Services for controlling the arm. """
         rospy.init_node('arm')
         
         # Publisher
@@ -143,5 +143,5 @@ class Yeet():
 
 if __name__ == "__main__":
 
-    node = Yeet()
+    node = Arm()
     node.run()
