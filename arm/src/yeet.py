@@ -7,8 +7,28 @@ from rospy import Service
 
 
 class JointState:
-    def __init__(self):
-        pass
+    def __init__(self, joint1=0, joint2=0, joint3=0, joint4=0, joint5=0, gripper=-1.5):
+        self.joint1 = joint1
+        self.joint2 = joint2
+        self.joint3 = joint3
+        self.joint4 = joint4
+        self.joint5 = joint5
+        self.gripper = gripper
+
+    def interpolate_path(self, target, steps):
+        """ Interpolates a path from current state to target state. """
+        path = []
+        for i in range(1, steps):
+            path.append(JointState(
+                self.joint1 + (target.joint1 - self.joint1) * i / steps,
+                self.joint2 + (target.joint2 - self.joint2) * i / steps,
+                self.joint3 + (target.joint3 - self.joint3) * i / steps,
+                self.joint4 + (target.joint4 - self.joint4) * i / steps,
+                self.joint5 + (target.joint5 - self.joint5) * i / steps,
+                self.gripper + (target.gripper - self.gripper) * i / steps
+            ))
+        path.append(target)
+        return path
 
 
 class Yeet():
@@ -46,34 +66,18 @@ class Yeet():
         self.gripper_close_cube = -0.2
 
         # joints initial position
-        self.joint1_initial = 0
-        self.joint2_initial = 0
-        self.joint3_initial = 0
-        self.joint4_initial = 0
-        self.joint5_initial = 0
+        self.joints_initial = JointState()
 
         # joints pick up
-        self.joint1_pick_up = 0
-        self.joint2_pick_up = -1
-        self.joint3_pick_up = -0.8
-        self.joint4_pick_up = -1.3
-        self.joint5_pick_up = -0.2
+        self.joints_pick_up_cube = JointState(0, -1, -0.8, -1.3, -0.2, -0.2)
+        self.joints_pick_up_sphere = JointState(0, -1, -0.8, -1.3, -0.2, -0.5)
 
         # joints yeet
-        self.joint1_yeet = 0
-        self.joint2_yeet = 0
-        self.joint3_yeet = 0
-        self.joint4_yeet = 0
-        self.joint5_yeet = 0
+        self.joints_yeet = JointState(0, 0, 0, 0, 0, -1.5)
 
         # Variables HERE
         self.should_gripper_move = False
-        self.target_gripper = 0
-        self.target_joint1 = 0
-        self.target_joint2 = 0
-        self.target_joint3 = 0
-        self.target_joint4 = 0
-        self.target_joint5 = -1.5
+        self.path = [self.joints_initial]
 
     ###### All your callbacks here ######
 
@@ -84,8 +88,11 @@ class Yeet():
         
     def pick_up_service_callback(self, req): 
         """ Callback function for the pick up service. """
-        self.pick_up(type='cube')
-        return TriggerResponse(True, "Pick up")
+        try:
+            self.pick_up(type='cube')
+            return TriggerResponse(True, "Pick up")
+        except ValueError as e:
+            return TriggerResponse(False, str(e))
 
     def yeet_service_callback(self, req):
         """ Callback function for the yeet service. """
@@ -95,47 +102,38 @@ class Yeet():
     ###### All your other methods here #######
 
     def initial_position(self):
-        """ Sets joints commands to be published for the initial position. """
-        self.target_joint1 = self.joint1_initial
-        self.target_joint2 = self.joint2_initial
-        self.target_joint3 = self.joint3_initial
-        self.target_joint4 = self.joint4_initial
-        self.target_joint5 = self.joint5_initial
-        self.target_gripper = self.gripper_open
+        """ Sets target and path joint states to be published for the initial position. """
+        self.path = self.path[0].interpolate_path(self.joints_initial, 20)
 
     def pick_up(self, type):
-        """ Sets joints commands to be published for a pick up. """
-        self.target_joint1 = self.joint1_pick_up
-        self.target_joint2 = self.joint2_pick_up
-        self.target_joint3 = self.joint3_pick_up
-        self.target_joint4 = self.joint4_pick_up
-        self.target_joint5 = self.joint5_pick_up
-        if type == "sphere":
-            self.target_gripper = self.gripper_close_sphere
-        elif type == "cube":
-            self.target_gripper = self.gripper_close_cube
+        """ Sets target and path joint states to be published for a pick up. """
+        if type == "cube":
+            self.path = self.path[0].interpolate_path(self.joints_pick_up_cube, 20)
+        elif type == "sphere":
+            self.path = self.path[0].interpolate_path(self.joints_pick_up_sphere, 20)
+        else:
+            raise ValueError("Type must be either 'cube' or 'sphere'")
     
     def yeet(self):
-        """ Sets joints commands to be published for a yeet. """
-        self.target_joint1 = self.joint1_yeet
-        self.target_joint2 = self.joint2_yeet
-        self.target_joint3 = self.joint3_yeet
-        self.target_joint4 = self.joint4_yeet
-        self.target_joint5 = self.joint5_yeet
-        self.target_gripper = self.gripper_open
+        """ Sets target and path joint states to be published for a yeet. """
+        self.path = self.path[0].interpolate_path(self.joints_yeet, 10)
 
     def main(self): # Do main stuff here    
         """
         Main loop, instead of changing run function,
         write your code here to make it more readable.
         """
-        self.joint1_pub.publish(Float64(self.target_joint1))
-        self.joint2_pub.publish(Float64(self.target_joint2))
-        self.joint3_pub.publish(Float64(self.target_joint3))
-        self.joint4_pub.publish(Float64(self.target_joint4))
-        self.joint5_pub.publish(Float64(self.target_joint5))
+
+        current_joints: JointState = self.path[0]
+        if len(self.path) > 1:
+            self.path.pop(0)
+        self.joint1_pub.publish(Float64(current_joints.joint1))
+        self.joint2_pub.publish(Float64(current_joints.joint2))
+        self.joint3_pub.publish(Float64(current_joints.joint3))
+        self.joint4_pub.publish(Float64(current_joints.joint4))
+        self.joint5_pub.publish(Float64(current_joints.joint5))
         if self.should_gripper_move:
-            self.gripper_pub.publish(Float64(self.target_gripper))
+            self.gripper_pub.publish(Float64(current_joints.gripper))
 
     def run(self):
         """
