@@ -49,7 +49,7 @@ class Yeet():
         self.yeet_service = Service('yeet', Trigger, self.yeet_service_callback)
 
         # Define rate
-        self.update_rate = 10 # [Hz]
+        self.update_rate = 100 # [Hz]
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate)
 
@@ -69,15 +69,15 @@ class Yeet():
         self.joints_initial = JointState()
 
         # joints pick up
-        self.joints_pick_up_cube = JointState(0, -1, -0.8, -1.3, -0.2, -0.2)
+        self.joints_pick_up_cube = JointState(0, -1, -0.8, -1.3, -0.2, -0.0)
         self.joints_pick_up_sphere = JointState(0, -1, -0.8, -1.3, -0.2, -0.5)
 
         # joints yeet
         self.joints_yeet = JointState(0, 0, 0, 0, 0, -1.5)
 
         # Variables HERE
-        self.should_gripper_move = False
         self.path = [self.joints_initial]
+        self.should_publish = True
 
     ###### All your callbacks here ######
 
@@ -103,20 +103,32 @@ class Yeet():
 
     def initial_position(self):
         """ Sets target and path joint states to be published for the initial position. """
-        self.path = self.path[0].interpolate_path(self.joints_initial, 20)
+        self.path = self.path[0].interpolate_path(self.joints_initial, int(self.update_rate))
+        for i in range(len(self.path)):
+            self.path[i].gripper = self.gripper_open
+        self.should_publish = True
 
     def pick_up(self, type):
         """ Sets target and path joint states to be published for a pick up. """
         if type == "cube":
-            self.path = self.path[0].interpolate_path(self.joints_pick_up_cube, 20)
+            self.path = self.path[0].interpolate_path(self.joints_pick_up_cube, int(self.update_rate))
         elif type == "sphere":
-            self.path = self.path[0].interpolate_path(self.joints_pick_up_sphere, 20)
+            self.path = self.path[0].interpolate_path(self.joints_pick_up_sphere, int(self.update_rate))
         else:
             raise ValueError("Type must be either 'cube' or 'sphere'")
+        # Keep the gripper open until the end of the motion
+        for i in range(len(self.path) - 1):
+            self.path[i].gripper = self.gripper_open
+        self.should_publish = True
     
     def yeet(self):
         """ Sets target and path joint states to be published for a yeet. """
-        self.path = self.path[0].interpolate_path(self.joints_yeet, 10)
+        current_gripper = self.path[0].gripper
+        self.path = [self.joints_yeet] * (self.update_rate // 5)
+        for i in range(len(self.path)):
+            if i > len(self.path) // 4 * 3:
+                self.path[i].gripper = current_gripper
+        self.should_publish = True
 
     def main(self): # Do main stuff here    
         """
@@ -125,15 +137,19 @@ class Yeet():
         """
 
         current_joints: JointState = self.path[0]
+        
+        if self.should_publish:
+            self.joint1_pub.publish(Float64(current_joints.joint1))
+            self.joint2_pub.publish(Float64(current_joints.joint2))
+            self.joint3_pub.publish(Float64(current_joints.joint3))
+            self.joint4_pub.publish(Float64(current_joints.joint4))
+            self.joint5_pub.publish(Float64(current_joints.joint5))
+            self.gripper_pub.publish(Float64(current_joints.gripper))
+        
         if len(self.path) > 1:
             self.path.pop(0)
-        self.joint1_pub.publish(Float64(current_joints.joint1))
-        self.joint2_pub.publish(Float64(current_joints.joint2))
-        self.joint3_pub.publish(Float64(current_joints.joint3))
-        self.joint4_pub.publish(Float64(current_joints.joint4))
-        self.joint5_pub.publish(Float64(current_joints.joint5))
-        if self.should_gripper_move:
-            self.gripper_pub.publish(Float64(current_joints.gripper))
+        else:
+            self.should_publish = False
 
     def run(self):
         """
