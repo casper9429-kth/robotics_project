@@ -40,11 +40,6 @@ class Arm():
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate)
 
-        # Tf 
-        # self.tf_buffer = tf2_ros.Buffer()
-        # self.br = tf2_ros.TransformBroadcaster()
-        # self.listner = tf2_ros.TransformListener(self.tf_buffer)
-
         # Parameters
 
         # Duration of the motion
