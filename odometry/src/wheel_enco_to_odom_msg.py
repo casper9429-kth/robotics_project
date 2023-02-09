@@ -10,6 +10,8 @@ class trans_enco_to_odom:
         rospy.loginfo('Initializing wheel encoders to odometry_msg node')
         rospy.init_node('wheel_enco_to_odom_msg')
         
+        rospy.sleep(1)
+        
         # Create subscriber to encoders
         self.sub_goal = rospy.Subscriber('/motor/encoders', Encoders, self.encoder_callback)
 
