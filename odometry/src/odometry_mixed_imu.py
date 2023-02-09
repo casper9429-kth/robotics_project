@@ -35,6 +35,9 @@ class Odometry:
         self.base = 0.3 
         self.update_rate = 20 
 
+        # First imu yaw angle
+        self.yaw_offset = None
+
         # Create rate var
         self.rate = rospy.Rate(self.update_rate)
 
@@ -61,9 +64,14 @@ class Odometry:
         
         # Convert quaternion to euler
         roll, pitch, yaw = tf.transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])
-    
+
+        if self.yaw_offset == None:
+            self.yaw_offset = yaw
+        
+        
+        
         # Update yaw
-        self.yaw = -yaw
+        self.yaw = self.yaw_offset - yaw
     
     
     def encoder_callback(self,msg):
