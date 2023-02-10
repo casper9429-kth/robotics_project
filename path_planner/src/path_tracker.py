@@ -14,9 +14,10 @@ class path_tracker:
         self.path = []
         self.rate = rospy.Rate(10)
         # subscribers
-        self.path_sub = rospy.Subscriber('/path', PoseStamped, self.path_callback)
-        self.transform_sub = rospy.Subscriber('/transform', TransformStamped, self.transform_callback)
         self.robot_frame = 'base_link'
+        self.path_sub = rospy.Subscriber('/path', PoseStamped, self.path_callback) #Take a look
+        self.transform_sub = rospy.Subscriber('/transform', TransformStamped, self.transform_callback)
+        
         print('Subscribers initalized')
         
         #publishers
@@ -52,10 +53,10 @@ class path_tracker:
         t.transform.translation.x = pose.pose.position.x
         t.transform.translation.y = pose.pose.position.y
         t.transform.translation.z = pose.pose.position.z
-        t.transform.rotation.x = pose.pose.orientation.x
-        t.transform.rotation.y = pose.pose.orientation.y
-        t.transform.rotation.z = pose.pose.orientation.z
-        t.transform.rotation.w = pose.pose.orientation.w
+        # t.transform.rotation.x = pose.pose.orientation.x
+        # t.transform.rotation.y = pose.pose.orientation.y
+        # t.transform.rotation.z = pose.pose.orientation.z
+        # t.transform.rotation.w = pose.pose.orientation.w
         self.br.sendTransform(t)
 
 
