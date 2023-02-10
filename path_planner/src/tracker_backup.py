@@ -4,7 +4,6 @@ import math
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist
 import tf2_ros
 import tf2_geometry_msgs
-from aruco_msgs.msg import MarkerArray
 
 # Recives poses from path_planner and transforms them to the robot frame
 
@@ -14,12 +13,11 @@ class path_tracker:
         print('path_tracker node initalized')
         self.path = []
         self.rate = rospy.Rate(10)
-        self.marker = MarkerArray()
         # subscribers
         self.robot_frame = 'base_link'
         self.path_sub = rospy.Subscriber('/path', PoseStamped, self.path_callback)                      # Might change depending on where the coordinates of the objects are published
         self.transform_sub = rospy.Subscriber('/transform', TransformStamped, self.transform_callback)
-        self.aruco_sub = rospy.Subscriber('/aruco/markers', MarkerArray, self.aruco_callback)
+        
         print('Subscribers initalized')
         
         #publishers
@@ -30,12 +28,6 @@ class path_tracker:
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
         print('Tf2 stuff initialized')
-
-
-    def aruco_callback(self, msg):
-        self.marker
-        
-
 
     def path_callback(self, msg):
         rospy.loginfo(msg)

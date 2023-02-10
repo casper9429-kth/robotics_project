@@ -5,7 +5,7 @@
 	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
 
 	<!-- Include teleop_twist_joy -->
-    <include file="$(find teleop_twist_joy)/launch/teleop.launch" />
+    <!--include file="$(find teleop_twist_joy)/launch/teleop.launch" /-->
 
 	<!-- Include realsense2_camera -->
 	<include file="$(find robp_launch)/include/rs_camera.launch" />
