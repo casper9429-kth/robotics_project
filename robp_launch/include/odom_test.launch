@@ -1,6 +1,9 @@
 <?xml version="1.0"?>
 <launch>
 
+	<!-- This launch file can be used to test odometry with the real robot. Using teleop -->
+
+
 	<!-- Include phidgets-->
 	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
 
