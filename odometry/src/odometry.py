@@ -42,8 +42,6 @@ class Odometry:
         self.listener = tf.TransformListener()
         
 
-    
-
     def encoder_callback(self,msg):
         """
         Encoder callback
