@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rospy
-
-
+from aruco_msgs.msg import MarkerArray
+from collections import defaultdict
 # Read in aruco markers, prefilter the data and save the data
 
 class aruco_marker_filter_node():
@@ -29,7 +29,7 @@ class aruco_marker_filter_node():
 
         # Subscribers 
         ## Subscribe to aruco/markers and save the data
-        self.sub_aruco_markers = rospy.Subscriber("aruco/markers", type, self.callback_aruco_markers)
+        self.sub_aruco_markers = rospy.Subscriber("aruco/markers", MarkerArray, self.callback_aruco_markers)
         # self.sub_topic = rospy.Subscriber("topic", type, self.callback_topic)
         
         # Publisher
@@ -40,6 +40,9 @@ class aruco_marker_filter_node():
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
 
+        # dict to save aruco markers
+        self.aruco_data_dict = defaultdict(list)
+
         # Tf 
         # self.tf_buffer = tf2_ros.Buffer()
         # self.br = tf2_ros.TransformBroadcaster()
@@ -47,13 +50,26 @@ class aruco_marker_filter_node():
 
         # Paramethers HERE
 
-    ###### All your callbacks here ######
+    def callback_aruco_markers(self, msg):
+        """
+        callback_aruco_markers: 
+        """
+                
         
-    # def callback_topic(self): 
-    #     """Callback function for the topic"""
-    #     # do callback stuff
-    #     pass
+        # Logic to determine if the marker data should be saved or not
+        ## If the marker has been seen less than 100 times, save the data
+        
+        ## OR
+        
+        ## If it was less than 5 seconds ago since the marker was seen, save the data 
 
+        
+        # Pre filter the data
+        
+        # Save the data
+        
+        
+        
     ###### All your other methods here #######
 
     # def publish(self):
