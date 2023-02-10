@@ -1,9 +1,10 @@
 <?xml version="1.0"?>
 <launch>
 
-	<!-- <param name="/use_sim_time" value="true" /> -->
-
+	<!-- This launch file can be used to test odometry with the real robot. Using teleop -->
 	<node name="map_to_odom" pkg="tf2_ros" type="static_transform_publisher" args="0 0 0 0 0 0 map odom" />
+
+
 	<!-- Include phidgets-->
 	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
 
@@ -19,17 +20,11 @@
 	<!-- run the arm_camera -->
 	<node name="arm_camera" pkg="arm_camera" type="arm_camera.py" output='screen'/>
 
-	<!-- run odometry -->
-	<node name="odometry" pkg="odometry" type="odometry.py" output='screen'/>
-
-	<!-- run detection -->
-	<!-- <node name="detection" pkg="detection" type="detection.py" output='screen'/> -->
+	<!-- run rviz -->
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/odometry.rviz" />
 
 	<!-- run aruco detection -->
 	<node name="display_markers" pkg="detection" type="display_markers.py" output='screen'/>
-
-	<!-- run rviz -->
-	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/odometry.rviz" />
 
     <node name="aruco" pkg="aruco_ros" type="marker_publisher">
 		<remap from="/camera_info" to="/camera/color/camera_info"/>
@@ -42,10 +37,9 @@
 	</node>
 
 	<param name="robot_description" command="$(find xacro)/xacro --inorder '$(find realsense2_description)/urdf/test_d435_camera.urdf.xacro' use_nominal_extrinsics:=false"/>
-	
 
+	<!-- run odometry -->
+	<!-- Uncomment the one you want to use, and comment the ones you don't want to use in odometry.launch -->
+	<include file="$(find odometry)/include/odometry.launch" />
 
 </launch>
-
-
-
