@@ -23,13 +23,15 @@ def aruco_callback(msg):
     stamp = msg.header.stamp
     frame_id = msg.header.frame_id
 
-    pose_map = PoseStamped()
-    pose_map.header.frame_id = frame_id
-    pose_map.header.stamp = stamp
-
+    
     for marker in msg.markers:
         id = marker.id
         pose = marker.pose
+        
+        pose_map = PoseStamped()
+        pose_map.header.frame_id = frame_id
+        pose_map.header.stamp = stamp
+
 
         # Transform pose from camera_color_optical_frame to map 
         pose_map.pose.orientation = pose.pose.orientation
@@ -56,7 +58,7 @@ def aruco_callback(msg):
         t.header.stamp = stamp
         
         # rospy.loginfo(msg)
-    
+
         t.transform.rotation = pose_map.pose.orientation
         t.transform.translation = pose_map.pose.position
         br.sendTransform(t)
