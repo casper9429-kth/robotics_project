@@ -71,7 +71,7 @@ class Odometry:
         
         
         # Update yaw
-        self.yaw = self.yaw_offset - yaw
+        self.yaw = yaw - self.yaw_offset  
     
     
     def encoder_callback(self,msg):
