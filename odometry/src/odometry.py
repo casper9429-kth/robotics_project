@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 import rospy
 from geometry_msgs.msg import TransformStamped
-from geometry_msgs.msg import PoseStamped
 from robp_msgs.msg import Encoders
 import tf_conversions
 import tf2_ros
 import math
 from  math import pi
-from aruco_msgs.msg import MarkerArray
 import tf
 
 
 class Odometry:
     def __init__(self):
+        """
+        Uses the encoders to calculate v,w and from that the pose of the robot.
+        """
         # Initialize node
         rospy.loginfo('Initializing odometry node')
         rospy.init_node('odometry')
@@ -40,9 +41,6 @@ class Odometry:
         # Init a tf listener
         self.listener = tf.TransformListener()
         
-     
-                
-
 
     def encoder_callback(self,msg):
         """

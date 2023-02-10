@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 import rospy
 from robp_msgs.msg import DutyCycles
@@ -10,8 +11,6 @@ import scipy
 import json
 import os
 from collections import defaultdict
-
-
 
 
 class cmd_vel_to_motors:
@@ -61,9 +60,6 @@ class cmd_vel_to_motors:
 
     
     def run(self):
-        
-        
-        
         while not rospy.is_shutdown():
             # Convert the desired linear and angular velocity to the desired wheel velocities
             v_left, v_right = self.transform_v_omega_to_v_left_v_right(self.linear_velocity, self.angular_velocity)
@@ -83,13 +79,11 @@ class cmd_vel_to_motors:
             
             self.rate.sleep()
 
-
     def transform_v_omega_to_v_left_v_right(self, v, omega):
         """Transforms the desired linear and angular velocity to the desired wheel velocities, angular velocity is in rad/s, speed in m/s"""
         v_right = (2*v + self.base * omega)/2
         v_left = (2*v - self.base * omega)/2
         return v_left, v_right
-
 
 
     def transform_v_left_v_right_to_v_omega(self, v_left, v_right):
