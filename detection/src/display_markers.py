@@ -23,11 +23,12 @@ def aruco_callback(msg):
     stamp = msg.header.stamp
     frame_id = msg.header.frame_id
 
-    pose_map = PoseStamped()
-    pose_map.header.frame_id = frame_id
-    pose_map.header.stamp = stamp
-
     for marker in msg.markers:
+
+        pose_map = PoseStamped()
+        pose_map.header.frame_id = frame_id
+        pose_map.header.stamp = stamp
+
         id = marker.id
         pose = marker.pose
 
