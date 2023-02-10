@@ -1,5 +1,5 @@
 ekf_se_odom:
-  frequency: 50
+  frequency: 20
   sensor_timeout: 0.1
   two_d_mode: true
   transform_time_offset: 0.0
@@ -18,7 +18,7 @@ ekf_se_odom:
                  true,  false,  false,
                  false, false, true,
                  false, false, false]
-  odom0_queue_size: 10
+  odom0_queue_size: 50
   odom0_nodelay: true
   odom0_differential: false
   odom0_relative: false

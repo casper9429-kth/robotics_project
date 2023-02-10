@@ -2,6 +2,8 @@
 import rospy
 
 
+# Read in aruco markers, prefilter the data and save the data
+
 class aruco_marker_filter_node():
     def __init__(self):
         """
@@ -9,10 +11,15 @@ class aruco_marker_filter_node():
             
         Functionality: \\
         * Listens after aruco markers at "topic1" and saves the data.
+        
         * Filters the data and publishes the filtered data at "topic2"
+        
         * Keeps publishing the aruco markers if seen and not detected.
+        
         * If seen again, it will update the position of the marker when the new position is more accurate. 
+        
         * If seen again but at a different location, it will flag that the the robot has drifted and the position is not accurate.       
+        
         Purpose: \\
             
         
@@ -21,6 +28,8 @@ class aruco_marker_filter_node():
         rospy.init_node('aruco_marker_filter_node')
 
         # Subscribers 
+        ## Subscribe to aruco/markers and save the data
+        self.sub_aruco_markers = rospy.Subscriber("aruco/markers", type, self.callback_aruco_markers)
         # self.sub_topic = rospy.Subscriber("topic", type, self.callback_topic)
         
         # Publisher
