@@ -11,6 +11,9 @@ import tf
 
 class Odometry:
     def __init__(self):
+        """
+        Uses the encoders to calculate v,w and from that the pose of the robot.
+        """
         # Initialize node
         rospy.loginfo('Initializing odometry node')
         rospy.init_node('odometry')
@@ -38,8 +41,6 @@ class Odometry:
         # Init a tf listener
         self.listener = tf.TransformListener()
         
-
-    
 
     def encoder_callback(self,msg):
         """
