@@ -20,50 +20,46 @@ listener = tf2_ros.TransformListener(tfBuffer)
 def aruco_callback(msg):
     #rospy.loginfo('New aruco marker detected:\n%s', msg)
     
-
-
     stamp = msg.header.stamp
     frame_id = msg.header.frame_id
+
+    pose_map = PoseStamped()
+    pose_map.header.frame_id = frame_id
+    pose_map.header.stamp = stamp
 
     for marker in msg.markers:
         id = marker.id
         pose = marker.pose
 
-    rospy.loginfo(stamp)
-    # Transform pose from camera_color_optical_frame to map 
-    
-    pose_map = PoseStamped()
-    pose_map.header.frame_id = frame_id
-    pose_map.header.stamp = stamp
-    pose_map.pose.orientation = pose.pose.orientation
-    pose_map.pose.position = pose.pose.position
-    
-    
-    try:
-        pose_map = tfBuffer.transform(pose_map, "map", rospy.Duration(1.0))
-        rospy.loginfo("tf ok")
-    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-        rospy.logwarn(e)
-        return   
-    
+        # Transform pose from camera_color_optical_frame to map 
+        pose_map.pose.orientation = pose.pose.orientation
+        pose_map.pose.position = pose.pose.position
+        
+        
+        try:
+            pose_map = tfBuffer.transform(pose_map, "map", rospy.Duration(1.0))
+            rospy.loginfo("tf ok")
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.logwarn(e)
+            return   
+        
 
-    # Publish new tranform to aruco/detectedX
-    
-    br = tf2_ros.TransformBroadcaster()
+        # Publish new tranform to aruco/detectedX
+        
+        br = tf2_ros.TransformBroadcaster()
 
-    t = TransformStamped()
-    t.header.frame_id = "map"
-    t.child_frame_id = "aruco/detected" 
-    t.child_frame_id = t.child_frame_id + str(id)
+        t = TransformStamped()
+        t.header.frame_id = "map"
+        t.child_frame_id = "aruco/detected" 
+        t.child_frame_id = t.child_frame_id + str(id)
 
-    t.header.stamp = stamp
+        t.header.stamp = stamp
+        
+        # rospy.loginfo(msg)
     
-    # rospy.loginfo(msg)
-   
-    t.transform.rotation = pose_map.pose.orientation
-    t.transform.translation = pose_map.pose.position
-    rospy.loginfo(t)
-    br.sendTransform(t)
+        t.transform.rotation = pose_map.pose.orientation
+        t.transform.translation = pose_map.pose.position
+        br.sendTransform(t)
 
 sub_goal = rospy.Subscriber('/aruco/markers', MarkerArray, aruco_callback)
 
