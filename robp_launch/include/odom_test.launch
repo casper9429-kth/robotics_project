@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<launch>
+
+	<!-- This launch file can be used to test odometry with the real robot. Using teleop -->
+
+
+	<!-- Include phidgets-->
+	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
+
+	<!-- Include teleop_twist_joy -->
+    <include file="$(find teleop_twist_joy)/launch/teleop.launch" />
+
+	<!-- Include realsense2_camera -->
+	<include file="$(find robp_launch)/include/rs_camera.launch" />
+
+	<!-- run the motors -->
+    <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
+
+	<!-- run the arm_camera -->
+	<node name="arm_camera" pkg="arm_camera" type="arm_camera.py" output='screen'/>
+
+	<!-- run rviz -->
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/odometry.rviz" />
+
+    <!-- Aruco -->    
+	<param name="robot_description" command="$(find xacro)/xacro --inorder '$(find realsense2_description)/urdf/test_d435_camera.urdf.xacro' use_nominal_extrinsics:=false"/>
+
+	<!-- run odometry -->
+	<!-- Uncomment the one you want to use, and comment the ones you don't want to use in odometry.launch -->
+	<include file="$(find odometry)/include/odometry.launch" />
+
+</launch>

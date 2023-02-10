@@ -164,6 +164,8 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   src/odometry.py
+  src/wheel_enco_to_odom_msg.py
+  src/odometry_mixed_imu.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
