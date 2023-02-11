@@ -167,6 +167,12 @@ if __name__ == "__main__":
 
 
 
-# Robot has defined odom frame and it is fixed in the map frame
 
-# Don't save data in odom frame, it will move
+
+# v1
+
+# Odom is defined in the map frame
+
+# when odom is reseen it is moved in the map frame to the correct position
+
+#
