@@ -9,6 +9,8 @@ import tf2_ros
 from collections import defaultdict
 import numpy as np
 from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import PoseArray
+from geometry_msgs.msg import Pose
 # Read in aruco markers, prefilter the data and save the data
 
 class aruco_marker_filter_node():
@@ -17,26 +19,27 @@ class aruco_marker_filter_node():
         ROS node: aruco_marker_filter_node\\
             
         Functionality: \\
-        * Listens after aruco markers at "topic1" and saves the data.
+        * Listens after aruco markers at "aruco/markers" and saves the data.
         
-        * Filters the data and publishes the filtered data at "topic2"
+        * Filters the data and publishes the filtered data at "aruco/detectedx/belif" and aruco/detected_array/belif"
         
-        * Keeps publishing the aruco markers if seen and not detected.
-        
-        * If seen again, it will update the position of the marker when the new position is more accurate. 
-        
-        * If seen again but at a different location, it will flag that the the robot has drifted and the position is not accurate.       
-        
+        * Keeps publishing the aruco markers, even when not seen
+                
+        * If aruco marker is seen again, publish the filtered data at "aruco/detected_array/update"
+
         Purpose: \\
-            
         
-        Put the node name here, and description of the node
+        * To keep track of the aruco markers, even when not seen.    
         """
         rospy.init_node('aruco_marker_filter_node')
 
         # Subscribers 
         ## Subscribe to aruco/markers and save the data
         self.sub_aruco_markers = rospy.Subscriber("aruco/markers", MarkerArray, self.callback_aruco_markers)
+
+        ## Define publisher that publishes the filtered data as a MarkerArray
+        self.aruco_belif_pub = rospy.Publisher("aruco/detected_array/belif", PoseArray, queue_size=50)
+        self.aruco_update_pub = rospy.Publisher("aruco/detected_array/update", PoseArray, queue_size=50)
 
         # Define rate
         self.update_rate = 10 # [Hz] Change this to the rate you want
@@ -107,7 +110,7 @@ class aruco_marker_filter_node():
                 
                 
                 
-            # Aruco latest seen: keep the 100 latest aruco data and time
+            # Aruco latest seen: keep the 100 latest aruco data and time of the latest aruco data
             self.aruco_latest_time[id] = stamp.secs
             self.aruco_latest_data[id].append(pose_map)
             if len(self.aruco_latest_data[id]) > 100:
@@ -121,24 +124,34 @@ class aruco_marker_filter_node():
     def publish_aruco_marker_belief(self):
         """
         Publish the aruco marker belief of the aruco markers that are established
-        
-        
         """
 
         # Publish the aruco marker belief of the aruco markers that are established
+        pose_array = PoseArray()
+        pose_array.header.frame_id = "map"
+        pose_array.header.stamp = rospy.Time.now()
+        array = []
+        
         for key in self.aruco_ref_established.keys():
             if self.aruco_ref_established[key] == True:
                 # Publish the aruco marker belief of the aruco markers that are established in map frame using tf transform at time.now
                 pose_map = self.aruco_ref_data[key]
-                
+                new_pose = Pose()
 
                 t = TransformStamped()
                 t.header.frame_id = "map"
                 t.child_frame_id = "aruco/detected" + str(key) + "/belief" 
                 t.header.stamp = rospy.Time.now()
+                array.append(pose_map.pose)
+
                 t.transform.rotation = pose_map.pose.orientation
                 t.transform.translation = pose_map.pose.position
                 self.br.sendTransform(t)
+        
+        # If poses in pose array pub it
+        if len(array) > 0:
+            pose_array.poses = array
+            self.aruco_belif_pub.publish(pose_array)
                 
     def process_aruco_init_data(self):
         """
@@ -203,7 +216,90 @@ class aruco_marker_filter_node():
                 
                 rospy.loginfo("aruco marker id: %s is established, but can still be updated", id)
             
-                
+            
+    def publish_aruco_marker_update(self):
+        """
+        If an aruco marker is seen whithin a time threshold, publish the aruco marker update.
+        This is where the robot thinks it sees the aruco marker now in map frame.
+
+        * Will publish at aruco/detectedx/update
+        
+        """
+        
+        # Creat pose array
+        pose_array = PoseArray()
+        pose_array.header.frame_id = "map"
+        pose_array.header.stamp = rospy.Time.now()
+        array = []
+        
+        threshold_time = 0.5
+        threshold_samples = 10
+        
+        time = rospy.get_time().to_sec()
+        # iterate through all aruco markers
+        for id in self.aruco_init_data.keys():
+
+            # if the aruco marker is established
+            if self.aruco_ref_established[id] == True:
+
+                # if the aruco marker is seen recently
+                if time - self.aruco_latest_time[id] < threshold_time:
+                    
+                    # Calculate the mean of the latest 10 observations
+                    x = [pose.pose.position.x for pose in self.aruco_latest_data[id]]
+                    y = [pose.pose.position.y for pose in self.aruco_latest_data[id]]
+                    z = [pose.pose.position.z for pose in self.aruco_latest_data[id]]
+                    
+                    roll = [tf.transformations.euler_from_quaternion([pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w])[0] for pose in self.aruco_latest_data[id]]
+                    pitch = [tf.transformations.euler_from_quaternion([pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w])[1] for pose in self.aruco_latest_data[id]]
+                    yaw = [tf.transformations.euler_from_quaternion([pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w])[2] for pose in self.aruco_latest_data[id]]                
+
+                    # Filter the latest 10 observations
+                    if len(self.aruco_latest_data[id]) > threshold_samples:
+                        x = x[-threshold_samples:]
+                        y = y[-threshold_samples:]
+                        z = z[-threshold_samples:]
+                        yaw = yaw[-threshold_samples:]
+                        pitch = pitch[-threshold_samples:]
+                        roll = roll[-threshold_samples:]
+
+                    # Do outlier detection on the latest 0:10 observations
+                    x = x[np.abs(x - np.mean(x)) < 1 * np.std(x)]
+                    y = y[np.abs(y - np.mean(y)) < 1 * np.std(y)]
+                    z = z[np.abs(z - np.mean(z)) < 1 * np.std(z)]
+                    yaw = yaw[np.abs(yaw - np.mean(yaw)) < 1 * np.std(yaw)]
+                    pitch = pitch[np.abs(pitch - np.mean(pitch)) < 1 * np.std(pitch)]
+                    roll = roll[np.abs(roll - np.mean(roll)) < 1 * np.std(roll)]    
+                    
+                    # Create the aruco update pose
+                    aruco_update_data = PoseStamped()
+                    aruco_update_data.pose.position.x = np.mean(x)
+                    aruco_update_data.pose.position.y = np.mean(y)
+                    aruco_update_data.pose.position.z = np.mean(z)
+                    aruco_update_data.pose.orientation = tf.transformations.quaternion_from_euler(np.mean(roll), np.mean(pitch), np.mean(yaw))
+                    aruco_update_data.header.frame_id = "map"
+                    aruco_update_data.header.stamp = rospy.Time.now()
+                    
+                    # Add to pose array
+                    array.append(aruco_update_data.pose)
+                    
+                    
+                    t = TransformStamped()
+                    t.header.frame_id = "map"
+                    t.child_frame_id = "aruco/detected" + str(id) + "/update" 
+                    t.header.stamp = rospy.Time.now()
+                    t.transform.rotation = aruco_update_data.pose.orientation
+                    t.transform.translation = aruco_update_data.pose.position
+                    self.br.sendTransform(t)
+        
+        # Publish the pose array
+        if len(array) > 0:
+            pose_array.poses = array
+            self.aruco_update_pub.publish(pose_array)
+            
+                    
+                    
+                    
 
     def main(self): # Do main stuff here    
         """
@@ -217,6 +313,10 @@ class aruco_marker_filter_node():
         
         # Keep publishing the aruco, when not seen as an belif
         self.publish_aruco_marker_belief()
+        
+        # If aruco marker is seen, publish the aruco marker update.
+        self.publish_aruco_marker_update()
+        
         
 
     def run(self):
