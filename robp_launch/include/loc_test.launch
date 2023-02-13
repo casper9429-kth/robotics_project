@@ -6,7 +6,7 @@
 
 
 	<!-- Include odom_intit-->
-	<node name="odom_init" pkg="localization" type="odom_init.py" output='screen'/>
+	<node name="odom_init" pkg="localization" type="odom_updater.py" output='screen'/>
 
 	<!-- Include phidgets-->
 	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
