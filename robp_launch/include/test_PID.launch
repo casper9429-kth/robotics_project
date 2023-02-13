@@ -6,7 +6,7 @@
 
 	<node name="map_to_odom" pkg="tf2_ros" type="static_transform_publisher" args="0 0 0 0 0 0 map odom" />
 	<!-- run the motors -->
-    <!--node name="cmd_vel_to_motors_PID" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors_PID.py" output='screen'/-->
+    <node name="cmd_vel_to_motors_PID" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors_PID.py" output='screen'/>
 
 	<!-- run the path tracker -->
 	<node name="path_tracker" pkg="path_planner" type="path_tracker_v1.py" output='screen'/>
@@ -18,7 +18,7 @@
     <!-- <include file="$(find teleop_twist_joy)/launch/teleop.launch" /> -->
 
 	<!-- run the keyboard -->
-	<node name="twist_keyboard" pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" output='screen'/>
+	<!-- <node name="twist_keyboard" pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" output='screen'/> -->
 	
 	<node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
 	
