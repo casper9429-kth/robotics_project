@@ -230,19 +230,20 @@ class odom_init():
         
         # If odom not is established, publish it as zero, also publish base_link as zero to make eveything works
         if not self.establish_odom():
-            # Publish zero odom
-            odom = TransformStamped()
-            odom.header.stamp = rospy.Time.now()
-            odom.header.frame_id = "map"
-            odom.child_frame_id = "odom"
-            odom.transform.translation.x = 0
-            odom.transform.translation.y = 0
-            odom.transform.translation.z = 0
-            odom.transform.rotation.x = 0
-            odom.transform.rotation.y = 0
-            odom.transform.rotation.z = 0
-            odom.transform.rotation.w = 1
-            self.br.sendTransform(odom)
+            ## Publish zero odom
+            #odom = TransformStamped()
+            #odom.header.stamp = rospy.Time.now()
+            #odom.header.frame_id = "map"
+            #odom.child_frame_id = "odom"
+            #odom.transform.translation.x = 0
+            #odom.transform.translation.y = 0
+            #odom.transform.translation.z = 0
+            #odom.transform.rotation.x = 0
+            #odom.transform.rotation.y = 0
+            #odom.transform.rotation.z = 0
+            #odom.transform.rotation.w = 1
+            #self.br.sendTransform(odom)
+
 
             # Publish zero base_link
             base_link = TransformStamped()
