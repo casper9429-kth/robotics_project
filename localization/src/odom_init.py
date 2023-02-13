@@ -224,8 +224,10 @@ class odom_init():
             # If odom is established, publish the established odom and base_link
             # At topic /odom_init
             # At topic /base_link_init        
-            self.odom_established_pub.publish(self.base_link_pose)
-            self.base_link_init_pub.publish(self.odom_pose)
+            #self.odom_established_pub.publish(self.base_link_pose)
+            #self.base_link_init_pub.publish(self.base_link_pose)
+
+            # Remove when done
             trana = self.trans_established
             trana.header.stamp = rospy.Time.now()
             
@@ -236,33 +238,33 @@ class odom_init():
         # If odom not is established, publish it as zero, also publish base_link as zero to make eveything works
         if not self.establish_odom():
             ## Publish zero odom
-            #odom = TransformStamped()
-            #odom.header.stamp = rospy.Time.now()
-            #odom.header.frame_id = "map"
-            #odom.child_frame_id = "odom"
-            #odom.transform.translation.x = 0
-            #odom.transform.translation.y = 0
-            #odom.transform.translation.z = 0
-            #odom.transform.rotation.x = 0
-            #odom.transform.rotation.y = 0
-            #odom.transform.rotation.z = 0
-            #odom.transform.rotation.w = 1
-            #self.br.sendTransform(odom)
+            odom = TransformStamped()
+            odom.header.stamp = rospy.Time.now()
+            odom.header.frame_id = "map"
+            odom.child_frame_id = "odom"
+            odom.transform.translation.x = 0
+            odom.transform.translation.y = 0
+            odom.transform.translation.z = 0
+            odom.transform.rotation.x = 0
+            odom.transform.rotation.y = 0
+            odom.transform.rotation.z = 0
+            odom.transform.rotation.w = 1
+            self.br.sendTransform(odom)
 
 
             # Publish zero base_link
-            base_link = TransformStamped()
-            base_link.header.stamp = rospy.Time.now()
-            base_link.header.frame_id = "odom"
-            base_link.child_frame_id = "base_link"
-            base_link.transform.translation.x = 0
-            base_link.transform.translation.y = 0
-            base_link.transform.translation.z = 0
-            base_link.transform.rotation.x = 0
-            base_link.transform.rotation.y = 0
-            base_link.transform.rotation.z = 0
-            base_link.transform.rotation.w = 1
-            self.br.sendTransform(base_link)
+            # base_link = TransformStamped()
+            # base_link.header.stamp = rospy.Time.now()
+            # base_link.header.frame_id = "odom"
+            # base_link.child_frame_id = "base_link"
+            # base_link.transform.translation.x = 0
+            # base_link.transform.translation.y = 0
+            # base_link.transform.translation.z = 0
+            # base_link.transform.rotation.x = 0
+            # base_link.transform.rotation.y = 0
+            # base_link.transform.rotation.z = 0
+            # base_link.transform.rotation.w = 1
+            # self.br.sendTransform(base_link)
 
         if self.establish_odom():            
             # Move the robot so that the aruco marker is at the same position as the odom
@@ -280,8 +282,8 @@ class odom_init():
             # apply the transform to base_link to move the aruco marker to the same position as the odom
             new_base_link = TransformStamped()
             new_base_link.header.stamp = rospy.Time.now()
-            new_base_link.header.frame_id = "odom"
-            new_base_link.child_frame_id = "base_link"
+            new_base_link.header.frame_id = "map"
+            new_base_link.child_frame_id = "odom"
             new_base_link.transform.translation.x = trans.transform.translation.x
             new_base_link.transform.translation.y = trans.transform.translation.y
             new_base_link.transform.translation.z = trans.transform.translation.z
@@ -293,8 +295,8 @@ class odom_init():
             self.trans_established = new_base_link 
             
             # Save the base_link position and the odom position in map frame
-            self.base_link_pose = self.tfBuffer.lookup_transform("map", "base_link", rospy.Time(0),rospy.Duration(1.0))
-            self.odom_pose = self.tfBuffer.lookup_transform("map", "odom", rospy.Time(0),rospy.Duration(1.0))
+            #self.base_link_pose = self.tfBuffer.lookup_transform("map", "base_link", rospy.Time(0),rospy.Duration(1.0))
+            #self.odom_pose = self.tfBuffer.lookup_transform("map", "odom", rospy.Time(0),rospy.Duration(1.0))
             
             self.maintain = True
             

@@ -23,6 +23,7 @@ class Odometry:
         
         # Create subscriber to encoders
         self.sub_goal = rospy.Subscriber('/motor/encoders', Encoders, self.encoder_callback)
+        #self.sub_base_link_init = rospy.Subscriber('odom_init/base_link', TransformStamped, self.base_link_init_callback)
 
         # Create subscriber to imu/data
         self.sub_imu = rospy.Subscriber('/imu/data', Imu, self.imu_callback)
@@ -44,13 +45,30 @@ class Odometry:
         # init inital pose
         self.x = 0
         self.y = 0
+        self.z = 0
         self.yaw = 0
+        #self.x_init = 0
+        #self.y_init = 0
+        #self.z_init = 0
+        #self.yaw_init = 0
+        
         
         # Init a tf broadcaster
         self.br = tf2_ros.TransformBroadcaster()
 
         # Init a tf listener
         self.listener = tf.TransformListener()
+        
+    #def base_link_init_callback(self,msg):
+    #    """Extract the initial pose of the robot from the odom_init/base_link topic"""
+    #    self.x_init = msg.transform.translation.x
+    #    self.y_init = msg.transform.translation.y
+    #    self.z_init = msg.transform.translation.z
+    #    q = msg.transform.rotation
+    #    roll, pitch, yaw = tf.transformations.euler_from_quaternion([q.x, q.y, q.z, q.w])
+    #    self.yaw_init = yaw
+        
+        
         
 
     def imu_callback(self,msg):
@@ -67,9 +85,7 @@ class Odometry:
 
         if self.yaw_offset == None:
             self.yaw_offset = yaw
-        
-        
-        
+                
         # Update yaw
         self.yaw = yaw - self.yaw_offset  
     
@@ -106,7 +122,7 @@ class Odometry:
         t.header.stamp = rospy.Time.now()
         t.transform.translation.x = self.x
         t.transform.translation.y = self.y
-        t.transform.translation.z = 0.0 # z is always 0
+        t.transform.translation.z = self.z # z is always 0
         q = tf_conversions.transformations.quaternion_from_euler(0, 0, self.yaw) # transform yaw to quaternion
         t.transform.rotation.x = q[0]
         t.transform.rotation.y = q[1]
