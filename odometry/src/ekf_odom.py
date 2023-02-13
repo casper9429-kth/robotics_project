@@ -1,3 +1,7 @@
+# V1.0
+# x,y can't be messrured
+# theta can be measured
+
 #!/usr/bin/env python
 import rospy
 from geometry_msgs.msg import TransformStamped
@@ -118,13 +122,22 @@ class ekf_odometry():
 
 
         # Perform odometry update
-
         current_time = rospy.Time.now().to_sec()
         self.x += self.mu[0] * math.cos(self.theta) * self.update_dt
         self.y += self.mu[0] * math.sin(self.theta) * self.update_dt
         self.theta += self.mu[1] * self.update_dt
         
+
         # Publish the odometry message
+        self.publish_odometry()
+
+        # Update time        
+        self.last_time = self.current_time
+    
+    def publish_odometry(self):
+        """
+        Publish odometry message and transform 
+        """
         odom = Odometry()
         odom.header.stamp = rospy.Time.now()
         odom.header.frame_id = "odom"
@@ -151,9 +164,6 @@ class ekf_odometry():
         t.transform.rotation.z = q[2]
         t.transform.rotation.w = q[3]
         self.br.sendTransform(t)
-        
-        self.last_time = self.current_time
-    
 
 
     def run(self):
