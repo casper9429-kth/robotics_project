@@ -136,7 +136,7 @@ class Odometry:
         # new_twist.header.stamp = t
         new_twist.linear.x = v
         new_twist.angular.z = omega
-        rospy.loginfo('New twist:\n%s', new_twist)
+        # rospy.loginfo('New twist:\n%s', new_twist)
         self.pub_vel.publish(new_twist)
 
 
