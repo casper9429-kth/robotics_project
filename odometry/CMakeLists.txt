@@ -165,6 +165,7 @@ include_directories(
 catkin_install_python(PROGRAMS
   src/wheel_enco_to_odom_msg.py
   src/odometry_mixed_imu.py
+  src/ekf_odom.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
