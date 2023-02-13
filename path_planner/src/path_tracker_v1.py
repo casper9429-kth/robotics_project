@@ -26,13 +26,13 @@ class path_tracker():
         print('Tf2 stuff initialized')
 
         # Position and orientation of the robot in the base_link frame
-        self.pose.pose.position.x = 0
-        self.pose.pose.position.y = 0
-        self.pose.pose.position.z = 0
-        self.pose.pose.orientation.x = 0
-        self.pose.pose.orientation.y = 0
-        self.pose.pose.orientation.z = 0
-        self.pose.pose.orientation.w = 0
+        self.pose.pose.position = 0
+        # self.pose.pose.position.y = 0
+        # self.pose.pose.position.z = 0
+        self.pose.pose.orientation = 0
+        # self.pose.pose.orientation.y = 0
+        # self.pose.pose.orientation.z = 0
+        # self.pose.pose.orientation.w = 0
 
         #publishers
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
@@ -48,6 +48,7 @@ class path_tracker():
     def goal_callback(self, msg):
         self.goal.pose.position = msg.pose.position
         self.goal.pose.orientation = msg.pose.orientation
+
         # print('GOAL POSITION')
         # print(self.goal)
         
