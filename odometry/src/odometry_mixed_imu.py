@@ -8,8 +8,6 @@ import math
 from  math import pi
 import tf
 from sensor_msgs.msg import Imu
-from geometry_msgs.msg import Twist
-from aruco_msgs.msg import MarkerArray
 
 class Odometry:
     def __init__(self):
@@ -29,8 +27,6 @@ class Odometry:
         # Create subscriber to imu/data
         self.sub_imu = rospy.Subscriber('/imu/data', Imu, self.imu_callback)
 
-        # Create a publisher to publish v, omega of the robot right now in the topic /robot/velocities
-        self.pub_vel = rospy.Publisher('/robot/velocities', Twist, queue_size=10)
     
         
         # Robot parameters
@@ -41,7 +37,6 @@ class Odometry:
 
         # First imu yaw angle
         self.yaw_offset = None
-        self.yaw_old = 0
 
         # Create rate var
         self.rate = rospy.Rate(self.update_rate)
@@ -56,8 +51,7 @@ class Odometry:
 
         # Init a tf listener
         self.listener = tf.TransformListener()
-
-       
+        
 
     def imu_callback(self,msg):
         """
@@ -73,7 +67,6 @@ class Odometry:
 
         if self.yaw_offset == None:
             self.yaw_offset = yaw
-            self.yaw_old = yaw - self.yaw_offset  
         
         
         
@@ -122,42 +115,11 @@ class Odometry:
 
         # Publish transform to tf broadcaster init in __init__
         self.br.sendTransform(t)
-        
-
-        # Calculate v and omega
-        omega = 2 * (self.yaw - self.yaw_old) / (msg.delta_time_left + msg.delta_time_right) 
-        v_left = self.wheel_r * d_rad_left / msg.delta_time_left 
-        v_right = self.wheel_r * d_rad_right / msg.delta_time_right
-        v,_ = self.transform_v_left_v_right_to_v_omega(v_left, v_right)
-        t = msg.header.stamp
-
-        # Publish v and omega
-        new_twist = Twist()
-        # new_twist.header.stamp = t
-        new_twist.linear.x = v
-        new_twist.angular.z = omega
-        # rospy.loginfo('New twist:\n%s', new_twist)
-        self.pub_vel.publish(new_twist)
+    
 
 
 
-        self.yaw_old = self.yaw
 
-
-
-    def transform_v_omega_to_v_left_v_right(self, v, omega):
-        """Transforms the desired linear and angular velocity to the desired wheel velocities, angular velocity is in rad/s, speed in m/s"""
-        v_right = (2*v + self.base * omega)/2
-        v_left = (2*v - self.base * omega)/2
-        return v_left, v_right
-
-
-
-    def transform_v_left_v_right_to_v_omega(self, v_left, v_right):
-        """Transforms the desired wheel velocities to the desired linear and angular velocity, angular velocity is in rad/s, speed in m/s"""
-        v = (v_left + v_right) / 2
-        omega = (v_right - v_left) / self.base
-        return v, omega
 
 if __name__ == '__main__':
     new_odometry = Odometry()

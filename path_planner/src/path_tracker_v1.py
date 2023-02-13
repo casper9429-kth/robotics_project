@@ -62,10 +62,12 @@ class path_tracker():
             self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)
         except:
             print('No transform found')
+            pass
+            
             # return None
 
         
-    # Calculate the direction the robot should go
+     # Calculate the direction the robot should go
     def math(self):
         in_goal_tolerance = 0.1
         turn =  1 *   math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
