@@ -17,6 +17,8 @@ rospy.init_node('display_markers')
 tfBuffer = tf2_ros.Buffer(rospy.Duration(60))
 listener = tf2_ros.TransformListener(tfBuffer)
 
+aruco_pose_pub = rospy.Publisher('/aruco_pose', PoseStamped, queue_size=10) #Added for testing purposes
+
 def aruco_callback(msg):
     #rospy.loginfo('New aruco marker detected:\n%s', msg)
     
@@ -41,6 +43,7 @@ def aruco_callback(msg):
             rospy.loginfo("tf ok")
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             rospy.logwarn(e)
+            aruco_pose_pub.publish(pose_map) #Added for testing purposes
             return   
         
 
