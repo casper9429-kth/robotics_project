@@ -28,7 +28,8 @@ class Odometry:
         # Create subscriber to imu/data
         self.sub_imu = rospy.Subscriber('/imu/data', Imu, self.imu_callback)
 
-    
+        # Subscribe to odom_init/odom
+        #self.sub_odom_init = rospy.Subscriber('odom_init/odom', TransformStamped, self.odom_init_callback)
         
         # Robot parameters
         self.ticks_per_rev = 3072
