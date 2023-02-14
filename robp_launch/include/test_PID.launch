@@ -2,7 +2,7 @@
 <launch>
 
 	<!-- Include phidgets-->
-	<!-- <include file="$(find robp_phidgets)/launch/phidgets.launch" /> -->
+	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
 
 	<!-- Include realsense2_camera -->
 	<include file="$(find robp_launch)/include/rs_camera.launch" />

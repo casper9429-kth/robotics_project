@@ -45,19 +45,19 @@ class path_tracker():
         self.goal_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  # To get the position of the goal from camera
         print('Subscribers initalized')
 
-
+    # Getting the position of the goal
     def aruco_callback(self, msg:Marker):
         # self.aruco.header = msg.header
+        # self.aruco.header.frame_id = 'map'
         # self.aruco.id = msg.id
-        # self.aruco.pose.pose.position = msg.pose.pose.position
-        # self.aruco.pose.pose.orientation = msg.pose.pose.orientation
-
+        # self.goal.header.frame_id = 'map'
+        self.goal.header.stamp = msg.header.stamp
         self.goal.pose.position = msg.pose.pose.position
         self.goal.pose.orientation = msg.pose.pose.orientation
 
-    def goal_callback(self, msg):
-        self.goal.pose.position = msg.pose.position
-        self.goal.pose.orientation = msg.pose.orientation
+    # def goal_callback(self, msg:PoseStamped):
+    #     self.goal.pose.position = msg.pose.position
+    #     self.goal.pose.orientation = msg.pose.orientation
 
 
         
@@ -70,7 +70,7 @@ class path_tracker():
             transform_map_2_base_link = self.tfBuffer.lookup_transform(self.robot_frame,'map', stamp,rospy.Duration(0.5)) # The transform that relate map frame to base link frame
             self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)
         except:
-            print('No transform found')
+            # print('No transform found')
             pass
             
             # return None
@@ -78,7 +78,7 @@ class path_tracker():
         
      # Calculate the direction the robot should go
     def math(self):
-        in_goal_tolerance = 0.1
+        in_goal_tolerance = 0.12
         turn =  1 *   math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
         forward = 1 * math.hypot(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
 
@@ -86,8 +86,8 @@ class path_tracker():
             forward = 0
             turn = 0
             # print('Goal reached')
-        turn = max(turn,-1.0)
-        turn = min(turn,1.0)
+        turn = max(turn,-0.5)
+        turn = min(turn,0.5)
         forward = max(turn,-0.5)
         forward = min(turn,0.5)
         #turn  = max(turn,-1)
@@ -105,18 +105,18 @@ class path_tracker():
         message.angular.z = msg[1]
         self.cmd_pub.publish(message)
 
-    # send goal to move_base which allows it to be shown in rviz
-    def send_goal(self):
-        self.goal.header.frame_id = 'map'
-        self.goal.header.stamp = rospy.Time.now()
-        self.goal_pub.publish(self.goal)
+    # # send goal to move_base which allows it to be shown in rviz
+    # def send_goal(self):
+    #     self.goal.header.frame_id = 'map'
+    #     self.goal.header.stamp = self.aruco.header.stamp
+    #     self.goal_pub.publish(self.goal)
 
 
     def spin(self):
         self.robots_location_in_map()
         directions = self.math()
         self.publish_twist(directions)
-        self.send_goal()
+        # self.send_goal()
     
                     
     
