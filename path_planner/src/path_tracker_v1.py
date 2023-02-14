@@ -77,8 +77,8 @@ class path_tracker():
             forward = 0
             turn = 0
             # print('Goal reached')
-        turn = max(turn,-0.5)
-        turn = min(turn,0.5)
+        turn = max(turn,-1.0)
+        turn = min(turn,1.0)
         forward = max(turn,-0.5)
         forward = min(turn,0.5)
         #turn  = max(turn,-1)
