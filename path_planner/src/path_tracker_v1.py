@@ -41,6 +41,7 @@ class path_tracker():
         # subscribers
         self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  # To get the position of the goal
         #self.goal_sub = rospy.Subscriber('/goal', PoseStamped, self.goal_callback)  # To get the position of the goal from path planner
+        self.rate = rospy.Rate(10)
         print('Subscribers initalized')
 
 
