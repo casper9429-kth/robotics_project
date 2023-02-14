@@ -30,6 +30,7 @@ class odom_updater():
                 
         # Publishers
         self.odom_established_pub = rospy.Publisher("odom_updater/odom", TransformStamped, queue_size=1)
+
                 
         # Define rate
         self.update_rate = 20 # [Hz] Change this to the rate you want
@@ -67,6 +68,7 @@ class odom_updater():
                             
                 try:
                     pose_map = self.tfBuffer.transform(pose_map, "map", rospy.Duration(1.0))
+
                 except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                     rospy.loginfo("Could not transform aruco marker pose to map frame")
                     rospy.logwarn(e)
