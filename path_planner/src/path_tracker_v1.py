@@ -7,6 +7,7 @@ import tf2_geometry_msgs
 from aruco_msgs.msg import MarkerArray
 
 
+
 class path_tracker():
     def __init__(self):
         rospy.init_node('path_tracker')
@@ -40,8 +41,9 @@ class path_tracker():
 
         # subscribers
         self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  # To get the position of the goal
-        #self.goal_sub = rospy.Subscriber('/goal', PoseStamped, self.goal_callback)  # To get the position of the goal from path planner
+        # self.goal_sub = rospy.Subscriber('/aruco/markers', MarkerArray, self.aruco_callback)  # To get the position of the goal from camera
         print('Subscribers initalized')
+
 
 
 
@@ -57,8 +59,8 @@ class path_tracker():
     def robots_location_in_map(self):
         
         stamp = self.pose.header.stamp  
-        try:
-            transform_map_2_base_link = self.tfBuffer.lookup_transform(self.robot_frame,'map', stamp,rospy.Duration(0.5)) # The transform that relate map fram to base link frame
+        try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
+            transform_map_2_base_link = self.tfBuffer.lookup_transform(self.robot_frame,'map', stamp,rospy.Duration(0.5)) # The transform that relate map frame to base link frame
             self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)
         except:
             print('No transform found')
