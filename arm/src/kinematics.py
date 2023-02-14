@@ -32,7 +32,7 @@ class Node_name():
         self.l_12 = 18e-3 # [m]
         self.l_23 = 100e-3 # [m]
         self.l_34 = 97e-3 # [m]
-        # self.l_5e = 100e-3 # [m] TODO: Find this value
+        self.l_5e = 55e-3 # [m] TODO: Find this value
 
         # Joint angles
         self.theta1 = 0
@@ -63,11 +63,12 @@ class Node_name():
         The first row is the first joint to the second joint.
         The last row is the fifth joint to the end effector.
         """
-        DH = [[0,         pi/2,  self.l_12, self.theta1       ],
+        DH = [[0,         -pi/2,  self.l_12, self.theta1      ],
               [self.l_23, 0,     0,         self.theta2 - pi/2],
               [self.l_34, 0,     0,         self.theta3       ],
-              [0,         -pi/2, 0,         self.theta4 + pi/2],
-              [0,         pi/2,  self.l_5e, self.theta5       ]]
+              [0,         pi/2, 0,         self.theta4 + pi/2 ],
+              [0,         0,     self.l_5e, self.theta5       ]]
+        return DH
     
     def forward_kinematics(self):
         """
@@ -97,7 +98,7 @@ class Node_name():
         Main loop, instead of changing run function,
         write your code here to make it more readable.
         """
-        print('funny message')
+        print(self.forward_kinematics())
 
     def run(self):
         """

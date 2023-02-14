@@ -158,6 +158,7 @@ include_directories(
 catkin_install_python(PROGRAMS
   src/yeet.py
   src/arm.py
+  src/kinematics.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
