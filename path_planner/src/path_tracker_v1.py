@@ -4,7 +4,7 @@ import math
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist
 import tf2_ros
 import tf2_geometry_msgs
-from aruco_msgs.msg import MarkerArray
+from aruco_msgs.msg import MarkerArray, Marker
 
 
 
@@ -18,6 +18,7 @@ class path_tracker():
         self.pose_in_map = PoseStamped()
         self.goal = PoseStamped()
         self.goal_in_base_link = PoseStamped()
+        self.aruco = Marker()
         self.pose.header.frame_id = self.robot_frame
 
         # tf stuff
@@ -40,19 +41,25 @@ class path_tracker():
         self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
 
         # subscribers
-        self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  # To get the position of the goal
-        # self.goal_sub = rospy.Subscriber('/aruco/markers', MarkerArray, self.aruco_callback)  # To get the position of the goal from camera
+        # self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  # To get the position of the goal
+        self.goal_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  # To get the position of the goal from camera
         print('Subscribers initalized')
 
 
+    def aruco_callback(self, msg:Marker):
+        # self.aruco.header = msg.header
+        # self.aruco.id = msg.id
+        # self.aruco.pose.pose.position = msg.pose.pose.position
+        # self.aruco.pose.pose.orientation = msg.pose.pose.orientation
 
+        self.goal.pose.position = msg.pose.pose.position
+        self.goal.pose.orientation = msg.pose.pose.orientation
 
     def goal_callback(self, msg):
         self.goal.pose.position = msg.pose.position
         self.goal.pose.orientation = msg.pose.orientation
 
-        # print('GOAL POSITION')
-        # print(self.goal)
+
         
 
     # give goal in base link frame
