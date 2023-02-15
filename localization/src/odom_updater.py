@@ -11,7 +11,7 @@ import numpy as np
 from geometry_msgs.msg import TransformStamped
 from geometry_msgs.msg import PoseArray
 from geometry_msgs.msg import Pose
-
+from std_msgs.msg import Bool
 
 class odom_updater():
     def __init__(self):
@@ -30,6 +30,9 @@ class odom_updater():
                 
         # Publishers
         self.odom_established_pub = rospy.Publisher("odom_updater/odom", TransformStamped, queue_size=1)
+
+        # Define a publisher that sends a bool msg 
+        self.reset_odom_cov_pub = rospy.Publisher("odom_updater/reset_odom_cov", Bool, queue_size=1)
 
                 
         # Define rate
@@ -141,6 +144,10 @@ class odom_updater():
                 new_t_map_odom.transform.rotation.z = q[2]
                 new_t_map_odom.transform.rotation.w = q[3]
 
+                reset_odom_cov_msg = Bool()
+                reset_odom_cov_msg.data = True
+                self.reset_odom_cov_pub.publish(reset_odom_cov_msg)
+                
                 #rospy.loginfo("Publishing new odom")
                 self.new_aruco_marker = False
                 self.br.sendTransform(new_t_map_odom)
@@ -173,6 +180,7 @@ class odom_updater():
                 new_t_map_odom.transform.rotation.z = q[2]
                 new_t_map_odom.transform.rotation.w = q[3]
 
+                
                 self.br.sendTransform(new_t_map_odom)
                 return None
                 

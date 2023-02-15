@@ -27,3 +27,9 @@ The node subscribes to the following topics:
 1. ``/motor/encoders``
 2. ``/imu/data``
 3. ``/motor/duty_cycles``
+4. ``odom_updater/reset_odom_cov``
+
+1. is used to get v,omega from the encoders
+2. is used to get omega from the imu
+3. is used to get the control input u
+4. is used to reset the covariance matrix of the odometry when the anchor is found

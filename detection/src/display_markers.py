@@ -40,7 +40,6 @@ def aruco_callback(msg):
         
         try:
             pose_map = tfBuffer.transform(pose_map, "map", rospy.Duration(1.0))
-            rospy.loginfo("tf ok")
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             rospy.logwarn(e)
             return   

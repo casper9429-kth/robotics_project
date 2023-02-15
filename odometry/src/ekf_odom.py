@@ -16,25 +16,30 @@ import numpy as np
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from robp_msgs.msg import DutyCycles
-from geometry_msgs.msg import PoseWithCovarianceStamped
+from aruco_msgs.msg import MarkerArray
+from std_msgs.msg import Bool
 
-class ekf_odometry():
+class ekf_slam():
     def __init__(self):
         """
-        Peforms EKF odometry
+        Peforms EKF odometry and EKF aruco slam
+        
+        The x,y,theta predict and v,omega predict and update is done in run 
+        
+        The x,y,theta update is done in aruco_callback
         """
-        rospy.init_node('ekf_odometry')
+        rospy.init_node('ekf_slam')
 
         # Subscribers
         self.sub_goal = rospy.Subscriber('/motor/encoders', Encoders, self.encoder_callback)
         self.sub_imu = rospy.Subscriber('/imu/data', Imu, self.imu_callback)
-        #self.cmd_vel_sub = rospy.Subscriber('/cmd_vel', Twist, self.cmd_vel_callback)
         self.duty_cycle_pub = rospy.Subscriber('/motor/duty_cycles', DutyCycles, self.duty_cycle_callback)
-
+        #self.aruco_sub = rospy.Subscriber('/aruco/markers', MarkerArray, self.aruco_callback)
         
+        self.reset_odom_cov_sub = rospy.Subscriber("odom_updater/reset_odom_cov", Bool,self.odom_cov_reset_callback)
+                                          
         # Publisher# Publish the map and the odometry
         self.odom_pub = rospy.Publisher("odom", Odometry, queue_size=50)
-        self.pose_with_covariance_pub = rospy.Publisher("pose_with_covariance", PoseWithCovarianceStamped, queue_size=50)
 
 
         # TF Stuff
@@ -70,15 +75,22 @@ class ekf_odometry():
         self.u = np.array([0,0])
         
         # EKF var 
+        ## v,omega fusion
         self.R = np.eye(2) * 100  
-
         self.Q_enco = np.eye(2)
         self.Q_enco[0,0] = 100
         self.Q_enco[1,1] = 10
-        
         self.Q_imu = np.eye(2)
         self.Q_imu[0,0] = 100000000 # Must be very high, because the imu is not very accurate at determining the speed
         self.Q_imu[1,1] = 0.1
+        ## aruco slam
+        ### x,y,theta predict
+        self.odom_sigma = np.eye(3)*0 # Predict cov
+        self.reset_odom_sigma = 0 # Reset odom cov when achor is found
+        self.R_odom = np.eye(3) 
+        self.R_odom[0,0] = 0.00001
+        self.R_odom[1,1] = 0.00001
+        self.R_odom[2,2] = 0.0000001        
         
         # Odometry var 
         self.x = 0
@@ -138,13 +150,49 @@ class ekf_odometry():
         self.current_time = current_time.to_sec()
         dt = self.current_time - self.last_time
         
+        
         if dt > self.update_dt*1.1:
             rospy.logwarn("refresh rate to high: %f", dt)
-            
+        
+        # Only predict
         self.x += self.mu[0] * math.cos(self.theta) * dt
         self.y += self.mu[0] * math.sin(self.theta) * dt
         self.theta = self.theta + self.mu[1] * dt
+        # Calculate/Update G_odom 
+        self.G_odom = np.array([[1, 0, -self.mu[0] * math.sin(self.theta) * dt],
+                       [0, 1, self.mu[0] * math.cos(self.theta) * dt],
+                       [0, 0, 1]])
         
+        # If anchor is found, reset odom cov
+        if np.abs(self.current_time - self.reset_odom_sigma) < 0.1:
+            self.odom_sigma = np.zeros((3,3))
+        elif np.abs(self.mu[0])<0.01 and np.abs(self.mu[1])<0.01:
+            pass
+        else:
+            # R_odom should get the error from v_omega fusion            
+            # self.sigma[0] is var in v
+            # self.sigma[1] is var in omega
+            # if v omega is high error, then R_odom should be high
+            # if time is high, then R_odom should be high
+            # Include linearization
+
+            # error x: (self.mu[0] + v) * math.cos(self.theta + omega*dt) * dt 
+            # lin x:   math.cos(self.theta + omega*dt) * dt, -(self.mu[0] + v) * math.sin(self.theta + omega*dt) * dt * dt
+            # error y: self.mu[0] * math.sin(self.theta) * dt
+            # lin y:  math.sin(self.theta + omega*dt) * dt, self.mu[0] * math.cos(self.theta + omega*dt) * dt * dt
+            # error theta: self.mu[1] * dt
+            # lin theta: 0, dt
+            # x_y_theta_lin = np.array([[math.cos(self.theta + self.mu[1]*dt) * dt, -(self.mu[0] + self.mu[0]) * math.sin(self.theta + self.mu[1]*dt) * dt * dt],[0,dt]])
+            # we can disregard the mu[]*dt terms since they are small
+            x_y_theta_lin = [[math.cos(self.theta) * dt, -(self.mu[0]) * math.sin(self.theta) * dt * dt],[math.sin(self.theta) * dt, self.mu[0] * math.cos(self.theta) * dt * dt],[0,dt]]
+            x_y_theta_lin = np.array(x_y_theta_lin)
+
+            # Include the errors from self.sigma and the error constant term to keep it from becoming zero            
+            R_odom = x_y_theta_lin @ self.sigma @ x_y_theta_lin.T + self.R_odom
+            
+            self.odom_sigma = self.G_odom @ self.odom_sigma @ self.G_odom.T + R_odom
+        
+        rospy.loginfo(self.odom_sigma)
         
         # Publish the odometry message
         self.publish_odometry(current_time)
@@ -169,14 +217,6 @@ class ekf_odometry():
         odom.pose.pose.position.y = self.y
         odom.pose.pose.orientation = tf.transformations.quaternion_from_euler(0, 0, self.theta)
         self.odom_pub.publish(odom)
-
-        odom_with_cov = PoseWithCovarianceStamped() 
-        odom_with_cov.header.stamp = time
-        odom_with_cov.header.frame_id = "odom"
-        odom_with_cov.pose.pose.position.x = self.x
-        odom_with_cov.pose.pose.position.y = self.y
-        odom_with_cov.pose.pose.orientation = tf.transformations.quaternion_from_euler(0, 0, self.theta)
-        self.pose_with_covariance_pub.publish(odom_with_cov)
 
 
         # Publish the transform 
@@ -207,6 +247,13 @@ class ekf_odometry():
             self.main()
             self.rate.sleep()
 
+
+    def odom_cov_reset_callback(self,msg):
+        """
+        Reset odom covariance callback
+        """
+        self.reset_odom_sigma = rospy.Time.now().to_sec()
+        #self.odom_sigma = np.zeros((3,3))#np.eye(3)*0
 
     def duty_cycle_callback(self,msg):
         """
@@ -278,5 +325,5 @@ class ekf_odometry():
 
 if __name__ == "__main__":
 
-    node=ekf_odometry()
+    node=ekf_slam()
     node.run()
