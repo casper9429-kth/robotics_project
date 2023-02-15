@@ -130,7 +130,7 @@ class ekf_odometry():
         current_time = rospy.Time.now()
         self.current_time = current_time.to_sec()
         dt = self.current_time - self.last_time
-        if dt > self.update_dt:
+        if dt > self.update_dt*1.05:
             rospy.loginfo("dt: %f", dt)
         self.x += self.mu[0] * math.cos(self.theta) * dt
         self.y += self.mu[0] * math.sin(self.theta) * dt

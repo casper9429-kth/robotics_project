@@ -15,6 +15,7 @@ from sensor_msgs.msg import Imu
 import numpy as np
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
+from robp_msgs.msg import DutyCycles
 
 class ekf_odometry():
     def __init__(self):
@@ -26,7 +27,9 @@ class ekf_odometry():
         # Subscribers
         self.sub_goal = rospy.Subscriber('/motor/encoders', Encoders, self.encoder_callback)
         self.sub_imu = rospy.Subscriber('/imu/data', Imu, self.imu_callback)
-        self.cmd_vel_sub = rospy.Subscriber('/cmd_vel', Twist, self.cmd_vel_callback)
+        #self.cmd_vel_sub = rospy.Subscriber('/cmd_vel', Twist, self.cmd_vel_callback)
+        self.duty_cycle_pub = rospy.Subscriber('/motor/duty_cycles', DutyCycles, self.duty_cycle_callback)
+
         
         # Publisher# Publish the map and the odometry
         self.odom_pub = rospy.Publisher("odom", Odometry, queue_size=50)
@@ -44,6 +47,7 @@ class ekf_odometry():
         
         
         # Robot parameters
+        
         self.ticks_per_rev = 3072
         self.wheel_r = 0.04921
         self.base = 0.3 
@@ -51,15 +55,15 @@ class ekf_odometry():
         
         # EKF var
         self.count = 0
-        self.mu_bel = np.zeros(2)
+        self.mu_bel = np.array([0,0])
         self.simga_bel = np.eye(2)
-        self.mu = np.zeros(2)
+        self.mu = np.array([0,0])
         self.sigma = np.eye(2)
         
         # Sensor var
-        self.enco = np.zeros(2)
-        self.imu = np.zeros(2)
-        self.u = np.zeros(2)
+        self.enco = np.array([0,0])
+        self.imu = np.array([0,0])
+        self.u = np.array([0,0])
         
         # EKF var 
         self.R = np.eye(2) * 100  
@@ -95,9 +99,9 @@ class ekf_odometry():
 
         if self.count == 0:
             # Initialize state vector
-            self.mu = np.zeros(2)
+            self.mu = np.array([0,0])
             self.sigma = np.eye(2)
-            self.mu_bel = np.zeros(2)
+            self.mu_bel = np.array([0,0])
             self.simga_bel = np.eye(2)
             self.count += 1        
             return
@@ -105,39 +109,52 @@ class ekf_odometry():
 
         # predict step
         self.mu_bel = self.u
-        self.simga_bel = np.eye(2) * self.sigma * np.eye(2).T + self.R
+        self.simga_bel = np.eye(2) @ self.sigma @ np.eye(2).T + self.R
+
 
 
         # update step enco
         H = np.eye(2)
-        K = self.simga_bel * H.T * np.linalg.inv(H * self.simga_bel * H.T + self.Q_enco)
-        self.mu_bel = self.mu_bel + K * (self.enco - self.mu_bel)
-        self.simga_bel = (np.eye(2) - K * H) * self.simga_bel        
         
+        K = self.simga_bel @ H.T @ np.linalg.inv(H @ self.simga_bel @ H.T + self.Q_enco)
+        self.mu_bel = self.mu_bel + K @ (self.enco - self.mu_bel)
+        self.simga_bel = (np.eye(2) - K @ H) @ self.simga_bel        
+        
+                
         # update step imu
         H = np.eye(2)
-        K = self.simga_bel * H.T * np.linalg.inv(H * self.simga_bel * H.T + self.Q_imu)
-        self.mu = self.mu_bel + K * (self.imu - self.mu_bel)
-        self.simga = (np.eye(2) - K * H) * self.simga_bel
+        K = self.simga_bel @ H.T @ np.linalg.inv(H @ self.simga_bel @ H.T + self.Q_imu)
+        self.mu = self.mu_bel + K @ (self.imu - self.mu_bel)
+        self.simga = (np.eye(2) - K @ H) @ self.simga_bel
+
 
 
         # Perform odometry update
-        current_time = rospy.Time.now().to_sec()
-        self.x += self.mu[0] * math.cos(self.theta) * self.update_dt
-        self.y += self.mu[0] * math.sin(self.theta) * self.update_dt
-        self.theta += self.mu[1] * self.update_dt
+        current_time = rospy.Time.now()
+        self.current_time = current_time.to_sec()
+        dt = self.current_time - self.last_time
         
-
+        if dt > self.update_dt*1.1:
+            rospy.logwarn("refresh rate to high: %f", dt)
+            
+        self.x += self.mu[0] * math.cos(self.theta) * dt
+        self.y += self.mu[0] * math.sin(self.theta) * dt
+        self.theta = self.theta + self.mu[1] * dt
+        
+        
         # Publish the odometry message
-        self.publish_odometry()
+        self.publish_odometry(current_time)
 
         # Update time        
         self.last_time = self.current_time
     
-    def publish_odometry(self):
+    def publish_odometry(self,time = None):
         """
         Publish odometry message and transform 
         """
+        if time is None:
+            time = rospy.Time.now()
+        
         odom = Odometry()
         odom.header.stamp = rospy.Time.now()
         odom.header.frame_id = "odom"
@@ -146,7 +163,7 @@ class ekf_odometry():
         odom.twist.twist.angular.z = self.mu[1]
         odom.pose.pose.position.x = self.x
         odom.pose.pose.position.y = self.y
-        odom.pose.orientation = tf.transformations.quaternion_from_euler(0, 0, self.theta)
+        odom.pose.pose.orientation = tf.transformations.quaternion_from_euler(0, 0, self.theta)
         self.odom_pub.publish(odom)
 
         # Publish the transform 
@@ -178,13 +195,27 @@ class ekf_odometry():
             self.rate.sleep()
 
 
+    def duty_cycle_callback(self,msg):
+        """
+        Duty cycle callback
+        """
+        
+        # Calc v_left and v_right
+        v_left = msg.duty_cycle_left
+        v_right = msg.duty_cycle_right
+
+        # calculate v, omega
+        v, omega = self.transform_v_left_v_right_to_v_omega(v_left, v_right)
+
+        self.u = np.array([v,omega])
+
     def imu_callback(self,msg):
         """
         Imu callback
         """
 
         # Get angular velocity in rad/s
-        self.imu = np.array([0,msg.angular_velocity.z])
+        self.imu = np.array([0,-msg.angular_velocity.z])
 
         
 
@@ -210,7 +241,7 @@ class ekf_odometry():
         This node subscribes to the /cmd_vel topic and converts the linear and angular velocity
         It then updates the internal variables that are used to publish the duty cycle message
         """
-        self.u = [msg.linear.x,msg.angular.z]
+        self.u = np.array([msg.linear.x,msg.angular.z])
 
 
     def transform_v_omega_to_v_left_v_right(self, v, omega):

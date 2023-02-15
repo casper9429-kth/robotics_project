@@ -118,7 +118,10 @@ class Odometry:
         #self.yaw = self.yaw + D_theta
         
         # Add new x, y and yaw to transform, first cart then rot
-        t.header.stamp = rospy.Time.now()
+        t = TransformStamped()
+        t.header.frame_id = 'odom'
+        t.child_frame_id = 'base_link'
+        t.header.stamp = msg.header.stamp
         t.transform.translation.x = self.x
         t.transform.translation.y = self.y
         t.transform.translation.z = self.z # z is always 0
