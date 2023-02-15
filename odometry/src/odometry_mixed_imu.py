@@ -102,6 +102,7 @@ class Odometry:
         self.y = self.y + D * math.sin(self.yaw)
         #self.yaw = self.yaw + D_theta
         
+        #print(f'robot pose: x: {self.x}, y: {self.y}, yaw: {self.yaw}')
         # Add new x, y and yaw to transform, first cart then rot
         t.header.stamp = rospy.Time.now()
         t.transform.translation.x = self.x
