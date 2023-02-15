@@ -16,6 +16,7 @@ import numpy as np
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from robp_msgs.msg import DutyCycles
+from geometry_msgs.msg import PoseWithCovarianceStamped
 
 class ekf_odometry():
     def __init__(self):
@@ -33,6 +34,9 @@ class ekf_odometry():
         
         # Publisher# Publish the map and the odometry
         self.odom_pub = rospy.Publisher("odom", Odometry, queue_size=50)
+        self.pose_with_covariance_pub = rospy.Publisher("pose_with_covariance", PoseWithCovarianceStamped, queue_size=50)
+
+
         # TF Stuff
         self.tfBuffer = tf2_ros.Buffer(rospy.Duration(60))
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
@@ -156,7 +160,7 @@ class ekf_odometry():
             time = rospy.Time.now()
         
         odom = Odometry()
-        odom.header.stamp = rospy.Time.now()
+        odom.header.stamp = time
         odom.header.frame_id = "odom"
         odom.child_frame_id = "base_link"        
         odom.twist.twist.linear.x = self.mu[0]
@@ -166,12 +170,21 @@ class ekf_odometry():
         odom.pose.pose.orientation = tf.transformations.quaternion_from_euler(0, 0, self.theta)
         self.odom_pub.publish(odom)
 
+        odom_with_cov = PoseWithCovarianceStamped() 
+        odom_with_cov.header.stamp = time
+        odom_with_cov.header.frame_id = "odom"
+        odom_with_cov.pose.pose.position.x = self.x
+        odom_with_cov.pose.pose.position.y = self.y
+        odom_with_cov.pose.pose.orientation = tf.transformations.quaternion_from_euler(0, 0, self.theta)
+        self.pose_with_covariance_pub.publish(odom_with_cov)
+
+
         # Publish the transform 
         # Add new x, y and yaw to transform, first cart then rot
         t = TransformStamped()
         t.header.frame_id = "odom"
         t.child_frame_id = "base_link"
-        t.header.stamp = rospy.Time.now()
+        t.header.stamp = time
         t.transform.translation.x = self.x
         t.transform.translation.y = self.y
         t.transform.translation.z = 0 # z is always 0
@@ -204,6 +217,7 @@ class ekf_odometry():
         v_left = msg.duty_cycle_left
         v_right = msg.duty_cycle_right
 
+
         # calculate v, omega
         v, omega = self.transform_v_left_v_right_to_v_omega(v_left, v_right)
 
@@ -227,13 +241,12 @@ class ekf_odometry():
         """
 
         # Calc v_left and v_right
-        mean = (msg.delta_time_left + msg.delta_time_right)/2
+        mean = 50#(msg.delta_time_left + msg.delta_time_right)/2
         v_left = (((msg.delta_encoder_left/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ mean)*1000
         v_right = (((msg.delta_encoder_right/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ mean)*1000
         #v_left = (((msg.delta_encoder_left/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ msg.delta_time_left)*1000
         #v_right = (((msg.delta_encoder_right/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ msg.delta_time_right)*1000
 
-        
         # calculate v, omega
         v, omega = self.transform_v_left_v_right_to_v_omega(v_left, v_right)
 

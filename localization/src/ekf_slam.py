@@ -14,7 +14,9 @@ from aruco_msgs.msg import MarkerArray
 from geometry_msgs.msg import PoseStamped
 from collections import defaultdict
 
-
+# Aruco EKF SLAM
+# If aruco marker is seen, add it to the state space and update the state vector
+# It inherits the covariance matrix from the odometry EKF
 
 
 class ekf_slam():
@@ -143,6 +145,7 @@ class ekf_slam():
     def aruco_marker_callback(self, msg):
         """
         Callback function for aruco marker detection
+        
         """
         
         for marker in msg.markers:
