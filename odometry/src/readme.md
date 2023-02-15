@@ -7,8 +7,6 @@
 2. ``ìnclude/``
    1. ``odometry.launch``
 
-ekf_odom.py and odometry_mixied_imu.py do the same thing, but the latter is deprecated.
-
 ## How to use
 # Include the launch file in your launch file
 ```
