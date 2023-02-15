@@ -69,12 +69,12 @@ class ekf_odometry():
         self.R = np.eye(2) * 100  
 
         self.Q_enco = np.eye(2)
-        self.Q_enco[0,0] = 10
-        self.Q_enco[1,1] = 100
+        self.Q_enco[0,0] = 100
+        self.Q_enco[1,1] = 10
         
         self.Q_imu = np.eye(2)
-        self.Q_imu[0,0] = 100000 # Must be very high, because the imu is not very accurate at determining the speed
-        self.Q_imu[1,1] = 50
+        self.Q_imu[0,0] = 100000000 # Must be very high, because the imu is not very accurate at determining the speed
+        self.Q_imu[1,1] = 0.1
         
         # Odometry var 
         self.x = 0
@@ -227,8 +227,11 @@ class ekf_odometry():
         """
 
         # Calc v_left and v_right
-        v_left = (((msg.delta_encoder_left/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ msg.delta_time_left)*1000
-        v_right = (((msg.delta_encoder_right/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ msg.delta_time_right)*1000
+        mean = (msg.delta_time_left + msg.delta_time_right)/2
+        v_left = (((msg.delta_encoder_left/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ mean)*1000
+        v_right = (((msg.delta_encoder_right/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ mean)*1000
+        #v_left = (((msg.delta_encoder_left/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ msg.delta_time_left)*1000
+        #v_right = (((msg.delta_encoder_right/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ msg.delta_time_right)*1000
 
         
         # calculate v, omega

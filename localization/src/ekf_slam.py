@@ -14,23 +14,20 @@ from aruco_msgs.msg import MarkerArray
 from geometry_msgs.msg import PoseStamped
 from collections import defaultdict
 
-class ekf_odometry():
+
+
+
+class ekf_slam():
     def __init__(self):
         """
-        Peforms EKF odometry
+        Peforms EKF SLAM using aruco markers
         """
-        rospy.init_node('ekf_odometry')
+        rospy.init_node('ekf_slam')
 
         # Subscribers
-        self.sub_goal = rospy.Subscriber('/motor/encoders', Encoders, self.encoder_callback) # encoders 
-        self.sub_imu = rospy.Subscriber('/imu/data', Imu, self.imu_callback)                 # imu 
-        self.cmd_vel_sub = rospy.Subscriber('/cmd_vel', Twist, self.cmd_vel_callback)        # cmd_vel 
         self.aruco_detect_sub = rospy.Subscriber('aruco/markers', MarkerArray, self.aruco_detect_callback) 
         
         
-        # Publisher# Publish the map and the odometry
-        self.odom_pub = rospy.Publisher("odom", Odometry, queue_size=50) # Publish the odometry and make it available for other nodes
-
         # TF Stuff
         self.tfBuffer = tf2_ros.Buffer(rospy.Duration(300))
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
@@ -55,13 +52,7 @@ class ekf_odometry():
         self.mu = np.zeros(2)
         self.sigma = np.eye(2)
         
-        
-        
-        # Sensor var, encoder and imu, will be updated by the callback functions
-        self.enco = np.zeros(2)
-        self.imu = np.zeros(2)
-        self.u = np.zeros(2)
-        
+                
         # EKF settings
         self.R = np.eye(2) * 100  
         self.Q_enco = np.eye(2)
@@ -310,5 +301,5 @@ class ekf_odometry():
 
 if __name__ == "__main__":
 
-    node=ekf_odometry()
+    node=ekf_slam()
     node.run()
