@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-import rospy
 import math
-from geometry_msgs.msg import PoseStamped, TransformStamped, Twist
+import rospy
 import tf2_ros
 import tf2_geometry_msgs
+from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray, Marker
-
+from geometry_msgs.msg import PoseStamped, TransformStamped, Twist
 
 
 class path_tracker():
@@ -19,6 +19,8 @@ class path_tracker():
         self.goal = PoseStamped()
         self.goal_in_base_link = PoseStamped()
         self.aruco = Marker()
+        # self.move = DutyCycles()
+        self.move = Twist()
         self.pose.header.frame_id = self.robot_frame
 
         # tf stuff
@@ -28,37 +30,37 @@ class path_tracker():
         print('Tf2 stuff initialized')
 
         # Position and orientation of the robot in the base_link frame
-        self.pose.pose.position = 0
-        # self.pose.pose.position.y = 0
-        # self.pose.pose.position.z = 0
-        self.pose.pose.orientation = 0
-        # self.pose.pose.orientation.y = 0
-        # self.pose.pose.orientation.z = 0
-        # self.pose.pose.orientation.w = 0
+        self.pose.pose.position.x = 0
+        self.pose.pose.position.y = 0
+        self.pose.pose.position.z = 0
+        self.pose.pose.orientation.x = 0
+        self.pose.pose.orientation.y = 0
+        self.pose.pose.orientation.z = 0
+        self.pose.pose.orientation.w = 0
 
         #publishers
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
+        self.duty_pub = rospy.Publisher('/motor/duty_cycles', DutyCycles, queue_size=10)
 
         # subscribers
-        # self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  # To get the position of the goal
-        self.goal_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  # To get the position of the goal from camera
+        self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  
+        # self.aruco_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  
         print('Subscribers initalized')
 
-
-    def aruco_callback(self, msg:Marker):
+    # To get the position of the goal from camera
+    # def aruco_callback(self, msg:Marker):
         # self.aruco.header = msg.header
         # self.aruco.id = msg.id
         # self.aruco.pose.pose.position = msg.pose.pose.position
         # self.aruco.pose.pose.orientation = msg.pose.pose.orientation
 
-        self.goal.pose.position = msg.pose.pose.position
-        self.goal.pose.orientation = msg.pose.pose.orientation
 
-    def goal_callback(self, msg):
+    # To get the position of the goal
+    def goal_callback(self, msg:PoseStamped):
+        rospy.sleep(2)              # wait for the tf to be ready
         self.goal.pose.position = msg.pose.position
         self.goal.pose.orientation = msg.pose.orientation
-
 
         
 
@@ -79,31 +81,33 @@ class path_tracker():
      # Calculate the direction the robot should go
     def math(self):
         in_goal_tolerance = 0.1
-        turn =  1 *   math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
-        forward = 1 * math.hypot(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
+        angle =  1 *   math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
+        distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
 
-        if math.hypot(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x) < in_goal_tolerance:
-            forward = 0
-            turn = 0
-            # print('Goal reached')
-        turn = max(turn,-1.0)
-        turn = min(turn,1.0)
-        forward = max(turn,-0.5)
-        forward = min(turn,0.5)
-        #turn  = max(turn,-1)
-        #turn  = min(turn,1)
-        #forward = max(forward,-1)
-        #forward = min(forward,1)
-        #print('turn: ',turn)
-        #print('forward: ',forward)
-        return [forward,turn]
 
-    # publish twist message
-    def publish_twist(self, msg):
-        message = Twist()
-        message.linear.x = msg[0]
-        message.angular.z = msg[1]
-        self.cmd_pub.publish(message)
+        if distance > in_goal_tolerance:
+            if abs(angle) >0.1:
+                self.move.linear.x = 0.0
+                self.move.angular.z = angle # might need to be negative
+                print('turning left')
+            elif distance > self.move.linear.x:
+                self.move.linear.x += 0.01
+                self.move.angular.z = 0.0
+                print('moving forward')
+            elif distance < 1:
+                self.move.linear.x -= 0.05
+                self.move.angular.z = 0.0
+                print('Slowing down')
+        else:
+            self.move.linear.x = 0.0
+            self.move.angular.z = 0.0
+            print('Goal reached') 
+        self.move.angular.z  = max(self.move.angular.z ,-0.5)
+        self.move.angular.z  = min(self.move.angular.z ,0.5)
+        self.move.linear.x  = max(self.move.linear.x ,-0.5)
+        self.move.linear.x  = min(self.move.linear.x ,0.5)
+        self.cmd_pub.publish(self.move)
+                
 
     # send goal to move_base which allows it to be shown in rviz
     def send_goal(self):
@@ -114,11 +118,10 @@ class path_tracker():
 
     def spin(self):
         self.robots_location_in_map()
-        directions = self.math()
-        self.publish_twist(directions)
         self.send_goal()
-    
-                    
+        directions = self.math()
+        # self.publish_twist(directions)
+               
     
     def main(self):
         try:
