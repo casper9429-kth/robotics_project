@@ -99,9 +99,7 @@ class Odometry:
         #rospy.loginfo('New encoder received:\n%s %s', msg.delta_time_left,msg.delta_time_right)
 
         # Init transform
-        t = TransformStamped()
-        t.header.frame_id = "odom"
-        t.child_frame_id = "base_link"
+
     
         # The assumtion that both encoders publish with roughly the same frequency is not correct.
         # But for this exercise it is ok.
