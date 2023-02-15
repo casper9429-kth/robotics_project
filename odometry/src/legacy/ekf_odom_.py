@@ -13,11 +13,11 @@ from  math import pi
 import tf
 from sensor_msgs.msg import Imu
 import numpy as np
+from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray
 from std_msgs.msg import Bool
-from collections import defaultdict
 
 class ekf_slam():
     def __init__(self):
@@ -34,7 +34,7 @@ class ekf_slam():
         self.sub_goal = rospy.Subscriber('/motor/encoders', Encoders, self.encoder_callback)
         self.sub_imu = rospy.Subscriber('/imu/data', Imu, self.imu_callback)
         self.duty_cycle_pub = rospy.Subscriber('/motor/duty_cycles', DutyCycles, self.duty_cycle_callback)
-        self.aruco_sub = rospy.Subscriber('/aruco/markers', MarkerArray, self.aruco_callback)
+        #self.aruco_sub = rospy.Subscriber('/aruco/markers', MarkerArray, self.aruco_callback)
         
         self.reset_odom_cov_sub = rospy.Subscriber("odom_updater/reset_odom_cov", Bool,self.odom_cov_reset_callback)
                                           
@@ -47,8 +47,7 @@ class ekf_slam():
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
         self.br = tf2_ros.TransformBroadcaster()
 
-        # Settings
-        self.debug = False
+
 
         # Define rate
         self.update_rate = 100 # [Hz] Change this to the rate you want
@@ -57,14 +56,11 @@ class ekf_slam():
         
         
         # Robot parameters
+        
         self.ticks_per_rev = 3072
         self.wheel_r = 0.04921
         self.base = 0.3 
 
-        # Aruco Slam Setting
-        self.anchor_id = 3
-        self.seen_aruco_ids = set()
-        self.aruco_state_vector = defaultdict()
         
         # EKF var
         self.count = 0
@@ -196,7 +192,7 @@ class ekf_slam():
             
             self.odom_sigma = self.G_odom @ self.odom_sigma @ self.G_odom.T + R_odom
         
-        #rospy.loginfo(self.odom_sigma)
+        rospy.loginfo(self.odom_sigma)
         
         # Publish the odometry message
         self.publish_odometry(current_time)
@@ -250,78 +246,6 @@ class ekf_slam():
         while not rospy.is_shutdown():
             self.main()
             self.rate.sleep()
-    
-    def aruco_callback(self,msg):
-        """
-        aruco callback
-
-        Handles the ekf slam when an aruco marker is seen
-        * If new marker, add to the state vector and inherit the covariance from base_link
-        * If known marker, flag that a new measurement is available
-        * Don't act on the anchor marker 
-        \\
-        Each aruco marker is saved in self.auco_state_vector dict, with its key being its ID
-        each aruco marker has the following keys:
-        * id : id of the marker
-        * cov : covariance of the marker
-        * pose_map : pose of the marker in map frame (transform_stamped)
-        * pose_odom : pose of the marker in odom frame (transform_stamped)
-        * new_measurement : flag that a new measurement is available of the marker is available
-        
-        """
-        for marker in msg.markers:
-            # If anchor, don't do anything
-            if marker.id == self.anchor_id:
-                return
-            
-            # If new marker, give it covariance from base_link and add to state vector
-            # Check if marker id has already been seen in set()
-            if marker.id not in self.seen_aruco_ids:
-                # add id to self.seen_aruco_ids
-                self.seen_aruco_ids.add(marker.id)
-                
-                # look up pose of marker in map_frame
-                try:
-                    map_to_marker = self.listener.lookupTransform('map','aruco/detected'+str(marker.id),rospy.Time(0))
-                except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                    pass
-                
-                # look up pose of marker in odom_frame
-                try :
-                    odom_to_marker = self.listener.lookupTransform('odom','aruco/detected'+str(marker.id),rospy.Time(0))
-                except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                    pass
-                
-                # add marker to state vector
-                new_marker = defaultdict()
-                new_marker['id'] = marker.id
-                new_marker['cov'] = self.odom_sigma
-                new_marker['pose_map'] = map_to_marker
-                new_marker['pose_odom'] = odom_to_marker
-                new_marker['new_pose_map'] = None
-                new_marker['new_pose_odom'] = None 
-                new_marker['new_measurement'] = False
-                self.aruco_state_vector[marker.id] = new_marker
-            else: # Already seen marker                
-                # Flag that we have a new update information for this marker
-                # When used in the main loop, this will be used to update the state vector and covariance
-                # After usage, it will be set to False again
-                try:
-                    map_to_marker = self.listener.lookupTransform('map','aruco/detected'+str(marker.id),rospy.Time(0))
-                except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                    pass
-                
-                # look up pose of marker in odom_frame
-                try :
-                    odom_to_marker = self.listener.lookupTransform('odom','aruco/detected'+str(marker.id),rospy.Time(0))
-                except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                    pass
-                self.aruco_state_vector[marker.id]['new_measurement'] = True                
-                self.aruco_state_vector[marker.id]['new_pose_map'] = map_to_marker
-                self.aruco_state_vector[marker.id]['new_pose_odom'] = odom_to_marker                
-                
-
-                               
 
 
     def odom_cov_reset_callback(self,msg):
@@ -329,6 +253,7 @@ class ekf_slam():
         Reset odom covariance callback
         """
         self.reset_odom_sigma = rospy.Time.now().to_sec()
+        #self.odom_sigma = np.zeros((3,3))#np.eye(3)*0
 
     def duty_cycle_callback(self,msg):
         """

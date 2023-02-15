@@ -4,7 +4,6 @@
 
 1. ``src/``
    1. ``ekf_odom.py``
-   2. ``odometry_mixied_imu.py`` (Deprecated)
 2. ``ìnclude/``
    1. ``odometry.launch``
 

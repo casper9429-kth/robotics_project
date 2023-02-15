@@ -163,7 +163,6 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
-  src/odometry_mixed_imu.py
   src/ekf_odom.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
