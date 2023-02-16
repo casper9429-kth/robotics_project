@@ -1,18 +1,23 @@
-
 #!/usr/bin/env python3
+from math import pi, atan2, acos, asin, sqrt
+
 import rospy
 from hiwonder_servo_msgs.msg import CommandDuration
 from std_srvs.srv import Trigger, TriggerResponse
 from rospy import Service
 
 
-class JointState:
+class Joints:
     def __init__(self, joint1=0, joint2=0, joint3=0, joint4=0, joint5=0):
         self.joint1 = joint1
         self.joint2 = joint2
         self.joint3 = joint3
         self.joint4 = joint4
         self.joint5 = joint5
+
+    def __str__(self):
+        # format the output to 3 decimal places
+        return f"JointState(joint1={self.joint1:.3f}, joint2={self.joint2:.3f}, joint3={self.joint3:.3f}, joint4={self.joint4:.3f}, joint5={self.joint5:.3f})"
 
 
 class Arm():
@@ -34,6 +39,7 @@ class Arm():
         # self.pick_up_service = Service('arm/pick_up', TODO, self.pick_up_service_callback)
         self.open_gripper_service = Service('arm/poses/open_gripper', Trigger, self.open_gripper_service_callback)
         self.close_gripper_service = Service('arm/poses/close_gripper', Trigger, self.close_gripper_service_callback)
+        self.testing_service = Service('arm/poses/testing', Trigger, self.testing_service_callback)
 
         # Define rate
         self.update_rate = 10 # [Hz]
@@ -41,6 +47,12 @@ class Arm():
         self.rate = rospy.Rate(self.update_rate)
 
         # Parameters
+
+        # Measurements
+        self.l_12 = 18e-3 # [m]
+        self.l_23 = 100e-3 # [m]
+        self.l_34 = 97e-3 # [m]
+        self.l_5e = 55e-3 # [m] TODO: Find this value
 
         # Duration of the motion
         self.joint_duration = 2000 # [ms]
@@ -52,10 +64,13 @@ class Arm():
         self.gripper_close_cube = -0.0
 
         # joints initial position
-        self.joints_initial = JointState()
+        self.joints_initial = Joints()
 
         # joints pick up
-        self.joints_prepare_pick_up = JointState(0, -1, -0.8, -1.3, -0.2)
+        self.joints_prepare_pick_up = Joints(0, -1, -0.8, -1.3, -0.2)
+
+        # joints testing
+        self.joints_testing = self.inverse_kinematics(-150e-3, -60e-3, 0)
 
     ###### All your callbacks here ######
 
@@ -97,8 +112,33 @@ class Arm():
             return TriggerResponse(True, 'Closed gripper')
         else:
             return TriggerResponse(False, 'object_type must be either "cube" or "sphere".')
+    
+    def testing_service_callback(self, req):
+        """ Callback function for the testing service. """
+        self.publish_joints(self.joints_testing)
+        return TriggerResponse(True, 'Testing')
         
     ###### All your other methods here #######
+
+    def inverse_kinematics(self, x, y, z=0):
+        """ Calculates the inverse kinematics for the arm. """
+        theta1 = atan2(y, x) % (2 * pi) - pi
+        theta5 = theta1
+
+        h = z
+        d = sqrt(x**2 + y**2)
+        a = self.l_23
+        b = self.l_34
+        cos_beta = (d**2 + h**2 - a**2 - b**2) / (2 * a * b)
+        beta = acos(cos_beta)
+        A = a + b * cos_beta
+        B = b * sqrt(1 - cos_beta**2)
+        alpha = asin(d / sqrt(A**2 + B**2)) - atan2(B, A)
+        theta2 = -alpha
+        theta3 = -beta
+        theta4 = 0
+
+        return Joints(theta1, theta2, theta3, theta4, theta5)
 
     def publish_joints(self, joints):
         """ Publishes the current joint states. """
@@ -132,6 +172,5 @@ class Arm():
 
 
 if __name__ == "__main__":
-
     node = Arm()
     node.run()
