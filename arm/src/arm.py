@@ -55,7 +55,7 @@ class Arm():
         self.l_5e = 55e-3 # [m] TODO: Find this value
 
         # Duration of the motion
-        self.joint_duration = 2000 # [ms]
+        self.joint_duration = 300 # [ms]
         self.gripper_duration = 1000 # [ms]
 
         # gripper
@@ -136,7 +136,9 @@ class Arm():
         alpha = asin(d / sqrt(A**2 + B**2)) - atan2(B, A)
         theta2 = -alpha
         theta3 = -beta
-        theta4 = 0
+        theta4 = pi - theta2 - theta3
+        if theta4 > pi:
+            theta4 -= 2 * pi
 
         return Joints(theta1, theta2, theta3, theta4, theta5)
 
