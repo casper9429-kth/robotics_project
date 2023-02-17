@@ -4,21 +4,20 @@ import math
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist
 import tf2_ros
 import tf2_geometry_msgs
-from aruco_msgs.msg import MarkerArray, Marker
-
+from aruco_msgs.msg import MarkerArray
 
 
 class path_tracker():
     def __init__(self):
         rospy.init_node('path_tracker')
         print('path_tracker node initalized')
+        self.path = []
         self.robot_frame = 'base_link'
         self.rate = rospy.Rate(10)
         self.pose = PoseStamped()
         self.pose_in_map = PoseStamped()
         self.goal = PoseStamped()
         self.goal_in_base_link = PoseStamped()
-        self.aruco = Marker()
         self.pose.header.frame_id = self.robot_frame
 
         # tf stuff
@@ -41,33 +40,29 @@ class path_tracker():
         self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
 
         # subscribers
-        # self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  # To get the position of the goal
-        self.goal_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  # To get the position of the goal from camera
+        self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  # To get the position of the goal
+        #self.goal_sub = rospy.Subscriber('/goal', PoseStamped, self.goal_callback)  # To get the position of the goal from path planner
+        self.rate = rospy.Rate(10)
         print('Subscribers initalized')
 
+        self.last_v = 0
 
-    def aruco_callback(self, msg:Marker):
-        # self.aruco.header = msg.header
-        # self.aruco.id = msg.id
-        # self.aruco.pose.pose.position = msg.pose.pose.position
-        # self.aruco.pose.pose.orientation = msg.pose.pose.orientation
 
-        self.goal.pose.position = msg.pose.pose.position
-        self.goal.pose.orientation = msg.pose.pose.orientation
 
     def goal_callback(self, msg):
         self.goal.pose.position = msg.pose.position
         self.goal.pose.orientation = msg.pose.orientation
 
-
+        # print('GOAL POSITION')
+        # print(self.goal)
         
 
     # give goal in base link frame
     def robots_location_in_map(self):
         
         stamp = self.pose.header.stamp  
-        try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
-            transform_map_2_base_link = self.tfBuffer.lookup_transform(self.robot_frame,'map', stamp,rospy.Duration(0.5)) # The transform that relate map frame to base link frame
+        try:
+            transform_map_2_base_link = self.tfBuffer.lookup_transform(self.robot_frame,'map', stamp,rospy.Duration(0.5)) # The transform that relate map fram to base link frame
             self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)
         except:
             print('No transform found')
@@ -75,6 +70,14 @@ class path_tracker():
             
             # return None
 
+    def stanly_controller(self):
+        K = 1
+        K_soft = 1
+        tolerance_in_goal = 0.1
+        cross_track_error = math.hypot(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
+        v = 0
+        heading_error = math.atan2(self.goal_in_base_link.pose.position.y, self.goal_in_base_link.pose.position.x)
+        delta = math.atan2(K*cross_track_error, v+K_soft)
         
      # Calculate the direction the robot should go
     def math(self):
@@ -86,8 +89,9 @@ class path_tracker():
             forward = 0
             turn = 0
             # print('Goal reached')
-        turn = max(turn,-1.0)
-        turn = min(turn,1.0)
+        
+        turn = max(turn,-0.5)
+        turn = min(turn,0.5)
         forward = max(turn,-0.5)
         forward = min(turn,0.5)
         #turn  = max(turn,-1)
@@ -115,6 +119,7 @@ class path_tracker():
     def spin(self):
         self.robots_location_in_map()
         directions = self.math()
+        self.last_v = directions[0] # assigns the last speed
         self.publish_twist(directions)
         self.send_goal()
     
