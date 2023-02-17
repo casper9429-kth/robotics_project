@@ -18,14 +18,21 @@ from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray
 from std_msgs.msg import Bool
 from collections import defaultdict
+from geometry_msgs.msg import PoseStamped
 
-# Ekf slam should work in map frame and move the estimate of the aruco markers in map frame
-# And move the robot in the map frame by moving odom. It could therefore be isolated from this script
+# EKF Aruco Slam, v,omega fusion, odometry in one script
+# This node pefors EKF Aruco Slam with odometry, v,omega fusion 
+# When the aruco marker with id 3 is seen, the odom is set to the center of the map
 
-# For aruco slam the following is needed
-# Covariance of the current odom frame, therefore it makes sense to have it in this node for this iteration
 
-# step 1: clean code
+# Improvements:
+# * make the covariance matrix of the aruco markers transform to map frame and back to odom frame when reseen 
+# * split script into 3 scripts, one for odometry, one for aruco slam and one for v,omega fusion
+# v-omega sensor fusion should publish 
+# odometry should publish odom,tf and cov for odom in odom frame, it should reset the cov when the aruco marker with id 3 is seen
+# 
+
+
 class ekf_slam():
     def __init__(self):
         """
@@ -108,57 +115,176 @@ class ekf_slam():
         
         # Time var
         self.last_time = rospy.Time.now().to_sec()
-        self.current_time = rospy.Time.now().to_sec()
+        self.current_time_sec = rospy.Time.now().to_sec()
 
         
 
 
     def main(self): # Do main stuff here    
         """
-        Main loop, instead of changing run function,
+        Main loop, instead of changing run function
         write your code here to make it more readable.
         """
         
         
-
+        ########## Init state v,omega:  sensor fusion ##########
         if self.count == 0:
-            # Initialize state vector
-            self.mu = np.array([0,0])
-            self.sigma = np.eye(2)
-            self.mu_bel = np.array([0,0])
-            self.simga_bel = np.eye(2)
-            self.count += 1        
+            self.init_sensor_fusion()
             return
         
-        # EKF v_omega
+        ########## EKF v,omega: sensor fusion ##########
         self.ekf_v_omega_predict()
         self.ekf_v_omega_update_enco()
         self.ekf_v_omega_update_imu()                
 
 
-        # Perform odometry update
-        current_time = rospy.Time.now()
-        self.current_time = current_time.to_sec()
-        dt = self.current_time - self.last_time
+
+        ########## Time calculation: used by odom ##########
+        self.time_calculations_for_odom()
+
+
+        ########## EKF odom predict: part 1 aruco slam ##########        
+        ## Predict odometry
+        self.predict_odometry()        
         
-        if dt > self.update_dt*1.1:
-            rospy.logwarn("refresh rate to high: %f", dt)
+        ########## EKF odom update, part 2 aruco slam ##########
+        self.aruco_ekf_slam()
+        
+        ########## Publish odom ##########
+        self.publish_odometry(self.current_time)
+
+        # Update time        
+        self.last_time = self.current_time_sec
+
+
+    def time_calculations_for_odom(self):
+        """
+        Peform time calculations needed for odometry
+        """
+        ## Time calculation, used
+        self.current_time = rospy.Time.now()
+        self.current_time_sec = self.current_time.to_sec()
+        self.dt = self.current_time_sec - self.last_time
+        ## Time warning
+        if self.dt > self.update_dt*1.2:
+            rospy.logwarn("refresh rate to high: %f", self.dt)
+            rospy.logwarn("refresh rate should be: %f", self.update_dt)
+
+
+
+    def init_sensor_fusion(self):
+        """
+        Init ekf loop
+        """
+        # Initialize state vector
+        self.mu = np.array([0,0])
+        self.sigma = np.eye(2)
+        self.mu_bel = np.array([0,0])
+        self.simga_bel = np.eye(2)
+        self.count += 1
+
+    def aruco_ekf_slam(self):
+        """
+        Aruco slam ekf update
+        Iter through all aruco markers, sequentially update the state if new measurement is available
+        If new measurement is available, run ekf slam update and save result
+        Else, do nothing        
+        """
+        # iter over all aruco markers, sequentially update the state
+        for key in self.aruco_state_vector.keys():
+            aruco_state = self.aruco_state_vector[key]
+            # If new messurement, run sequential update
+            if aruco_state['new_measurement']:
+
+                # Run ekf slam on aruco marker, one at a time
+                aruco_mu, aruco_sigma = self.aruco_slam_update(aruco_state)
+
+                # Save the data from the aruco slam update step in the data structures where it should be saved
+                self.aruco_slam_save_data(aruco_state,aruco_mu,aruco_sigma,key)                
+
+
+
+
+    def aruco_slam_save_data(self,aruco_state,aruco_mu,aruco_sigma,key):
+        """
+        Saves the data from the aruco slam update step
+        In the data structures where it should be saved
+        """
+        # Update mu and sigma in the marker and in the robot by splitting the mu_bel and sigma_bel from ekf update
+        self.x = aruco_mu[0]
+        self.y = aruco_mu[1]
+        self.odom_sigma[0:2,0:2] = aruco_sigma[0:2,0:2]
+        self.aruco_state_vector[key]['cov'][0:2,0:2] = aruco_sigma[2:,2:]
+
+        # transform the new pose of the marker into map frame
+        ## get the new pose in odom frame, because we need to know orientation, z etc which is not estimated by the ekf
+        m_odom = self.aruco_state_vector[key]['new_pose_odom'] #marker_odom 
+        ## create a pose stamped message and fill it with the new pose in odom frame, but change the state var estimated by the ekf
+        m_odom_ps = PoseStamped()
+        m_odom_ps.header.stamp = self.current_time
+        m_odom_ps.header.frame_id = "odom"
+        m_odom_ps.pose.position.x = aruco_mu[2]#m_odom.transform.translation.x
+        m_odom_ps.pose.position.y = aruco_mu[3]#m_odom.transform.translation.y
+        m_odom_ps.pose.position.z = m_odom.transform.translation.z
+        m_odom_ps.pose.orientation.x = m_odom.transform.rotation.x
+        m_odom_ps.pose.orientation.y = m_odom.transform.rotation.y
+        m_odom_ps.pose.orientation.z = m_odom.transform.rotation.z
+        m_odom_ps.pose.orientation.w = m_odom.transform.rotation.w
+        ## transform the pose to map frame, and save it in the state vector. Use map because odom will change over time
+        m_map_ts = self.tfBuffer.transform(m_odom_ps, "map",rospy.Time(0))
+        self.aruco_state_vector[key]['pose_map'] = m_map_ts
+
+        # Set new measurement to false so we dont run the ekf update again with the same measurement
+        self.aruco_state_vector[key]['new_measurement'] = False
+
+
+
+    def aruco_slam_update(self,aruco_state):
+        """
+        Peforms the aruco slam update step
+        """
+        # Pre calculate variables
+        z_belif = self.calc_z_belif(aruco_state)
+        z_mesh = self.calc_z_mesh(aruco_state)
+        H = self.calc_linearized_messurement_model(aruco_state)                
+        aruco_sigma_bel = self.calc_aruco_sigma_bel(aruco_state)
+        aruco_mu_bel = np.array([self.x,self.y,aruco_state['x'],aruco_state['y']])
+        Q_aruco = np.eye(2) * 0.01 # Small
+
+        # kalman update step
+        aruco_k = aruco_sigma_bel @ H.T @ np.linalg.inv(H @ aruco_sigma_bel @ H.T + Q_aruco)
+        aruco_mu = aruco_mu_bel + aruco_k @ (z_mesh - z_belif)
+        aruco_sigma = (np.eye(4) - aruco_k @ H) @ aruco_sigma_bel
+        return aruco_mu, aruco_sigma    
     
-        # Only predict
-        self.x += self.mu[0] * math.cos(self.theta) * dt
-        self.y += self.mu[0] * math.sin(self.theta) * dt
-        self.theta = self.theta + self.mu[1] * dt
-        # Calculate/Update G_odom 
-        self.G_odom = np.array([[1, 0, -self.mu[0] * math.sin(self.theta) * dt],
-                       [0, 1, self.mu[0] * math.cos(self.theta) * dt],
+    def predict_odometry(self):
+        """
+        Predicts the odometry using the odometry model for the ekf aruco prediction step        
+        """
+        ## Predict odometry
+        self.x += self.mu[0] * math.cos(self.theta) * self.dt
+        self.y += self.mu[0] * math.sin(self.theta) * self.dt
+        self.theta = self.theta + self.mu[1] * self.dt
+
+        ## Predict odom cov after prediction
+        self.odom_sigma = self.calc_odom_sigma_bel(self.dt)        
+
+    
+    def calc_odom_sigma_bel(self,dt):
+        """
+        Calculates the sigma for the odometry during the ekf prediction step
+        """
+                ### Calculate/Update G_odom, used for odometry covariance
+        self.G_odom = np.array([[1, 0, -self.mu[0] * math.sin(self.theta) * self.dt],
+                       [0, 1, self.mu[0] * math.cos(self.theta) * self.dt],
                        [0, 0, 1]])
         
-        # If anchor is found, reset odom cov
-        if np.abs(self.current_time - self.reset_odom_sigma) < 0.1:
-            self.odom_sigma = np.zeros((3,3))
-        elif np.abs(self.mu[0])<0.01 and np.abs(self.mu[1])<0.01:
-            pass
-        else:
+        ### If time since last reset odom cov is less than 0.1, reset odom cov, will be reset when anchor is found 
+        if np.abs(self.current_time_sec - self.reset_odom_sigma) < 0.1:
+            return np.zeros((3,3))
+        elif np.abs(self.mu[0])<0.01 and np.abs(self.mu[1])<0.01: ### If robot is not moving, don't update/increase odom cov
+            return self.odom_sigma
+        else: ## If robot is moving, update odom cov. 
             # R_odom should get the error from v_omega fusion            
             # self.sigma[0] is var in v
             # self.sigma[1] is var in omega
@@ -166,130 +292,71 @@ class ekf_slam():
             # if time is high, then R_odom should be high
             # Include linearization
 
-            # error x: (self.mu[0] + v) * math.cos(self.theta + omega*dt) * dt 
-            # lin x:   math.cos(self.theta + omega*dt) * dt, -(self.mu[0] + v) * math.sin(self.theta + omega*dt) * dt * dt
-            # error y: self.mu[0] * math.sin(self.theta) * dt
-            # lin y:  math.sin(self.theta + omega*dt) * dt, self.mu[0] * math.cos(self.theta + omega*dt) * dt * dt
-            # error theta: self.mu[1] * dt
-            # lin theta: 0, dt
-            # x_y_theta_lin = np.array([[math.cos(self.theta + self.mu[1]*dt) * dt, -(self.mu[0] + self.mu[0]) * math.sin(self.theta + self.mu[1]*dt) * dt * dt],[0,dt]])
-            # we can disregard the mu[]*dt terms since they are small
-            x_y_theta_lin = [[math.cos(self.theta) * dt, -(self.mu[0]) * math.sin(self.theta) * dt * dt],[math.sin(self.theta) * dt, self.mu[0] * math.cos(self.theta) * dt * dt],[0,dt]]
+            # error x: (self.mu[0] + v) * math.cos(self.theta + omega*self.dt) * self.dt 
+            # lin x:   math.cos(self.theta + omega*self.dt) * self.dt, -(self.mu[0] + v) * math.sin(self.theta + omega*self.dt) * self.dt * self.dt
+            # error y: self.mu[0] * math.sin(self.theta) * self.dt
+            # lin y:  math.sin(self.theta + omega*self.dt) * self.dt, self.mu[0] * math.cos(self.theta + omega*self.dt) * self.dt * self.dt
+            # error theta: self.mu[1] * self.dt
+            # lin theta: 0, self.dt
+            # x_y_theta_lin = np.array([[math.cos(self.theta + self.mu[1]*self.dt) * self.dt, -(self.mu[0] + self.mu[0]) * math.sin(self.theta + self.mu[1]*self.dt) * self.dt * self.dt],[0,self.dt]])
+            # we can disregard the mu[]*self.dt terms since they are small
+            x_y_theta_lin = [[math.cos(self.theta) * self.dt, -(self.mu[0]) * math.sin(self.theta) * self.dt * self.dt],[math.sin(self.theta) * self.dt, self.mu[0] * math.cos(self.theta) * self.dt * self.dt],[0,self.dt]]
             x_y_theta_lin = np.array(x_y_theta_lin)
 
             # Include the errors from self.sigma and the error constant term to keep it from becoming zero            
             R_odom = x_y_theta_lin @ self.sigma @ x_y_theta_lin.T + self.R_odom
             
-            self.odom_sigma = self.G_odom @ self.odom_sigma @ self.G_odom.T + R_odom
-        
-        
-        
-        # Aruco EKF SLAM update step (only use x,y of aruco marker in odom frame, this is by convention wrong but to make it work using only x,y)
-        ## Peform the aruco update step on all aruco marker
-        
-        ## sequential update
-        
-        # Needed variables
-        # We start by only using x,y of aruco marker in odom frame
-        # And the x,y of the robot in odom frame
-        
-        
-        # Messurement model
-        # z = h(x_belif,y_belif,m1x_belif,m1y_belif,m2x_belif,m2y_belif,....)
-        # z = (r_1,b_1,r_2,b_2,....) # distance and bearing to all aruco markers
-        # r is the distance to the aruco marker
-        # b is the bearing to the aruco marker in map frame
-
-        # belif
-        # r_belif = np.sqrt((x_belif - m1x_belif)**2 + (y_belif - m1y_belif)**2)
-        # bear_belif = np.arctan2(m1y_belif - y_belif, m1x_belif - x_belif)
-        # z_belif = (r_belif,bear_belif)
-        
-        # messurement        
-        # r_mesh = np.sqrt((x_belif - m1x_update)**2 + (y_belif - m1y_update)**2)
-        # r_mesh = np.arctan2(m1y_update-y_belif,m1x_update-x_belif)
-        # z_mesh = (r_mesh,bear_mesh)
-         
-        # Linearize the messurement model with respect to x_belif,y_belif,m1x_belif,m1y_belif,m2x_belif,m2y_belif,....
-        # this gives us H 
-        
-        # We also need to construct sigma_bel, remember that the algorithm is sequential
-        # aruco_ekf_sigma_bel, sigma_bel         
-        # sigma_bel_0 = sigma_bel_x_y         0
-        # sigma_bel_1 = 0                 sigma_bel_aruco
-
-        # And we need to construct mu_bel
-        # mu_bel = mu_bel_x_y
-        # mu_bel = mu_bel_aruco
-        
-        # Run these through the ekf update step and you get the new mu_bel and sigma_bel
-        # kalman update step                 
-        # H = np.eye()
-        # K = self.simga_bel @ H.T @ np.linalg.inv(H @ self.simga_bel @ H.T + self.Q_enco)
-        # self.mu_bel = self.mu_bel + K @ (self.enco - self.mu_bel)
-        # self.simga_bel = (np.eye(2) - K @ H) @ self.simga_bel        
-
-        # Update mu and sigma in the marker and in the robot by splitting the mu_bel and sigma_bel
-        # mu_bel_x_y = mu_bel[0:2]
-        # mu_bel_aruco = mu_bel[2:]
-        # sigma_x_y = sigma_bel[0:2,0:2]
-        # sigma_aruco = sigma_bel[2:,2:]
-        
-        for key in self.aruco_state_vector.keys():
-            aruco_state = self.aruco_state_vector[key]
-            # If new messurement, run sequential update
-            if aruco_state['new_measurement']:
-                # calculate z_belif
-                r_belif = np.sqrt((self.x - aruco_state['x'])**2 + (self.y - aruco_state['y'])**2)
-                bear_belif = np.arctan2(aruco_state['y'] - self.y, aruco_state['x'] - self.x)
-                z_belif = np.array([r_belif,bear_belif])
-
-                # calculate z_mesh
-                r_mesh = np.sqrt((self.x - aruco_state['new_x'])**2 + (self.y - aruco_state['new_y'])**2)
-                bear_mesh = np.arctan2(aruco_state['new_y'] - self.y, aruco_state['new_x'] - self.x)
-                z_mesh = np.array([r_mesh,bear_mesh])
-                
-                # Linearize the messurement model with respect to x_belif,y_belif,m1x_belif,m1y_belif and construct H
-                h_0_0 = (1/np.sqrt((self.x - aruco_state['x'])**2 + (self.y - aruco_state['y'])**2))*(self.x - aruco_state['x'])
-                h_0_1 = (1/np.sqrt((self.x - aruco_state['x'])**2 + (self.y - aruco_state['y'])**2))*(self.y - aruco_state['y'])
-                h_0_2 = (1/np.sqrt((self.x - aruco_state['x'])**2 + (self.y - aruco_state['y'])**2))*(-self.x + aruco_state['x'])
-                h_0_3 = (1/np.sqrt((self.x - aruco_state['x'])**2 + (self.y - aruco_state['y'])**2))*(-self.y + aruco_state['y'])
-                h_1_0 = (1/(1+((aruco_state['y'] - self.y)/ (aruco_state['x'] - self.x))**2))*((aruco_state['y'] - self.y)/ ((aruco_state['x'] - self.x)**2))
-                h_1_1 = (1/(1+((aruco_state['y'] - self.y)/ (aruco_state['x'] - self.x))**2))*((- self.y)/ (aruco_state['x'] - self.x))
-                h_1_2 = -(1/(1+((aruco_state['y'] - self.y)/ (aruco_state['x'] - self.x))**2))*((aruco_state['y'] - self.y)/ ((aruco_state['x'] - self.x)**2))
-                h_1_3 = (1/(1+((aruco_state['y'] - self.y)/ (aruco_state['x'] - self.x))**2))*((aruco_state['y'])/ (aruco_state['x'] - self.x))
-                H = np.array([[h_0_0,h_0_1,h_0_2,h_0_3],[h_1_0,h_1_1,h_1_2,h_1_3]])
-                
-                # Construct sigma_bel
-                aruco_sigma_bel = np.eye(4)
-                aruco_sigma_bel[0:2,0:2] = self.odom_sigma[0:2,0:2]
-                aruco_sigma_bel[2:,2:] = aruco_state['cov'][0:2,0:2]
-                
-                # Construct mu_bel
-                aruco_mu_bel = np.array([self.x,self.y,aruco_state['x'],aruco_state['y']])
-
-                # Construct Q
-                Q_aruco = np.eye(2) * 0.01 # Small
-
-                # kalman update step
-                aruco_k = aruco_sigma_bel @ H.T @ np.linalg.inv(H @ aruco_sigma_bel @ H.T + Q_aruco)
-                aruco_mu = aruco_mu_bel + aruco_k @ (z_mesh - z_belif)
-                aruco_sigma = (np.eye(4) - aruco_k @ H) @ aruco_sigma_bel
-                
-                # Update mu and sigma in the marker and in the robot by splitting the mu_bel and sigma_bel
-                self.x = aruco_mu[0]
-                self.y = aruco_mu[1]
-                self.odom_sigma[0:2,0:2] = aruco_sigma[0:2,0:2]
-                self.aruco_state_vector[key]['x'] = aruco_mu[2]
-                self.aruco_state_vector[key]['y'] = aruco_mu[3]
-                self.aruco_state_vector[key]['cov'][0:2,0:2] = aruco_sigma[2:,2:]
-                self.aruco_state_vector[key]['new_measurement'] = False
-                
-        # Publish the odometry message
-        self.publish_odometry(current_time)
-        # Update time        
-        self.last_time = self.current_time
+            
+            return self.G_odom @ self.odom_sigma @ self.G_odom.T + R_odom
     
+    
+    def calc_aruco_sigma_bel(self,aruco_state):
+        """
+        Calculates the sigma_bel for the aruco marker
+        """
+        # Construct sigma_bel
+        aruco_sigma_bel = np.eye(4)
+        aruco_sigma_bel[0:2,0:2] = self.odom_sigma[0:2,0:2]
+        aruco_sigma_bel[2:,2:] = aruco_state['cov'][0:2,0:2]
+        return aruco_sigma_bel
+    
+    def calc_linearized_messurement_model(self,aruco_state):
+        """
+        Calculates the linearized messurement model for the aruco marker
+        """
+        # Linearize the messurement model with respect to x_belif,y_belif,m1x_belif,m1y_belif and construct H
+        h_0_0 = (1/np.sqrt((self.x - aruco_state['x'])**2 + (self.y - aruco_state['y'])**2))*(self.x - aruco_state['x'])
+        h_0_1 = (1/np.sqrt((self.x - aruco_state['x'])**2 + (self.y - aruco_state['y'])**2))*(self.y - aruco_state['y'])
+        h_0_2 = (1/np.sqrt((self.x - aruco_state['x'])**2 + (self.y - aruco_state['y'])**2))*(-self.x + aruco_state['x'])
+        h_0_3 = (1/np.sqrt((self.x - aruco_state['x'])**2 + (self.y - aruco_state['y'])**2))*(-self.y + aruco_state['y'])
+        h_1_0 = (1/(1+((aruco_state['y'] - self.y)/ (aruco_state['x'] - self.x))**2))*((aruco_state['y'] - self.y)/ ((aruco_state['x'] - self.x)**2))
+        h_1_1 = (1/(1+((aruco_state['y'] - self.y)/ (aruco_state['x'] - self.x))**2))*((- self.y)/ (aruco_state['x'] - self.x))
+        h_1_2 = -(1/(1+((aruco_state['y'] - self.y)/ (aruco_state['x'] - self.x))**2))*((aruco_state['y'] - self.y)/ ((aruco_state['x'] - self.x)**2))
+        h_1_3 = (1/(1+((aruco_state['y'] - self.y)/ (aruco_state['x'] - self.x))**2))*((aruco_state['y'])/ (aruco_state['x'] - self.x))
+        H = np.array([[h_0_0,h_0_1,h_0_2,h_0_3],[h_1_0,h_1_1,h_1_2,h_1_3]])
+        return H
+    
+    
+    def calc_z_mesh(self,aruco_state):
+        """
+        Calculates the z_mesh for the aruco marker
+        """
+        # calculate z_mesh
+        r_mesh = np.sqrt((self.x - aruco_state['new_x'])**2 + (self.y - aruco_state['new_y'])**2)
+        bear_mesh = np.arctan2(aruco_state['new_y'] - self.y, aruco_state['new_x'] - self.x)
+        z_mesh = np.array([r_mesh,bear_mesh])
+        return z_mesh
+
+    def calc_z_belif(self,aruco_state):
+        """
+        Calculates the z_belif for the aruco marker
+        """
+        # calculate z_belif
+        r_belif = np.sqrt((self.x - aruco_state['x'])**2 + (self.y - aruco_state['y'])**2)
+        bear_belif = np.arctan2(aruco_state['y'] - self.y, aruco_state['x'] - self.x)
+        z_belif = np.array([r_belif,bear_belif])
+        return z_belif
+
     
     def ekf_v_omega_predict(self):
         """
@@ -298,6 +365,7 @@ class ekf_slam():
         # predict step
         self.mu_bel = self.u
         self.simga_bel = np.eye(2) @ self.sigma @ np.eye(2).T + self.R
+        
     def ekf_v_omega_update_imu(self):
         """
         Peforms the update step from imu messurement for the v_omega_ekf
@@ -356,16 +424,6 @@ class ekf_slam():
         self.br.sendTransform(t)
 
 
-    def run(self):
-        """
-        Run the node. 
-        Don't change anything here, change main instead.
-        """
-        
-        # Run as long as node is not shutdown
-        while not rospy.is_shutdown():
-            self.main()
-            self.rate.sleep()
     
     def aruco_callback(self,msg):
         """
@@ -416,13 +474,10 @@ class ekf_slam():
                 new_marker['id'] = marker.id
                 new_marker['cov'] = self.odom_sigma
                 new_marker['pose_map'] = map_to_marker
-                new_marker['pose_odom'] = odom_to_marker
                 new_marker['x'] = odom_to_marker.transform.translation.x
                 new_marker['y'] = odom_to_marker.transform.translation.y
                 new_marker['new_x'] = None
                 new_marker['new_y'] = None
-                new_marker['new_pose_map'] = None
-                new_marker['new_pose_odom'] = None 
                 new_marker['new_measurement'] = False
                 new_marker['t_stamp'] = rospy.Time.now()
                 self.aruco_state_vector[marker.id] = new_marker
@@ -435,6 +490,7 @@ class ekf_slam():
                 if (rospy.Time.now() - self.aruco_state_vector[marker.id]['t_stamp']).to_sec() < 1:
                     return
 
+                # look up pose of the aruco marker in map frame 
                 try:
                     map_to_marker = self.tfBuffer.lookup_transform('map','aruco/detected'+str(marker.id),rospy.Time(0))
                 except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
@@ -445,15 +501,56 @@ class ekf_slam():
                     odom_to_marker = self.tfBuffer.lookup_transform('odom','aruco/detected'+str(marker.id),rospy.Time(0))
                 except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                     return
+                
+                # the belif of the marker in odom frame might not be the same if odom moved in map frame since last time
+                # look up the transform between the old pose in map frame and transform it into the current odom
+                # Get old pose in map frame
+                
+                # correct the old pose in odom frame with the new pose in odom frame using stationary map frame
+                old_pose_map = self.aruco_state_vector[marker.id]['pose_map']
+                old_pose_new_odom = self.transform_old_map_pose_into_new_frame(old_pose_map, 'odom',marker.header.stamp)
+                self.aruco_state_vector[marker.id]['x'] = old_pose_new_odom.transform.translation.x
+                self.aruco_state_vector[marker.id]['y'] = old_pose_new_odom.transform.translation.y
+
+                # add new messurement to state vector                
                 self.aruco_state_vector[marker.id]['new_measurement'] = True                
-                self.aruco_state_vector[marker.id]['new_pose_map'] = map_to_marker
-                self.aruco_state_vector[marker.id]['new_pose_odom'] = odom_to_marker    
                 self.aruco_state_vector[marker.id]['new_x'] = odom_to_marker.transform.translation.x
-                self.aruco_state_vector[marker.id]['new_y'] = odom_to_marker.transform.translation.y            
+                self.aruco_state_vector[marker.id]['new_y'] = odom_to_marker.transform.translation.y     
+                self.aruco_state_vector[marker.id]['new_pose_odom'] = odom_to_marker       
                 self.aruco_state_vector[marker.id]['t_stamp'] = rospy.Time.now()
                 
 
                                
+    def transform_old_map_pose_into_new_frame(self,pose_in_map, new_frame='odom',time = None):
+        """
+        Takes old pose in map frame and transforms it into new frame at latest time
+        Accepts PoseStamped or TransformStamped
+        """
+        if time is None:
+            time = rospy.Time.now()
+        
+        if type(pose_in_map) is PoseStamped:
+            pose_in_map_stamped = pose_in_map
+            pose_in_map_stamped.header.stamp = time
+            pose_in_map_stamped.header.frame_id = 'map'
+
+        elif type(pose_in_map) is TransformStamped:
+            pose_map_stamped = PoseStamped()
+            pose_map_stamped.header.stamp = time
+            pose_map_stamped.header.frame_id = 'map'
+            pose_map_stamped.pose.position.x = pose_in_map.transform.translation.x
+            pose_map_stamped.pose.position.y = pose_in_map.transform.translation.y
+            pose_map_stamped.pose.position.z = pose_in_map.transform.translation.z
+            pose_map_stamped.pose.orientation.x = pose_in_map.transform.rotation.x
+            pose_map_stamped.pose.orientation.y = pose_in_map.transform.rotation.y
+            pose_map_stamped.pose.orientation.z = pose_in_map.transform.rotation.z
+            pose_map_stamped.pose.orientation.w = pose_in_map.transform.rotation.w
+
+        new_pose = self.tfBuffer.transform(pose_map_stamped,new_frame,rospy.Time(0))
+        
+        return new_pose
+
+
 
 
     def odom_cov_reset_callback(self,msg):
@@ -471,7 +568,6 @@ class ekf_slam():
         v_left = msg.duty_cycle_left
         v_right = msg.duty_cycle_right
 
-
         # calculate v, omega
         v, omega = self.transform_v_left_v_right_to_v_omega(v_left, v_right)
 
@@ -483,11 +579,7 @@ class ekf_slam():
         """
 
         # Get angular velocity in rad/s
-        self.imu = np.array([0,-msg.angular_velocity.z])
-
-        
-
-    
+        self.imu = np.array([0,-msg.angular_velocity.z])    
     
     def encoder_callback(self,msg):
         """
@@ -498,8 +590,6 @@ class ekf_slam():
         mean = 50#(msg.delta_time_left + msg.delta_time_right)/2
         v_left = (((msg.delta_encoder_left/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ mean)*1000
         v_right = (((msg.delta_encoder_right/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ mean)*1000
-        #v_left = (((msg.delta_encoder_left/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ msg.delta_time_left)*1000
-        #v_right = (((msg.delta_encoder_right/ self.ticks_per_rev ) * 2*pi * self.wheel_r )/ msg.delta_time_right)*1000
 
         # calculate v, omega
         v, omega = self.transform_v_left_v_right_to_v_omega(v_left, v_right)
@@ -529,8 +619,18 @@ class ekf_slam():
         return v, omega
 
 
+    def run(self):
+        """
+        Run the node. 
+        Don't change anything here, change main instead.
+        """
+        
+        # Run as long as node is not shutdown
+        while not rospy.is_shutdown():
+            self.main()
+            self.rate.sleep()
+
 
 if __name__ == "__main__":
-
     node=ekf_slam()
     node.run()
