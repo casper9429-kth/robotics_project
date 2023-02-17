@@ -71,11 +71,11 @@ class ArmServices():
         self.d_5e = 55e-3 # [m] TODO: Find (and define) this value
 
         # Duration of the motion
-        self.max_joint_speed = 1 # [rad/s]
+        self.max_joint_speed = 0.8 # [rad/s]
         self.gripper_duration = 1 # [s]
 
         # gripper
-        self.gripper_open = -1.5
+        self.gripper_open = -1.8
         self.gripper_close = { 'cube': -0.0, 'sphere': -0.5, 'animal': None } # TODO: Figure out animal gripper value
 
         # Joints
@@ -154,7 +154,7 @@ class ArmServices():
             return ArmTriggerResponse(False, self.error_messages['missing target'], 0)
         try:
             self.publish_gripper(self.gripper_close[self.target_type], self.gripper_duration)
-            return ArmTriggerResponse(True, 'Closing gripper')
+            return ArmTriggerResponse(True, 'Closing gripper', self.gripper_duration)
         except KeyError:
             return ArmTriggerResponse(False, self.error_messages['bad target type'], 0)
     
@@ -164,7 +164,7 @@ class ArmServices():
         y = pick_up_target.y
         z = pick_up_target.z
         yaw = pick_up_target.yaw
-        self.joints_prepare_to_pick_up = self.inverse_kinematics(x, y, z + 170e-3, yaw) # TODO: change to match gripper height
+        self.joints_prepare_to_pick_up = self.inverse_kinematics(x, y, z + 200e-3, yaw) # TODO: change to match gripper height
         self.joints_pick_up = self.inverse_kinematics(x, y, z + 120e-3, yaw) # TODO: change to match gripper height
         return SetPickUpTargetResponse(True, 'Pick up target set') # TODO: this should be false if the target is out of reach
         

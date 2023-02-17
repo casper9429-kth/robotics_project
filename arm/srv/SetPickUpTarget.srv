@@ -7,4 +7,4 @@ float64 z
 float64 yaw
 ---
 bool valid
-string error # Error message, if any
+string message # Message, if any
