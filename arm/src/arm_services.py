@@ -71,7 +71,7 @@ class ArmServices():
         self.d_5e = 55e-3 # [m] TODO: Find (and define) this value
 
         # Duration of the motion
-        self.max_joint_speed = 0.5 # [rad/s]
+        self.max_joint_speed = 1 # [rad/s]
         self.gripper_duration = 1 # [s]
 
         # gripper
