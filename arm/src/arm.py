@@ -5,7 +5,7 @@ import rospy
 from hiwonder_servo_msgs.msg import CommandDuration
 from std_srvs.srv import Trigger, TriggerResponse
 from rospy import Service
-
+from arm.msg import PickUpTarget
 
 class Joints:
     def __init__(self, joint1=0, joint2=0, joint3=0, joint4=0, joint5=0):
@@ -34,7 +34,7 @@ class Arm():
         self.gripper_pub = rospy.Publisher("/r_joint_controller/command_duration", CommandDuration, queue_size=10)
 
         # Subscribers
-        self.pick_up_target_sub = rospy.Subscriber("/arm/pick_up_target", Joints, self.pick_up_target_callback)
+        self.pick_up_target_sub = rospy.Subscriber("/arm/pick_up_target", PickUpTarget, self.pick_up_target_callback)
 
         # Services
         self.straight_service = Service('arm/poses/straight', Trigger, self.straight_service_callback)
