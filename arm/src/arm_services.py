@@ -34,9 +34,6 @@ class ArmServices():
         self.joint5_pub = rospy.Publisher("/joint5_controller/command_duration", CommandDuration, queue_size=10)
         self.gripper_pub = rospy.Publisher("/r_joint_controller/command_duration", CommandDuration, queue_size=10)
 
-        # Subscribers
-        self.pick_up_target_sub = rospy.Subscriber("/arm/pick_up_target", PickUpTarget, self.pick_up_target_callback)
-
         # Services
         self.straight_service = Service('arm/poses/straight', Trigger, self.straight_service_callback)
         self.observe_service = Service('arm/poses/observe', Trigger, self.observe_service_callback)
@@ -76,6 +73,9 @@ class ArmServices():
         # Target type
         self.target_type = None
 
+        # Subscribers (this needs to be down here because the callback uses the above variables)
+        self.pick_up_target_sub = rospy.Subscriber("/arm/pick_up_target", PickUpTarget, self.pick_up_target_callback)
+
     ###### All your callbacks here ######
 
     def straight_service_callback(self, _):
@@ -95,7 +95,7 @@ class ArmServices():
     def pick_up_service_callback(self, _):
         if self.joints_pick_up is None:
             return TriggerResponse(False, 'No pick up target received.')
-        self.publish_joints(self.joints_pick_up_cube)
+        self.publish_joints(self.joints_pick_up)
         return TriggerResponse(True, 'Arm picking up')
         
     def open_gripper_service_callback(self, _):
@@ -117,8 +117,8 @@ class ArmServices():
         y = pick_up_target.y
         z = pick_up_target.z
         yaw = pick_up_target.yaw
-        self.joints_prepare_to_pick_up = self.inverse_kinematics(x, y, z + 200e-3, yaw) # TODO: change to match gripper height
-        self.joints_pick_up = self.inverse_kinematics(x, y, z + 100e-3, yaw) # TODO: change to match gripper height
+        self.joints_prepare_to_pick_up = self.inverse_kinematics(x, y, z + 170e-3, yaw) # TODO: change to match gripper height
+        self.joints_pick_up = self.inverse_kinematics(x, y, z + 120e-3, yaw) # TODO: change to match gripper height
         
     ###### All your other methods here #######
 
