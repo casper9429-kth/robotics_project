@@ -91,7 +91,7 @@ class path_tracker():
                 self.move.angular.z = angle # might need to be negative
                 print('turning left')
             elif distance > self.move.linear.x:
-                self.move.linear.x += 0.01
+                self.move.linear.x += 0.1
                 self.move.angular.z = 0.0
                 print('moving forward')
             elif distance < 1:
@@ -118,7 +118,7 @@ class path_tracker():
 
     def spin(self):
         self.robots_location_in_map()
-        self.send_goal()
+        #self.send_goal()
         directions = self.math()
         # self.publish_twist(directions)
                

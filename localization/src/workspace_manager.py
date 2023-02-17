@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
 import rospy
-from geometry_msgs.msg import PoseStamped, PoseArray
+from geometry_msgs.msg import PoseStamped, PoseArray, Pose
 import tf2_ros
 import tf2_geometry_msgs
 
 
 
-class Node_name():
+class workspace_manager():
     def __init__(self) -> None:
         """ Put the node name here, and description of the node"""
-        rospy.init_node('Workspace_manager')
+        rospy.init_node('workspace_manager')
 
         # Subscribers 
         #self.sub_topic = rospy.Subscriber("topic", type, self.callback_topic)
         
         # Publisher
-        self.message_pub = rospy.Publisher("/Workspace_poses", PoseArray, queue_size=10)
+        self.message_pub = rospy.Publisher("/workspace_poses/pose_array", PoseArray, queue_size=10)
+        self.message_pub_point = rospy.Publisher("/workspace_poses/pose", PoseStamped, queue_size=10)
 
         # Define rate
-        self.update_rate = 1 # [Hz] Change this to the rate you want
+        self.update_rate = 1/2 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
         
@@ -30,11 +31,12 @@ class Node_name():
 
         # Paramethers HERE
         self.pose_array = PoseArray()
-        self.workspace_points = []
+        
     ###### All your callbacks here ######
         
     # def callback_topic(self): 
-    #     """Callback function for the topic"""
+    #     """Callback function for the topic"""seStamped' object has no attribute 'position'
+
     #     # do callback stuff
     #     pass
 
@@ -63,21 +65,26 @@ class Node_name():
         with open(filepath) as file:
             for line in file:
                 value = line.strip().split('\t')
-                print(value)
-                point = PoseStamped()
-                point.header.frame_id = 'map'
+                #print(value)
+                point = Pose()
 
                 if self.is_valid_decimal(value[0]) and self.is_valid_decimal(value[1]):
-                    point.pose.position.x = float(value[0])
-                    point.pose.position.y = float(value[1])
-                    self.workspace_points.append(point)
+                    point.position.x = float(value[0])
+                    point.position.y = float(value[1])
+                    self.pose_array.poses.append(point)
+                    #self.message_pub_point.publish(point)
+                    
+                    #print(point)
         #print(workspace_points)
 
-        self.pose_array = PoseArray()
+        #self.pose_array = PoseArray()
         self.pose_array.header.frame_id = 'map'
-        self.pose_array.poses = self.workspace_points
-    #print(pose_array)
-
+        #self.pose_array.poses = self.workspace_points
+        #print(self.pose_array)
+        #print(1)
+        self.message_pub.publish(self.pose_array)
+        self.pose_array = PoseArray()
+        #print(2)
 
     def run(self):
         """
@@ -88,7 +95,7 @@ class Node_name():
         # Run as long as node is not shutdown
         try:
             while not rospy.is_shutdown():
-                self.run()
+                self.main()
                 self.rate.sleep()
         except rospy.ROSInterruptException:
             pass
@@ -96,5 +103,5 @@ class Node_name():
 
 if __name__ == "__main__":
 
-    node=Node_name()
+    node=workspace_manager()
     node.run()
