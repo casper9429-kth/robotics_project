@@ -110,7 +110,7 @@ class cmd_vel_to_motors:
         #self.integral_right = self.integral_right + (self.v_right_des - self.v_right_enco)
         #self.integral_left = self.integral_left + (self.v_left_des - self.v_lef v_left = 2*pi*f*msg.delta_time_left / self.ticks_per_rev
         v_right = 2*pi*f*msg.delta_time_right / self.ticks_per_rev
-        
+        v_left = 2*pi*f*msg.delta_time_left / self.ticks_per_rev
 
         
 
