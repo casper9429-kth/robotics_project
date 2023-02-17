@@ -16,8 +16,8 @@ class Joints:
         self.joint5 = joint5
 
     def __str__(self):
-        # format the output to 3 decimal places
-        return f"JointState(joint1={self.joint1:.3f}, joint2={self.joint2:.3f}, joint3={self.joint3:.3f}, joint4={self.joint4:.3f}, joint5={self.joint5:.3f})"
+        # format the output to 2 decimal places
+        return f"JointState(joint1={self.joint1:.2f}, joint2={self.joint2:.2f}, joint3={self.joint3:.2f}, joint4={self.joint4:.2f}, joint5={self.joint5:.2f})"
 
 
 class Arm():
@@ -33,13 +33,16 @@ class Arm():
         self.joint5_pub = rospy.Publisher("/joint5_controller/command_duration", CommandDuration, queue_size=10)
         self.gripper_pub = rospy.Publisher("/r_joint_controller/command_duration", CommandDuration, queue_size=10)
 
+        # Subscribers
+        self.pick_up_target_sub = rospy.Subscriber("/arm/pick_up_target", Joints, self.pick_up_target_callback)
+
         # Services
-        self.initial_position_service = Service('arm/poses/initial', Trigger, self.initial_service_callback)
-        self.prepare_pick_up_service = Service('arm/poses/prepare_to_pick_up', Trigger, self.prepare_to_pick_up_service_callback)
-        # self.pick_up_service = Service('arm/pick_up', TODO, self.pick_up_service_callback)
+        self.straight_service = Service('arm/poses/straight', Trigger, self.straight_service_callback)
+        self.observe_service = Service('arm/poses/observe', Trigger, self.observe_service_callback)
+        self.prepare_to_pick_up_service = Service('arm/poses/prepare_to_pick_up', Trigger, self.prepare_to_pick_up_service_callback)
+        self.pick_up_service = Service('arm/poses/pick_up', Trigger, self.pick_up_service_callback)
         self.open_gripper_service = Service('arm/poses/open_gripper', Trigger, self.open_gripper_service_callback)
         self.close_gripper_service = Service('arm/poses/close_gripper', Trigger, self.close_gripper_service_callback)
-        self.testing_service = Service('arm/poses/testing', Trigger, self.testing_service_callback)
 
         # Define rate
         self.update_rate = 10 # [Hz]
@@ -49,42 +52,46 @@ class Arm():
         # Parameters
 
         # Measurements
-        self.l_12 = 18e-3 # [m]
-        self.l_23 = 100e-3 # [m]
-        self.l_34 = 97e-3 # [m]
-        self.l_5e = 55e-3 # [m] TODO: Find this value
+        self.d_12 = 18e-3 # [m]
+        self.d_23 = 100e-3 # [m]
+        self.d_34 = 97e-3 # [m]
+        self.d_5e = 55e-3 # [m] TODO: Find this value
 
         # Duration of the motion
-        self.joint_duration = 300 # [ms]
+        self.joint_duration = 1500 # [ms] TODO: make dynamic
         self.gripper_duration = 1000 # [ms]
 
         # gripper
         self.gripper_open = -1.5
-        self.gripper_close_sphere = -0.5
-        self.gripper_close_cube = -0.0
+        self.gripper_close = { 'cube': -0.0, 'sphere': -0.5, 'animal': None } # TODO: Figure out animal gripper value
 
-        # joints initial position
-        self.joints_initial = Joints()
+        # Joints
+        self.joints_straight = Joints()
+        self.joints_observe = Joints(joint1=0, joint2=0, joint3=-pi/2, joint4=-pi/2, joint5=0)
+        self.joints_prepare_to_pick_up = None
+        self.joints_observe = None
 
-        # joints pick up
-        self.joints_prepare_pick_up = Joints(0, -1, -0.8, -1.3, -0.2)
-
-        # joints testing
-        self.joints_testing = self.inverse_kinematics(-150e-3, -60e-3, 0)
+        # Target type
+        self.target_type = None
 
     ###### All your callbacks here ######
 
-    def initial_service_callback(self, req):
+    def straight_service_callback(self, _):
         """ Callback function for the initial position service. """
-        self.publish_joints(self.joints_initial)
+        self.publish_joints(self.joints_straight)
         return TriggerResponse(True, 'Initial')
     
-    def prepare_to_pick_up_service_callback(self, req): 
+    def observe_service_callback(self, _):
+        """ Callback function for the testing service. """
+        self.publish_joints(self.joints_observe)
+        return TriggerResponse(True, 'Testing')
+
+    def prepare_to_pick_up_service_callback(self, _): 
         """ Callback function for the prepare to pick up service. """
-        self.publish_joints(self.joints_prepare_pick_up)
+        self.publish_joints(self.joints_prepare_to_pick_up)
         return TriggerResponse(True, 'Preparing to pick up')
 
-    def pick_up_service_callback(self, req):
+    def pick_up_service_callback(self, _):
         """ Callback function for the prepare pick up service. """
         object_type = 'cube'
         if object_type == 'cube':
@@ -96,12 +103,12 @@ class Arm():
         else:
             return TriggerResponse(False, 'object_type must be either "cube" or "sphere".')
         
-    def open_gripper_service_callback(self, req):
+    def open_gripper_service_callback(self, _):
         """ Callback function for the close gripper service. """
         self.publish_gripper(self.gripper_open)
         return TriggerResponse(True, 'Opened gripper')
     
-    def close_gripper_service_callback(self, req):
+    def close_gripper_service_callback(self, _):
         """ Callback function for the close gripper service."""
         object_type = 'cube'
         if object_type == 'cube':
@@ -113,10 +120,13 @@ class Arm():
         else:
             return TriggerResponse(False, 'object_type must be either "cube" or "sphere".')
     
-    def testing_service_callback(self, req):
-        """ Callback function for the testing service. """
-        self.publish_joints(self.joints_testing)
-        return TriggerResponse(True, 'Testing')
+    def pick_up_target_callback(self, pick_up_target):
+        """ Callback function for the pick up target subscriber. """
+        self.type = pick_up_target.type
+        x = pick_up_target.target.x
+        y = pick_up_target.target.y
+        z = pick_up_target.target.z
+        self.publish_joints(req)
         
     ###### All your other methods here #######
 
@@ -127,8 +137,8 @@ class Arm():
 
         h = z
         d = sqrt(x**2 + y**2)
-        a = self.l_23
-        b = self.l_34
+        a = self.d_23
+        b = self.d_34
         cos_beta = (d**2 + h**2 - a**2 - b**2) / (2 * a * b)
         beta = acos(cos_beta)
         A = a + b * cos_beta
