@@ -41,6 +41,7 @@ class Arm():
         self.observe_service = Service('arm/poses/observe', Trigger, self.observe_service_callback)
         self.prepare_to_pick_up_service = Service('arm/poses/prepare_to_pick_up', Trigger, self.prepare_to_pick_up_service_callback)
         self.pick_up_service = Service('arm/poses/pick_up', Trigger, self.pick_up_service_callback)
+
         self.open_gripper_service = Service('arm/poses/open_gripper', Trigger, self.open_gripper_service_callback)
         self.close_gripper_service = Service('arm/poses/close_gripper', Trigger, self.close_gripper_service_callback)
 
@@ -55,7 +56,7 @@ class Arm():
         self.d_12 = 18e-3 # [m]
         self.d_23 = 100e-3 # [m]
         self.d_34 = 97e-3 # [m]
-        self.d_5e = 55e-3 # [m] TODO: Find this value
+        self.d_5e = 55e-3 # [m] TODO: Find (and define) this value
 
         # Duration of the motion
         self.joint_duration = 1500 # [ms] TODO: make dynamic
@@ -69,7 +70,7 @@ class Arm():
         self.joints_straight = Joints()
         self.joints_observe = Joints(joint1=0, joint2=0, joint3=-pi/2, joint4=-pi/2, joint5=0)
         self.joints_prepare_to_pick_up = None
-        self.joints_observe = None
+        self.joints_pick_up = None
 
         # Target type
         self.target_type = None
@@ -77,63 +78,53 @@ class Arm():
     ###### All your callbacks here ######
 
     def straight_service_callback(self, _):
-        """ Callback function for the initial position service. """
         self.publish_joints(self.joints_straight)
-        return TriggerResponse(True, 'Initial')
+        return TriggerResponse(True, 'Arm straight')
     
     def observe_service_callback(self, _):
-        """ Callback function for the testing service. """
         self.publish_joints(self.joints_observe)
-        return TriggerResponse(True, 'Testing')
+        return TriggerResponse(True, 'Arm observing')
 
-    def prepare_to_pick_up_service_callback(self, _): 
-        """ Callback function for the prepare to pick up service. """
+    def prepare_to_pick_up_service_callback(self, _):
+        if self.joints_prepare_to_pick_up is None:
+            return TriggerResponse(False, 'No pick up target received.')
         self.publish_joints(self.joints_prepare_to_pick_up)
-        return TriggerResponse(True, 'Preparing to pick up')
+        return TriggerResponse(True, 'Arm preparing to pick up')
 
     def pick_up_service_callback(self, _):
-        """ Callback function for the prepare pick up service. """
-        object_type = 'cube'
-        if object_type == 'cube':
-            self.publish_joints(self.joints_pick_up_cube)
-            return TriggerResponse(True, 'Pick up cube')
-        elif object_type == 'sphere':
-            self.publish_joints(self.joints_pick_up_sphere)
-            return TriggerResponse(True, 'Picked up sphere')
-        else:
-            return TriggerResponse(False, 'object_type must be either "cube" or "sphere".')
+        if self.joints_pick_up is None:
+            return TriggerResponse(False, 'No pick up target received.')
+        self.publish_joints(self.joints_pick_up_cube)
+        return TriggerResponse(True, 'Arm picking up')
         
     def open_gripper_service_callback(self, _):
-        """ Callback function for the close gripper service. """
         self.publish_gripper(self.gripper_open)
-        return TriggerResponse(True, 'Opened gripper')
+        return TriggerResponse(True, 'Opening gripper')
     
     def close_gripper_service_callback(self, _):
-        """ Callback function for the close gripper service."""
-        object_type = 'cube'
-        if object_type == 'cube':
-            self.publish_gripper(self.gripper_close_cube)
-            return TriggerResponse(True, 'Closed gripper')
-        elif object_type == 'sphere':
-            self.publish_gripper(self.gripper_close_sphere)
-            return TriggerResponse(True, 'Closed gripper')
-        else:
-            return TriggerResponse(False, 'object_type must be either "cube" or "sphere".')
+        if self.target_type is None:
+            return TriggerResponse(False, 'No pick up target received.')
+        try:
+            self.publish_gripper(self.gripper_close[self.target_type])
+            return TriggerResponse(True, 'Closing gripper')
+        except KeyError:
+            return TriggerResponse(False, 'Bad pick_up_target.type. Legal values are "cube", "sphere" and "animal".')
     
     def pick_up_target_callback(self, pick_up_target):
-        """ Callback function for the pick up target subscriber. """
-        self.type = pick_up_target.type
-        x = pick_up_target.target.x
-        y = pick_up_target.target.y
-        z = pick_up_target.target.z
-        self.publish_joints(req)
+        self.target_type = pick_up_target.type
+        x = pick_up_target.x
+        y = pick_up_target.y
+        z = pick_up_target.z
+        yaw = pick_up_target.yaw
+        self.joints_prepare_to_pick_up = self.inverse_kinematics(x, y, z + 200e-3, yaw) # TODO: change to match gripper height
+        self.joints_pick_up = self.inverse_kinematics(x, y, z + 100e-3, yaw) # TODO: change to match gripper height
         
     ###### All your other methods here #######
 
-    def inverse_kinematics(self, x, y, z=0):
+    def inverse_kinematics(self, x, y, z, yaw):
         """ Calculates the inverse kinematics for the arm. """
         theta1 = atan2(y, x) % (2 * pi) - pi
-        theta5 = theta1
+        theta5 = theta1 # TODO: change to match yaw of target
 
         h = z
         d = sqrt(x**2 + y**2)
@@ -164,7 +155,7 @@ class Arm():
         """ Publishes the current gripper state. """
         self.gripper_pub.publish(CommandDuration(data=gripper, duration=self.gripper_duration))
 
-    def main(self): # Do main stuff here    
+    def main(self): # Do main stuff here
         """
         Main loop, instead of changing run function,
         write your code here to make it more readable.
