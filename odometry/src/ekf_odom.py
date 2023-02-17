@@ -4,6 +4,8 @@
 
 #!/usr/bin/env python
 import rospy
+from tf2_geometry_msgs import PoseStamped
+#from tf2_geometry_msgs import TransformStamped
 from geometry_msgs.msg import TransformStamped
 from robp_msgs.msg import Encoders
 import tf_conversions
@@ -18,7 +20,7 @@ from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray
 from std_msgs.msg import Bool
 from collections import defaultdict
-from geometry_msgs.msg import PoseStamped
+# from geometry_msgs.msg import PoseStamped
 
 # EKF Aruco Slam, v,omega fusion, odometry in one script
 # This node pefors EKF Aruco Slam with odometry, v,omega fusion 
@@ -225,13 +227,13 @@ class ekf_slam():
         m_odom_ps.header.frame_id = "odom"
         m_odom_ps.pose.position.x = aruco_mu[2]#m_odom.transform.translation.x
         m_odom_ps.pose.position.y = aruco_mu[3]#m_odom.transform.translation.y
-        m_odom_ps.pose.position.z = m_odom.transform.translation.z
-        m_odom_ps.pose.orientation.x = m_odom.transform.rotation.x
-        m_odom_ps.pose.orientation.y = m_odom.transform.rotation.y
-        m_odom_ps.pose.orientation.z = m_odom.transform.rotation.z
-        m_odom_ps.pose.orientation.w = m_odom.transform.rotation.w
+        m_odom_ps.pose.position.z = m_odom.pose.position.z
+        m_odom_ps.pose.orientation.x = m_odom.pose.orientation.x
+        m_odom_ps.pose.orientation.y = m_odom.pose.orientation.y
+        m_odom_ps.pose.orientation.z = m_odom.pose.orientation.z
+        m_odom_ps.pose.orientation.w = m_odom.pose.orientation.w
         ## transform the pose to map frame, and save it in the state vector. Use map because odom will change over time
-        m_map_ts = self.tfBuffer.transform(m_odom_ps, "map",rospy.Time(0))
+        m_map_ts = self.tfBuffer.transform(m_odom_ps, "map",rospy.Duration(1.0))
         self.aruco_state_vector[key]['pose_map'] = m_map_ts
 
         # Set new measurement to false so we dont run the ekf update again with the same measurement
@@ -455,12 +457,14 @@ class ekf_slam():
                 # look up pose of marker in map_frame
                 try:
                     map_to_marker = self.tfBuffer.lookup_transform('map','aruco/detected'+str(marker.id),rospy.Time(0))
+                    map_to_marker = self.transformed_stamped_to_PoseStamped(map_to_marker)
                 except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                     return
                 
                 # look up pose of marker in odom_frame
                 try :
                     odom_to_marker = self.tfBuffer.lookup_transform('odom','aruco/detected'+str(marker.id),rospy.Time(0))
+                    odom_to_marker = self.transformed_stamped_to_PoseStamped(odom_to_marker)
                 except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                     return
 
@@ -474,8 +478,8 @@ class ekf_slam():
                 new_marker['id'] = marker.id
                 new_marker['cov'] = self.odom_sigma
                 new_marker['pose_map'] = map_to_marker
-                new_marker['x'] = odom_to_marker.transform.translation.x
-                new_marker['y'] = odom_to_marker.transform.translation.y
+                new_marker['x'] = odom_to_marker.pose.position.x
+                new_marker['y'] = odom_to_marker.pose.position.y
                 new_marker['new_x'] = None
                 new_marker['new_y'] = None
                 new_marker['new_measurement'] = False
@@ -493,12 +497,14 @@ class ekf_slam():
                 # look up pose of the aruco marker in map frame 
                 try:
                     map_to_marker = self.tfBuffer.lookup_transform('map','aruco/detected'+str(marker.id),rospy.Time(0))
+                    map_to_marker = self.transformed_stamped_to_PoseStamped(map_to_marker)
                 except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                     return
                 
                 # look up pose of marker in odom_frame
                 try :
                     odom_to_marker = self.tfBuffer.lookup_transform('odom','aruco/detected'+str(marker.id),rospy.Time(0))
+                    odom_to_marker = self.transformed_stamped_to_PoseStamped(odom_to_marker)
                 except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
                     return
                 
@@ -509,17 +515,47 @@ class ekf_slam():
                 # correct the old pose in odom frame with the new pose in odom frame using stationary map frame
                 old_pose_map = self.aruco_state_vector[marker.id]['pose_map']
                 old_pose_new_odom = self.transform_old_map_pose_into_new_frame(old_pose_map, 'odom',marker.header.stamp)
-                self.aruco_state_vector[marker.id]['x'] = old_pose_new_odom.transform.translation.x
-                self.aruco_state_vector[marker.id]['y'] = old_pose_new_odom.transform.translation.y
+                if old_pose_new_odom == None:
+                    return
+                self.aruco_state_vector[marker.id]['x'] = old_pose_new_odom.pose.position.x
+                self.aruco_state_vector[marker.id]['y'] = old_pose_new_odom.pose.position.y
 
                 # add new messurement to state vector                
                 self.aruco_state_vector[marker.id]['new_measurement'] = True                
-                self.aruco_state_vector[marker.id]['new_x'] = odom_to_marker.transform.translation.x
-                self.aruco_state_vector[marker.id]['new_y'] = odom_to_marker.transform.translation.y     
+                self.aruco_state_vector[marker.id]['new_x'] = odom_to_marker.pose.position.x
+                self.aruco_state_vector[marker.id]['new_y'] = odom_to_marker.pose.position.y     
                 self.aruco_state_vector[marker.id]['new_pose_odom'] = odom_to_marker       
                 self.aruco_state_vector[marker.id]['t_stamp'] = rospy.Time.now()
                 
-
+    def transformed_stamped_to_PoseStamped(self,tfs):
+        """
+        Convert tf stamped to Pose stamped
+        """
+        ps = PoseStamped()
+        ps.header = tfs.header
+        ps.pose.position.x = tfs.transform.translation.x
+        ps.pose.position.y = tfs.transform.translation.y
+        ps.pose.position.z = tfs.transform.translation.z
+        ps.pose.orientation.x = tfs.transform.rotation.x
+        ps.pose.orientation.y = tfs.transform.rotation.y
+        ps.pose.orientation.z = tfs.transform.rotation.z
+        ps.pose.orientation.w = tfs.transform.rotation.w
+        return ps
+    
+    def PoseStamped_to_transformed_stamped(self,ps):
+        """
+        Convert Pose stamped to tf stamped
+        """
+        tfs = TransformStamped()
+        tfs.header = ps.header
+        tfs.transform.translation.x = ps.pose.position.x
+        tfs.transform.translation.y = ps.pose.position.y
+        tfs.transform.translation.z = ps.pose.position.z
+        tfs.transform.rotation.x = ps.pose.orientation.x
+        tfs.transform.rotation.y = ps.pose.orientation.y
+        tfs.transform.rotation.z = ps.pose.orientation.z
+        tfs.transform.rotation.w = ps.pose.orientation.w
+        return tfs
                                
     def transform_old_map_pose_into_new_frame(self,pose_in_map, new_frame='odom',time = None):
         """
@@ -530,9 +566,18 @@ class ekf_slam():
             time = rospy.Time.now()
         
         if type(pose_in_map) is PoseStamped:
-            pose_in_map_stamped = pose_in_map
-            pose_in_map_stamped.header.stamp = time
-            pose_in_map_stamped.header.frame_id = 'map'
+            pose_map_stamped = PoseStamped()
+            pose_map_stamped.header.stamp = time
+            pose_map_stamped.header.frame_id = 'map'
+            pose_map_stamped.pose.position.x = pose_in_map.pose.position.x
+            pose_map_stamped.pose.position.y = pose_in_map.pose.position.y
+            pose_map_stamped.pose.position.z = pose_in_map.pose.position.z
+            pose_map_stamped.pose.orientation.x = pose_in_map.pose.orientation.x
+            pose_map_stamped.pose.orientation.y = pose_in_map.pose.orientation.y
+            pose_map_stamped.pose.orientation.z = pose_in_map.pose.orientation.z
+            pose_map_stamped.pose.orientation.w = pose_in_map.pose.orientation.w
+
+
 
         elif type(pose_in_map) is TransformStamped:
             pose_map_stamped = PoseStamped()
@@ -545,10 +590,14 @@ class ekf_slam():
             pose_map_stamped.pose.orientation.y = pose_in_map.transform.rotation.y
             pose_map_stamped.pose.orientation.z = pose_in_map.transform.rotation.z
             pose_map_stamped.pose.orientation.w = pose_in_map.transform.rotation.w
+        else:
+            return None
 
-        new_pose = self.tfBuffer.transform(pose_map_stamped,new_frame,rospy.Time(0))
-        
-        return new_pose
+        try:
+            new_pose = self.tfBuffer.transform(pose_map_stamped,new_frame,rospy.Duration(0.0))
+            return new_pose
+        except:
+            return None
 
 
 
