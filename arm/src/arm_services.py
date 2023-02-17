@@ -5,6 +5,7 @@ import rospy
 from hiwonder_servo_msgs.msg import CommandDuration
 from std_srvs.srv import Trigger, TriggerResponse
 from rospy import Service
+
 from arm.msg import PickUpTarget
 
 class Joints:
@@ -20,10 +21,10 @@ class Joints:
         return f"JointState(joint1={self.joint1:.2f}, joint2={self.joint2:.2f}, joint3={self.joint3:.2f}, joint4={self.joint4:.2f}, joint5={self.joint5:.2f})"
 
 
-class Arm():
+class ArmServices():
     def __init__(self) -> None:
         """ Services for controlling the arm. """
-        rospy.init_node('arm')
+        rospy.init_node('arm_services')
         
         # Publishers
         self.joint1_pub = rospy.Publisher("/joint1_controller/command_duration", CommandDuration, queue_size=10)
@@ -175,5 +176,5 @@ class Arm():
 
 
 if __name__ == "__main__":
-    node = Arm()
+    node = ArmServices()
     node.run()

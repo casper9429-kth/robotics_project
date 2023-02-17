@@ -1,7 +1,7 @@
 # This specifies the current target to pick up, in the arm base frame, and the type of object to pick up.
 # It is used when calling the pick up service.
+string type # 'cube', 'sphere', 'animal'
 float64 x
 float64 y
 float64 z
 float64 yaw
-string type # 'cube', 'sphere', 'animal'
