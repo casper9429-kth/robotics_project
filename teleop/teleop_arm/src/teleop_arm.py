@@ -2,7 +2,7 @@
 import rospy
 from rospy import ServiceProxy, wait_for_service
 from sensor_msgs.msg import Joy
-from std_srvs.srv import Trigger
+from arm.srv import ArmTrigger
 
 
 class TeleopArm():
@@ -10,8 +10,10 @@ class TeleopArm():
         """ A node to control the arm using the joycon. """
         rospy.init_node('teleop_arm')
         
-        wait_for_service('/arm/poses/initial')
+        wait_for_service('/arm/poses/straight')
+        wait_for_service('/arm/poses/observe')
         wait_for_service('/arm/poses/prepare_to_pick_up')
+        wait_for_service('/arm/poses/pick_up')
         wait_for_service('/arm/poses/open_gripper')
         wait_for_service('/arm/poses/close_gripper')
 
@@ -19,10 +21,12 @@ class TeleopArm():
         self.joy_subscriber = rospy.Subscriber('joy', Joy, self.joy_callback, queue_size=1)
         
         # Services
-        self.initial = ServiceProxy('arm/poses/initial', Trigger)
-        self.prepare_to_pick_up = ServiceProxy('arm/poses/prepare_to_pick_up', Trigger)
-        self.open_gripper = ServiceProxy('arm/poses/open_gripper', Trigger)
-        self.close_gripper = ServiceProxy('arm/poses/close_gripper', Trigger)
+        self.straight = ServiceProxy('arm/poses/straight', ArmTrigger)
+        self.observe = ServiceProxy('arm/poses/observe', ArmTrigger)
+        self.prepare_to_pick_up = ServiceProxy('arm/poses/prepare_to_pick_up', ArmTrigger)
+        self.pick_up = ServiceProxy('arm/poses/pick_up', ArmTrigger)
+        self.open_gripper = ServiceProxy('arm/poses/open_gripper', ArmTrigger)
+        self.close_gripper = ServiceProxy('arm/poses/close_gripper', ArmTrigger)
 
         # Define rate
         self.update_rate = 10 # [Hz] Change this to the rate you want
@@ -37,18 +41,25 @@ class TeleopArm():
         should_open = open_button == 1
         close_button = joy_msg.buttons[5] # RB
         should_close = close_button == 1
-        up_down_axes = joy_msg.axes[-1] # arrow pad up/down
+        up_down_axes = joy_msg.axes[1] # arrow pad up/down
         should_go_up = up_down_axes == 1
-        should_go_down = up_down_axes == -1
+        should_pick_up = up_down_axes == -1
+        left_right_axes = joy_msg.axes[0] # arrow pad left/right
+        should_prepare_to_pick_up = left_right_axes == 1 # left
+        should_observe = left_right_axes == -1 # right
         
         if should_open:
             self.open_gripper()
         elif should_close:
             self.close_gripper()
         elif should_go_up:
-            self.initial()
-        elif should_go_down:
+            self.straight()
+        elif should_observe:
+            self.observe()
+        elif should_prepare_to_pick_up:
             self.prepare_to_pick_up()
+        elif should_pick_up:
+            self.pick_up()
         
     ###### All your other methods here #######
 
