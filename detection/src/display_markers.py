@@ -19,12 +19,17 @@ listener = tf2_ros.TransformListener(tfBuffer)
 
 def aruco_callback(msg):
     #rospy.loginfo('New aruco marker detected:\n%s', msg)
+    # necessary to get the correct time stamp
     
     stamp = msg.header.stamp
     frame_id = msg.header.frame_id
 
-    
     for marker in msg.markers:
+
+        pose_map = PoseStamped()
+        pose_map.header.frame_id = frame_id
+        pose_map.header.stamp = stamp
+
         id = marker.id
         pose = marker.pose
         
