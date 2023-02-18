@@ -41,10 +41,10 @@ class TeleopArm():
         should_open = open_button == 1
         close_button = joy_msg.buttons[5] # RB
         should_close = close_button == 1
-        up_down_axes = joy_msg.axes[1] # arrow pad up/down
+        up_down_axes = joy_msg.axes[-1] # left stick pad up/down
         should_go_up = up_down_axes == 1
         should_pick_up = up_down_axes == -1
-        left_right_axes = joy_msg.axes[0] # arrow pad left/right
+        left_right_axes = joy_msg.axes[-2] # left stick left/right
         should_prepare_to_pick_up = left_right_axes == 1 # left
         should_observe = left_right_axes == -1 # right
         
