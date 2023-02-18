@@ -10,6 +10,10 @@
 		<remap from="/kobuki_motors/encoders" to="/kobuki/encoders" />
 	</node> -->
 
+	<!-- run the arm -->
+	<node name="arm_services" pkg="arm" type="arm_services.py" output='screen'/>
+	<node name="teleop_arm" pkg="teleop_arm" type="teleop_arm.py" output='screen'/>
+
     <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
 
 	<!-- run rviz -->
