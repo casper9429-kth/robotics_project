@@ -96,12 +96,13 @@ class ArmServices():
 
         # Target type
         self.target_type = None
+        self.allowed_target_types = ['cube', 'sphere', 'animal']
 
         # Error messages
         self.error_messages = {
             'missing joints': 'No joint states received. Is anyone publishing to /joint_states?',
             'missing target': 'No pick up target received.',
-            'bad target type': 'Bad pick_up_target.type. Legal values are "cube", "sphere" and "animal".',
+            'bad target type': '''Bad target type. Legal values are 'cube', 'sphere' and 'animal'.''',
             'target out of reach': 'Pick up target out of reach',
         }
 
@@ -175,6 +176,8 @@ class ArmServices():
             return ArmTriggerResponse(False, self.error_messages['bad target type'], 0)
     
     def set_pick_up_target_service_callback(self, pick_up_target):
+        if pick_up_target.type not in self.allowed_target_types:
+            return SetPickUpTargetResponse(False, self.error_messages['bad target type'])
         self.target_type = pick_up_target.type
         x = pick_up_target.x
         y = pick_up_target.y
