@@ -65,10 +65,14 @@ class ArmServices():
         # Parameters
 
         # Measurements
-        self.d_12 = 18e-3 # [m]
+        self.d_12 = 30e-3 # [m]
         self.d_23 = 100e-3 # [m]
-        self.d_34 = 97e-3 # [m]
-        self.d_5e = 55e-3 # [m] TODO: Find (and define) this value
+        self.d_34 = 96e-3 # [m]
+        self.d_5e = 180e-3 # [m] this is to the end of the end effector with a closed cube grip (approximately)
+        self.d_floor_to_base = 131e-3 # [m]
+        
+        self.pick_up_margin = 6e-3 # [m]
+        self.prepare_to_pick_up_margin = 90e-3 # [m]
 
         # Duration of the motion
         self.max_joint_speed = 0.8 # [rad/s]
@@ -76,7 +80,7 @@ class ArmServices():
 
         # gripper
         self.gripper_open = -1.8
-        self.gripper_close = { 'cube': -0.0, 'sphere': -0.5, 'animal': None } # TODO: Figure out animal gripper value
+        self.gripper_close = { 'cube': 0, 'sphere': -0.45, 'animal': 0 }
 
         # Joints
         self.joints_straight = Joints()
@@ -95,7 +99,8 @@ class ArmServices():
         self.error_messages = {
             'missing joints': 'No joint states received. Is anyone publishing to /joint_states?',
             'missing target': 'No pick up target received.',
-            'bad target type': 'Bad pick_up_target.type. Legal values are "cube", "sphere" and "animal".'
+            'bad target type': 'Bad pick_up_target.type. Legal values are "cube", "sphere" and "animal".',
+            'target out of reach': 'Pick up target out of reach',
         }
 
 
@@ -164,16 +169,23 @@ class ArmServices():
         y = pick_up_target.y
         z = pick_up_target.z
         yaw = pick_up_target.yaw
-        self.joints_prepare_to_pick_up = self.inverse_kinematics(x, y, z + 200e-3, yaw) # TODO: change to match gripper height
-        self.joints_pick_up = self.inverse_kinematics(x, y, z + 120e-3, yaw) # TODO: change to match gripper height
-        return SetPickUpTargetResponse(True, 'Pick up target set') # TODO: this should be false if the target is out of reach
+        try:
+            self.joints_prepare_to_pick_up = self.inverse_kinematics(x, y, z + self.prepare_to_pick_up_margin, yaw)
+            self.joints_pick_up = self.inverse_kinematics(x, y, z + self.pick_up_margin, yaw)
+        except ValueError:
+            return SetPickUpTargetResponse(False, self.error_messages['target out of reach'])
+        return SetPickUpTargetResponse(True, 'Pick up target set')
         
     ###### All your other methods here #######
 
     def inverse_kinematics(self, x, y, z, yaw):
         """ Calculates the inverse kinematics for the arm. """
         theta1 = atan2(y, x) % (2 * pi) - pi
-        theta5 = theta1 # TODO: change to match yaw of target
+        yaw = (yaw + pi / 2) % pi - pi / 2
+        theta5 = theta1 - yaw
+        
+        # The inverse kinematics works from the second joint to the fourth joint.
+        z = z - self.d_12 + self.d_5e
 
         h = z
         d = sqrt(x**2 + y**2)
