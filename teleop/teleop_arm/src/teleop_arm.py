@@ -10,7 +10,7 @@ class TeleopArm():
         """ A node to control the arm using the joycon. """
         rospy.init_node('teleop_arm')
         
-        wait_for_service('/arm/poses/straight')
+        wait_for_service('/arm/poses/default')
         wait_for_service('/arm/poses/observe')
         wait_for_service('/arm/poses/prepare_to_pick_up')
         wait_for_service('/arm/poses/pick_up')
@@ -21,7 +21,7 @@ class TeleopArm():
         self.joy_subscriber = rospy.Subscriber('joy', Joy, self.joy_callback, queue_size=1)
         
         # Services
-        self.straight = ServiceProxy('arm/poses/straight', ArmTrigger)
+        self.default = ServiceProxy('arm/poses/default', ArmTrigger)
         self.observe = ServiceProxy('arm/poses/observe', ArmTrigger)
         self.prepare_to_pick_up = ServiceProxy('arm/poses/prepare_to_pick_up', ArmTrigger)
         self.pick_up = ServiceProxy('arm/poses/pick_up', ArmTrigger)
@@ -42,7 +42,7 @@ class TeleopArm():
         close_button = joy_msg.buttons[5] # RB
         should_close = close_button == 1
         up_down_axes = joy_msg.axes[-1] # left stick pad up/down
-        should_go_up = up_down_axes == 1
+        should_default = up_down_axes == 1
         should_pick_up = up_down_axes == -1
         left_right_axes = joy_msg.axes[-2] # left stick left/right
         should_prepare_to_pick_up = left_right_axes == 1 # left
@@ -52,8 +52,8 @@ class TeleopArm():
             self.open_gripper()
         elif should_close:
             self.close_gripper()
-        elif should_go_up:
-            self.straight()
+        elif should_default:
+            self.default()
         elif should_observe:
             self.observe()
         elif should_prepare_to_pick_up:

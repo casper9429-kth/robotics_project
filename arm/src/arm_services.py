@@ -48,6 +48,7 @@ class ArmServices():
 
         # Services
         self.straight_service = Service('arm/poses/straight', ArmTrigger, self.straight_service_callback)
+        self.default_service = Service('arm/poses/default', ArmTrigger, self.default_service_callback)
         self.observe_service = Service('arm/poses/observe', ArmTrigger, self.observe_service_callback)
         self.prepare_to_pick_up_service = Service('arm/poses/prepare_to_pick_up', ArmTrigger, self.prepare_to_pick_up_service_callback)
         self.pick_up_service = Service('arm/poses/pick_up', ArmTrigger, self.pick_up_service_callback)
@@ -84,7 +85,8 @@ class ArmServices():
 
         # Joints
         self.joints_straight = Joints()
-        self.joints_observe = Joints(joint1=0, joint2=0, joint3=-pi/2, joint4=-pi/2, joint5=0)
+        self.joints_default = Joints(0, 0.52, -1.36, -1.76, 0)
+        self.joints_observe = Joints(0, 0, -pi/2, -pi/2, 0)
         self.joints_prepare_to_pick_up = None
         self.joints_pick_up = None
 
@@ -117,7 +119,16 @@ class ArmServices():
         except MissingJointsError:
             return ArmTriggerResponse(False, self.error_messages['missing joints'], 0)
         self.publish_joints(self.joints_straight, duration)
-        return ArmTriggerResponse(True, 'Arm straightening', duration) 
+        return ArmTriggerResponse(True, 'Arm straightening', duration)
+    
+    def default_service_callback(self, _):
+        duration = None
+        try:
+            duration = self.calculate_duration(self.joints, self.joints_default)
+        except MissingJointsError:
+            return ArmTriggerResponse(False, self.error_messages['missing joints'], 0)
+        self.publish_joints(self.joints_default, duration)
+        return ArmTriggerResponse(True, 'Arm defaulting', duration)
     
     def observe_service_callback(self, _):
         duration = None
