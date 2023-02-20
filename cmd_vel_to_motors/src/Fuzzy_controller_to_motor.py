@@ -9,6 +9,8 @@ import numpy as np
 import scipy
 import json
 import os
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
 from collections import defaultdict
 
 
@@ -64,26 +66,23 @@ class cmd_vel_to_motors:
         
         # Deine the rate at which the node will run        
         self.rate = rospy.Rate(20)
-    
+
+        # Define the fuzzy input variables (error and error rate)
+        self.error = ctrl.Antecedent(np.arange(-10, 11, 1), 'error')
+        self.error_rate = ctrl.Antecedent(np.arange(-10, 11, 1), 'error_rate')
+
+        # Define the fuzzy output variables (left wheel and right wheel speeds)
+        self.left_wheel = ctrl.Consequent(np.arange(-100, 101, 1), 'left_wheel')
+        self.right_wheel = ctrl.Consequent(np.arange(-100, 101, 1), 'right_wheel')
 
         # Define a DutyCycles message 
         self.duty_cycle_msg = DutyCycles()
         self.duty_cycle_msg.duty_cycle_left = 0.0
         self.duty_cycle_msg.duty_cycle_right = 0.0
 
-        # Integral variables
-        self.integral_left = 0.0
-        self.integral_right = 0.0
-        self.right_dt = 0.0
-        self.left_dt = 0.0
-
-        #PIDS
-        self.pid_right = None
-        self.pid_left = None
-
         self.run()
     
-    def encoder_callback(self,msg:Encoders):
+    def encoder_callback(self,msg):
         time = rospy.get_time()
         f = 20
         # tics per second
@@ -108,15 +107,14 @@ class cmd_vel_to_motors:
         self.right_dt = msg.delta_time_right
         # append integral
         #self.integral_right = self.integral_right + (self.v_right_des - self.v_right_enco)
-        #self.integral_left = self.integral_left + (self.v_left_des - self.v_lef                            # not complete
-        v_left = 2*pi*f*msg.delta_time_left / self.ticks_per_rev                                            # this was commented out
+        #self.integral_left = self.integral_left + (self.v_left_des - self.v_lef v_left = 2*pi*f*msg.delta_time_left / self.ticks_per_rev
         v_right = 2*pi*f*msg.delta_time_right / self.ticks_per_rev
-        v_left = 2*pi*f*msg.delta_time_left / self.ticks_per_rev
+        
 
         
 
 
-    def cmd_vel_callback(self, msg:Twist):
+    def cmd_vel_callback(self, msg):
         """
         This node subscribes to the /cmd_vel topic and converts the linear and angular velocity
         It then updates the internal variables that are used to publish the duty cycle message
@@ -165,48 +163,42 @@ class cmd_vel_to_motors:
         omega = (v_right - v_left) / self.base
         return v, omega
 
-    # Initializes the PID class for each wheel
-    def initalize_PID(self):
-        print('PIDs initalized')
-        # best values thus far
-        """
-        K_P_r = 0.6
-        K_P_l = 0.6  
-        #K_I
-        K_I_r = 0.001
-        K_I_l = 0.001
-        #K_D
-        K_D_r = 0.0
-        K_D_l = 0.0
-        """
-        # K_P
-        K_P_r = 0.7
-        K_P_l = 0.6  
-
-        #K_I
-        K_I_r = 0.001
-        K_I_l = 0.001
-
-        #K_D
-        K_D_r = 0.05
-        K_D_l = 0.05
-
-        self.pid_right = PIDController(K_P_r,K_I_r,K_D_r)
-        self.pid_left = PIDController(K_P_l,K_I_l,K_D_l)
-
-    # returns PID value for each controller
-    def PID(self):
+    def fuzzy_PID(self):
         v_left_desiered, v_right_desired = self.transform_v_omega_to_v_left_v_right(self.linear_velocity,self.angular_velocity)
         err_right = v_right_desired-self.v_right_enco
         err_left = v_left_desiered-self.v_left_enco
-        
-        # PID code for each controller
-        
 
-        v_right = self.pid_right.update(err_right,self.right_dt)
-        v_left = self.pid_left.update(err_left,self.left_dt)
+        v_actual,omega_actual = self.transform_v_left_v_right_to_v_omega(self.v_left_enco,self.v_right_enco)
         
-        return v_right,v_left
+        #Define the membership functions for the "left_wheel" and "right_wheel" output variables
+        self.left_wheel['fast_backward'] = fuzz.trimf(self.left_wheel.universe, [-100, -100, -50])
+        self.left_wheel['slow_backward'] = fuzz.trimf(self.left_wheel.universe, [-100, -50, 0])
+        self.left_wheel['stop'] = fuzz.trimf(self.left_wheel.universe, [-50, 0, 50])
+        self.left_wheel['slow_forward'] = fuzz.trimf(self.left_wheel.universe, [0, 50, 100])
+        self.left_wheel['fast_forward'] = fuzz.trimf(self.left_wheel.universe, [50, 100, 100])
 
+        self.right_wheel['fast_backward'] = fuzz.trimf(self.right_wheel.universe, [-100, -100, -50])
+        self.right_wheel['slow_backward'] = fuzz.trimf(self.right_wheel.universe, [-100, -50, 0])
+        self.right_wheel['stop'] = fuzz.trimf(self.right_wheel.universe, [-50, 0, 50])
+        self.right_wheel['slow_forward'] = fuzz.trimf(self.right_wheel.universe, [0, 50, 100])
+        self.right_wheel['fast_forward'] = fuzz.trimf(self.right_wheel.universe, [50, 100, 100])
+
+
+        # Define the fuzzy rules
+        rule1 = ctrl.Rule(self.error['negative_large'] & self.error_rate['negative_large'], (self.left_wheel['fast_backward'], self.right_wheel['fast_backward']))
+        rule2 = ctrl.Rule(self.error['negative_large'] & self.error_rate['negative_small'], (self.left_wheel['slow_backward'], self.right_wheel['fast_backward']))
+        rule3 = ctrl.Rule(self.error['negative_large'] & self.error_rate['zero'], (self.left_wheel['stop'], self.right_wheel['fast_backward']))
+        rule4 = ctrl.Rule(self.error['negative_large'] & self.error_rate['positive_small'], (self.left_wheel['stop'], self.right_wheel['slow_backward']))
+        rule5 = ctrl.Rule(self.error['negative_large'] & self.error_rate['positive_large'], (self.left_wheel['stop'], self.right_wheel['fast_backward']))
+
+        self.controller = ctrl.ControlSystem([rule1, rule2, rule3, rule4, rule5, ...])
+        self.fuzzy_pid = ctrl.ControlSystemSimulation(self.controller)
+
+        # Set the left and right wheel speeds
+        left_wheel_speed = self.fuzzy_pid.output['left_wheel']
+        right_wheel_speed = self.fuzzy_pid.output['right_wheel']
+
+        # Update the last error
+        self.last_error = error
 if __name__ == '__main__':
     new_object = cmd_vel_to_motors()
