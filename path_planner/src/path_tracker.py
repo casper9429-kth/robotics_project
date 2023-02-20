@@ -14,14 +14,31 @@ class path_tracker():
         print('path_tracker node initalized')
         self.robot_frame = 'base_link'
         self.rate = rospy.Rate(10)
+
+        # Position and orientation of the robot
         self.pose = PoseStamped()
         self.pose_in_map = PoseStamped()
+        # Position and orientation of the robot in the base_link frame
+        self.pose.header.frame_id = self.robot_frame
+        self.pose.pose.position.x = 0.0
+        self.pose.pose.position.y = 0.0
+        self.pose.pose.position.z = 0.0
+        self.pose.pose.orientation.x = 0.0
+        self.pose.pose.orientation.y = 0.0
+        self.pose.pose.orientation.z = 0.0
+        self.pose.pose.orientation.w = 0.0
+
+        # Goal position and orientation
         self.goal = PoseStamped()
         self.goal_in_base_link = PoseStamped()
-        self.aruco = Marker()
-        # self.move = DutyCycles()
+
+        # To control the robots movement
         self.move = Twist()
-        self.pose.header.frame_id = self.robot_frame
+        self.acceleration = 0.05
+        self.deceleration_distance = 0.0
+
+        # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
+        self.aruco = Marker()
 
         # tf stuff
         self.br = tf2_ros.TransformBroadcaster()
@@ -29,14 +46,6 @@ class path_tracker():
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
         print('Tf2 stuff initialized')
 
-        # Position and orientation of the robot in the base_link frame
-        self.pose.pose.position.x = 0
-        self.pose.pose.position.y = 0
-        self.pose.pose.position.z = 0
-        self.pose.pose.orientation.x = 0
-        self.pose.pose.orientation.y = 0
-        self.pose.pose.orientation.z = 0
-        self.pose.pose.orientation.w = 0
 
         #publishers
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
@@ -84,45 +93,56 @@ class path_tracker():
         angle =  1 *   math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
         distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
 
-
         if distance > in_goal_tolerance:
-            if abs(angle) >0.1:
+
+            if angle >= 0.1:
                 self.move.linear.x = 0.0
                 self.move.angular.z = angle # might need to be negative
                 print('turning left')
-            elif distance > self.move.linear.x:
-                self.move.linear.x += 0.01
+
+            elif angle <= -0.1:
+                self.move.linear.x = 0.0
+                self.move.angular.z = -angle # might need to be positive
+                print('turning right')
+
+            elif angle < 0.1 and angle > -0.1:
+                self.move.linear.x = self.velocity_controller(distance)
                 self.move.angular.z = 0.0
-                print('moving forward')
-            elif distance < 1:
-                self.move.linear.x -= 0.05
-                self.move.angular.z = 0.0
-                print('Slowing down')
+                
         else:
             self.move.linear.x = 0.0
             self.move.angular.z = 0.0
-            print('Goal reached') 
-        self.move.angular.z  = max(self.move.angular.z ,-0.5)
-        self.move.angular.z  = min(self.move.angular.z ,0.5)
-        self.move.linear.x  = max(self.move.linear.x ,-0.5)
-        self.move.linear.x  = min(self.move.linear.x ,0.5)
-        self.cmd_pub.publish(self.move)
+            print('Goal reached')
+
+        # self.move.angular.z  = max(self.move.angular.z ,-0.5)         # Should not be limited in case we need to rotate more than 90 degrees
+        # self.move.angular.z  = min(self.move.angular.z ,0.5)
+        
+        print(self.move)
+        self.cmd_pub.publish(self.move)   # publishing to cmd_vel_to_motors and not cmd_vel_to_motors_PID since it has some issues
                 
 
-    # send goal to move_base which allows it to be shown in rviz
-    def send_goal(self):
-        self.goal.header.frame_id = 'map'
-        self.goal.header.stamp = rospy.Time.now()
-        self.goal_pub.publish(self.goal)
+    def velocity_controller(self,distance):
+        # This is the distance the robot needs to stop from current velocity
+        self.deceleration_distance = 0.5 * self.move.linear.x**2 / self.acceleration
+        
+        if distance < self.deceleration_distance:
+            self.move.linear.x -= self.acceleration
+            self.move.linear.x  = max(self.move.linear.x ,0.0)
+            print('Slowing down')
+
+        # Makes it so that the robot always want to accelerate to a max speed of 0.5
+        elif self.move.linear.x < 0.5:
+            self.move.linear.x += self.acceleration
+            self.move.linear.x  = min(self.move.linear.x ,0.5)
+            print('Moving forward')
+        return self.move.linear.x
 
 
     def spin(self):
         self.robots_location_in_map()
-        self.send_goal()
         directions = self.math()
-        # self.publish_twist(directions)
-               
-    
+
+                
     def main(self):
         try:
             while not rospy.is_shutdown():

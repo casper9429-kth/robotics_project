@@ -83,7 +83,7 @@ class cmd_vel_to_motors:
 
         self.run()
     
-    def encoder_callback(self,msg):
+    def encoder_callback(self,msg:Encoders):
         time = rospy.get_time()
         f = 20
         # tics per second
@@ -108,14 +108,15 @@ class cmd_vel_to_motors:
         self.right_dt = msg.delta_time_right
         # append integral
         #self.integral_right = self.integral_right + (self.v_right_des - self.v_right_enco)
-        #self.integral_left = self.integral_left + (self.v_left_des - self.v_lef v_left = 2*pi*f*msg.delta_time_left / self.ticks_per_rev
+        #self.integral_left = self.integral_left + (self.v_left_des - self.v_lef                            # not complete
+        v_left = 2*pi*f*msg.delta_time_left / self.ticks_per_rev                                            # this was commented out
         v_right = 2*pi*f*msg.delta_time_right / self.ticks_per_rev
         
 
         
 
 
-    def cmd_vel_callback(self, msg):
+    def cmd_vel_callback(self, msg:Twist):
         """
         This node subscribes to the /cmd_vel topic and converts the linear and angular velocity
         It then updates the internal variables that are used to publish the duty cycle message
