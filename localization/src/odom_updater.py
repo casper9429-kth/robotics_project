@@ -158,7 +158,7 @@ class odom_updater():
                 
                 #rospy.loginfo("Publishing new odom")
                 self.new_aruco_marker = False
-                self.br.sendTransform(new_t_map_odom)
+                # self.br.sendTransform(new_t_map_odom)
 
                 # Save the quaternion of the transform from first map to odom
                 if self.map_odom_quat is None:
@@ -213,9 +213,7 @@ class odom_updater():
                 new_t_map_odom.transform.rotation.y = q[1]
                 new_t_map_odom.transform.rotation.z = q[2]
                 new_t_map_odom.transform.rotation.w = q[3]
-
-                
-                self.br.sendTransform(new_t_map_odom)
+                # self.br.sendTransform(new_t_map_odom)
                 
                 
                 t_map_mapSLAM = TransformStamped()
@@ -249,7 +247,7 @@ class odom_updater():
         odom.transform.rotation.y = 0
         odom.transform.rotation.z = 0
         odom.transform.rotation.w = 1
-        self.br.sendTransform(odom)
+        # self.br.sendTransform(odom)
 
 
         odom = TransformStamped()

@@ -160,8 +160,6 @@ class ekf_odom():
         self.y += self.mu[0] * math.sin(self.theta) * self.dt
         self.theta = self.theta + self.mu[1] * self.dt
 
-        ## Predict odom cov after prediction
-        self.odom_sigma = self.calc_odom_sigma_bel(self.dt)        
 
     
     
