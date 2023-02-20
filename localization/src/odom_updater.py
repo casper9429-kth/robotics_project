@@ -34,9 +34,16 @@ class odom_updater():
         # Define a publisher that sends a bool msg 
         self.reset_odom_cov_pub = rospy.Publisher("odom_updater/reset_odom_cov", Bool, queue_size=1)
 
+        # Define a publisher that sends a bool msg slam ready 
+        self.slam_ready_pub = rospy.Publisher("odom_updater/slam_ready", Bool, queue_size=1)
+
+
+                
+        # Rotation from map to odom first time:
+        self.map_odom_quat = None
                 
         # Define rate
-        self.update_rate = 20 # [Hz] Change this to the rate you want
+        self.update_rate = 100 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
         
@@ -144,6 +151,7 @@ class odom_updater():
                 new_t_map_odom.transform.rotation.z = q[2]
                 new_t_map_odom.transform.rotation.w = q[3]
 
+                # Reset odom covariance
                 reset_odom_cov_msg = Bool()
                 reset_odom_cov_msg.data = True
                 self.reset_odom_cov_pub.publish(reset_odom_cov_msg)
@@ -151,6 +159,32 @@ class odom_updater():
                 #rospy.loginfo("Publishing new odom")
                 self.new_aruco_marker = False
                 self.br.sendTransform(new_t_map_odom)
+
+                # Save the quaternion of the transform from first map to odom
+                if self.map_odom_quat is None:
+                    self.map_odom_quat = q
+
+                # Publish slam ready message, if seen once means slam is ready to go
+                temp = Bool()
+                temp.data = True
+                self.slam_ready_pub.publish(temp)
+
+                # Publish map_SLAM frame to visualize the map in rviz, it should be static and its xy plane should be parallel to odom xy plane
+                t_map_mapSLAM = TransformStamped()
+                t_map_mapSLAM.header.stamp = rospy.Time.now()
+                t_map_mapSLAM.header.frame_id = "map"
+                t_map_mapSLAM.child_frame_id = "map_SLAM"
+                t_map_mapSLAM.transform.translation.x = 0
+                t_map_mapSLAM.transform.translation.y = 0
+                t_map_mapSLAM.transform.translation.z = 0
+                t_map_mapSLAM.transform.rotation.x = self.map_odom_quat[0]
+                t_map_mapSLAM.transform.rotation.y = self.map_odom_quat[1]
+                t_map_mapSLAM.transform.rotation.z = self.map_odom_quat[2]
+                t_map_mapSLAM.transform.rotation.w = self.map_odom_quat[3]
+                self.br.sendTransform(t_map_mapSLAM)
+                
+
+
                 return None
             else:
                 # Look up previous odom pose and republish it
@@ -182,6 +216,23 @@ class odom_updater():
 
                 
                 self.br.sendTransform(new_t_map_odom)
+                
+                
+                t_map_mapSLAM = TransformStamped()
+                t_map_mapSLAM.header.stamp = rospy.Time.now()
+                t_map_mapSLAM.header.frame_id = "map"
+                t_map_mapSLAM.child_frame_id = "map_SLAM"
+                t_map_mapSLAM.transform.translation.x = 0
+                t_map_mapSLAM.transform.translation.y = 0
+                t_map_mapSLAM.transform.translation.z = 0
+                t_map_mapSLAM.transform.rotation.x = self.map_odom_quat[0]
+                t_map_mapSLAM.transform.rotation.y = self.map_odom_quat[1]
+                t_map_mapSLAM.transform.rotation.z = self.map_odom_quat[2]
+                t_map_mapSLAM.transform.rotation.w = self.map_odom_quat[3]
+                self.br.sendTransform(t_map_mapSLAM)
+
+                
+                
                 return None
                 
                 
@@ -199,6 +250,21 @@ class odom_updater():
         odom.transform.rotation.z = 0
         odom.transform.rotation.w = 1
         self.br.sendTransform(odom)
+
+
+        odom = TransformStamped()
+        odom.header.stamp = rospy.Time.now()
+        odom.header.frame_id = "map"
+        odom.child_frame_id = "map_SLAM"
+        odom.transform.translation.x = 0
+        odom.transform.translation.y = 0
+        odom.transform.translation.z = 0
+        odom.transform.rotation.x = 0
+        odom.transform.rotation.y = 0
+        odom.transform.rotation.z = 0
+        odom.transform.rotation.w = 1
+        self.br.sendTransform(odom)
+
 
         return None
             
