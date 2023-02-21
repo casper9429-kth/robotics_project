@@ -56,6 +56,8 @@ class ekf_slam():
         self.wheel_r = 0.04921
         self.base = 0.3 
 
+        self.aruco_latest_time = defaultdict(lambda: rospy.Time.now().to_sec())
+
 
         # Var to store aruco belief 
         self.aruco_belif_buffer = defaultdict()
@@ -63,8 +65,9 @@ class ekf_slam():
         new_marker['type'] = 'aruco'
         new_marker['x'] = 0
         new_marker['y'] = 0
+        new_marker['first_measurement'] = True
         new_marker['theta'] =  0# tf.transformations.euler_from_quaternion([new_aruco.transform.rotation.x,new_aruco.transform.rotation.y,new_aruco.transform.rotation.z,new_aruco.transform.rotation.w])[2]
-        new_marker['covariance'] = np.eye(3)*1000000000000000000 # high covariance, robot will pin the marker to its location when seen next time
+        new_marker['covariance'] = np.eye(2)*100000000000000000000000000000000000000 # high covariance, robot will pin the marker to its location when seen next time
         self.aruco_belif_buffer = defaultdict(lambda: new_marker)
 
         
@@ -73,9 +76,9 @@ class ekf_slam():
         
         self.aruco_state_vector = defaultdict()
         self.seen_aruco_ids = set()
-        self.slam_cov = np.zeros((2,2))
-        self.Q = np.array([[0.025, 0],
-                                [0, 0.025]])
+        self.slam_cov = np.zeros((3,3))
+        self.Q = np.array([[0.1, 0],
+                                [0, 0.1]])
 
         # map to odom transform
         self.odom = TransformStamped()
@@ -98,7 +101,7 @@ class ekf_slam():
         self.covariance_belif = np.zeros((3,3))        
         self.R = np.array([[0.0001, 0, 0],
                                 [0, 0.0001, 0],
-                                [0, 0, 0.0001]])
+                                [0, 0, 0.000001]])
                 
         # Time var
         self.last_time = rospy.Time.now().to_sec()
@@ -145,23 +148,30 @@ class ekf_slam():
                                 
                 continue
 
-
-
+            if rospy.Time.now().to_sec() - self.aruco_latest_time[marker.id] < 0.2:
+                return
+                
             try:
                 new_aruco = self.tfBuffer.lookup_transform("map_SLAM", "aruco/detected" + str(marker.id), rospy.Time(0))                
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 continue
+
+            if self.aruco_belif_buffer[marker.id]['first_measurement']:
+                self.aruco_belif_buffer[marker.id]['first_measurement'] = False
+                self.aruco_belif_buffer[marker.id]['x'] = new_aruco.transform.translation.x
+                self.aruco_belif_buffer[marker.id]['y'] = new_aruco.transform.translation.y
+                                
 
             new_marker = defaultdict()
             new_marker['type'] = 'aruco'
             new_marker['id'] = marker.id
             new_marker['x'] = new_aruco.transform.translation.x
             new_marker['y'] = new_aruco.transform.translation.y
-            new_marker['theta'] = tf.transformations.euler_from_quaternion([new_aruco.transform.rotation.x,new_aruco.transform.rotation.y,new_aruco.transform.rotation.z,new_aruco.transform.rotation.w])[2]
+            new_marker['theta'] = 0# tf.transformations.euler_from_quaternion([new_aruco.transform.rotation.x,new_aruco.transform.rotation.y,new_aruco.transform.rotation.z,new_aruco.transform.rotation.w])[2]
             new_marker['t'] = new_aruco.header.stamp.to_sec()
             new_marker['t_stamp'] = rospy.Time.now()
             self.slam_buffer.append(new_marker)
-
+            self.aruco_latest_time[marker.id] = rospy.Time.now().to_sec()
 
                 
 
@@ -170,9 +180,9 @@ class ekf_slam():
         Saves odometry data in a buffer and updates the covariance of the robot pose in the map frame
         """
         # Update step for EKF SLAM
-        x_belif = msg.pose.position.x
-        y_belif = msg.pose.position.y
-        theta_belif = tf.transformations.euler_from_quaternion([msg.pose.orientation.x,msg.pose.orientation.y,msg.pose.orientation.z,msg.pose.orientation.w])[2]
+        x_belif = msg.pose.pose.position.x
+        y_belif = msg.pose.pose.position.y
+        theta_belif = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z,msg.pose.pose.orientation.w])[2]
         t = msg.header.stamp.to_sec()
         dt = (msg.header.stamp - self.latest_time_belif).to_sec()
         self.latest_time_belif = msg.header.stamp
@@ -230,11 +240,12 @@ class ekf_slam():
         write your code here to make it more readable.
         """
         
+        # slam
         # threshold for the number of messages in the buffer        
         if len(self.slam_buffer) < 1000 or self.slam_buffer[-1]['type'] != 'odometry':
             # sustain the transform
             self.odom.header.stamp = rospy.Time.now()
-            self.br.send_transform(self.odom)
+            self.br.sendTransform(self.odom)
             return
 
         # Clear the buffer
@@ -246,19 +257,28 @@ class ekf_slam():
         for i,msg in enumerate(slam_buffer):
             if msg['type'] == 'odometry':
                 t = msg['t']
-                x = slam_buffer[0]['x']
-                y = slam_buffer[0]['y']
-                theta = slam_buffer[0]['theta']
+                x = msg['x']
+                y = msg['y']
+                theta = msg['theta']
                 slam_buffer = slam_buffer[i+1:]
                 self.slam_cov = self.calc_odom_sigma_bel(msg['dt'],x,y,theta,msg['v'],msg['omega'],t,self.slam_cov,self.R)
                 break
 
         
         # loop through the buffer and run the EKF SLAM
+        aruco_seen_ids = set()
         i = -1
         for i_int,_ in enumerate(slam_buffer):
             i += 1
+
+            if i >= len(slam_buffer):
+                break
+
+
+
             msg = slam_buffer[i]
+
+
             
             
             if msg['type'] == 'reset_odom_cov':
@@ -268,17 +288,23 @@ class ekf_slam():
                 # according to the newest odometry message
                 self.slam_cov = self.slam_cov * 0.0
                 # Find next odometry message
-                for new_index,temp_msg in enumerate(slam_buffer[i+1:]):
+                found_new_odom = False
+                for new_index,temp_msg in enumerate(slam_buffer[i:]):
                     if temp_msg['type'] == 'odometry':
                         latest_t = temp_msg['t']
                         x = temp_msg['x']
                         y = temp_msg['y']
                         theta = temp_msg['theta']
-                        i = new_index+1
-                        continue
+                        i = i + new_index
+                        found_new_odom = True
+                        break
+                
+                
 
+                if found_new_odom:
+                    continue
                 # should not be possible to get here
-                raise Exception("No odometry message found after reset_odom_cov")
+                raise Exception("No odometry message found after reset_odom_cov " + str(i) + " : "+ str(len(slam_buffer)) + str(msg))
                 
                 
             
@@ -295,24 +321,37 @@ class ekf_slam():
             
             if msg['type'] == 'aruco':
                 # Run the EKF SLAM update step
-
+                # EKF update
+                rospy.loginfo("aruco update")
                 ## get belif
+
+                if msg['id'] in aruco_seen_ids:
+                    continue
+                else: 
+                    aruco_seen_ids.add(msg['id'])
+                
                 mark_belif = self.aruco_belif_buffer[msg['id']]
                 m_b = [mark_belif['x'],mark_belif['y']]
                 m_b_c = mark_belif['covariance']
                 r_b = [x,y]
-                r_b_c = self.slam_cov
-                z_b = np.array([math.sqrt((m_b[0]-r_b[0])**2 + (m_b[1]-r_b[1])**2),math.atan2(m_b[1]-r_b[1],m_b[0]-r_b[0])])
+                r_b_c = self.slam_cov[0:2,0:2]
+                z_b = np.array([math.sqrt((m_b[0]-r_b[0])**2 + (m_b[1]-r_b[1])**2),np.arctan2(m_b[1]-r_b[1],m_b[0]-r_b[0])])
+
+                rospy.loginfo("belif: r %s m %s",r_b,m_b)
+                
+                
+
+                ## get measurement
+                m_m = [msg['x'],msg['y']]
+                rospy.loginfo("measurement: %s",m_m)
+                z_m = np.array([math.sqrt((m_m[0]-r_b[0])**2 + (m_m[1]-r_b[1])**2),np.arctan2(m_m[1]-r_b[1],m_m[0]-r_b[0])])
 
                 ## Linearize the measurement model around the belif
                 H = self.calc_H(r_b[0],r_b[1],m_b[0],m_b[1])
 
-                ## get measurement
-                m_m = [msg['x'],msg['y']]
-                z_m = np.array([math.sqrt((m_m[0]-r_b[0])**2 + (m_m[1]-r_b[1])**2),math.atan2(m_m[1]-r_b[1],m_m[0]-r_b[0])])
 
                 ## Create the state vector
-                mu_bel = np.array(r_b+m_b) # x,y,mx,my
+                mu_bel = np.array([r_b[0],r_b[1],m_b[0],m_b[1]]) # x,y,mx,my
                 
                 ## Create the covariance matrix
                 aruco_sigma = np.zeros((4,4))
@@ -327,15 +366,20 @@ class ekf_slam():
                 # Save new data
                 x = aruco_mu[0]
                 y = aruco_mu[1]
-                self.slam_cov = aruco_sigma[0:2,0:2]
+                self.slam_cov[0:2,0:2] = aruco_sigma[0:2,0:2]
                 
                 self.aruco_belif_buffer[msg['id']]['x'] = aruco_mu[2]
                 self.aruco_belif_buffer[msg['id']]['y'] = aruco_mu[3]
                 self.aruco_belif_buffer[msg['id']]['covariance'] = aruco_sigma[2:4,2:4]
                 
-                
+                ## new belif is created for the robot pose in the map_SLAM frame
+                rospy.loginfo("new belif: r %s m %s",aruco_mu[0:2],aruco_mu[2:4])
 
         # When done, update the position of odom to correct the position of the robot in the map_SLAM frame
+        
+        # Print 
+        rospy.loginfo("############# SLAM BATCH UPDATE #############")
+        rospy.loginfo("SLAM: " + str(x) + " " + str(y) + " " + str(theta))
         
         ## a new belif is created for the robot pose in the map_SLAM frame
         desired_base_link = TransformStamped()    
@@ -419,6 +463,7 @@ class ekf_slam():
         h_1_2 =-(1/(1+((my - y)/ (mx - x))**2))*((my - y)/ ((mx - x)**2))
         h_1_3 = (1/(1+((my - y)/ (mx - x))**2))*((my)/ (mx - x))
         H = np.array([[h_0_0,h_0_1,h_0_2,h_0_3],[h_1_0,h_1_1,h_1_2,h_1_3]])
+        
         return H
     
 
