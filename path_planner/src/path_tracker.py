@@ -2,6 +2,7 @@
 import math
 import rospy
 import tf2_ros
+import actionlib
 import tf2_geometry_msgs
 from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray, Marker
@@ -53,6 +54,7 @@ class path_tracker():
         self.duty_pub = rospy.Publisher('/motor/duty_cycles', DutyCycles, queue_size=10)
 
         # subscribers
+        # self.fence_sub = rospy.Subscriber('/fence', , self.fence_callback)
         self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  
         # self.aruco_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  
         print('Subscribers initalized')
