@@ -6,7 +6,7 @@ import actionlib
 import tf2_geometry_msgs
 from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray, Marker
-from geometry_msgs.msg import PoseStamped, TransformStamped, Twist
+from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose
 
 
 class path_tracker():
@@ -45,16 +45,17 @@ class path_tracker():
         self.br = tf2_ros.TransformBroadcaster()
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
+        rospy.sleep(2)
         print('Tf2 stuff initialized')
 
 
         #publishers
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-        self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
-        self.duty_pub = rospy.Publisher('/motor/duty_cycles', DutyCycles, queue_size=10)
+        # self.duty_pub = rospy.Publisher('/motor/duty_cycles', DutyCycles, queue_size=10)
 
         # subscribers
-        # self.fence_sub = rospy.Subscriber('/fence', , self.fence_callback)
+
+        self.fence_sub = rospy.Subscriber('/workspace_poses/pose_array', PoseArray, self.fence_callback)
         self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  
         # self.aruco_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  
         print('Subscribers initalized')
@@ -69,18 +70,35 @@ class path_tracker():
 
     # To get the position of the goal
     def goal_callback(self, msg:PoseStamped):
-        rospy.sleep(2)              # wait for the tf to be ready
-        self.goal.pose.position = msg.pose.position
+        self.goal.pose.position = msg.pose.position                 # 2D Nav goal in rviz is in odom frame
         self.goal.pose.orientation = msg.pose.orientation
-
+        # print(self.goal)
         
+
+
+    def fence_callback(self, msg:PoseArray):
+
+        self.fence = msg.poses
+        edges = []
+        for num in range(len(self.fence)-1):
+            x_coord = self.fence[num+1].position.x-self.fence[num].position.x
+            y_coord = self.fence[num+1].position.y-self.fence[num].position.y
+            edges.append([x_coord,y_coord])
+        x_connec = self.fence[0].position.x-self.fence[-1].position.x
+        y_connec = self.fence[0].position.y-self.fence[-1].position.y
+        edges.append([x_connec,y_connec])
+        print(edges)
+        
+        
+
+
 
     # give goal in base link frame
     def robots_location_in_map(self):
         
         stamp = self.pose.header.stamp  
         try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
-            transform_map_2_base_link = self.tfBuffer.lookup_transform(self.robot_frame,'map', stamp,rospy.Duration(0.5)) # The transform that relate map frame to base link frame
+            transform_map_2_base_link = self.tfBuffer.lookup_transform(self.robot_frame,'odom', stamp,rospy.Duration(0.5)) # The transform that relate odom frame to base link frame
             self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)
         except:
             print('No transform found')
@@ -91,20 +109,20 @@ class path_tracker():
         
      # Calculate the direction the robot should go
     def math(self):
-        in_goal_tolerance = 0.1
+        in_goal_tolerance = 0.15
         angle =  1 *   math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
         distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
 
         if distance > in_goal_tolerance:
 
             if angle >= 0.1:
-                self.move.linear.x = 0.0
-                self.move.angular.z = angle # might need to be negative
+                self.move.linear.x = 0.1
+                self.move.angular.z = 0.7 # might need to be negative
                 print('turning left')
 
             elif angle <= -0.1:
-                self.move.linear.x = 0.0
-                self.move.angular.z = -angle # might need to be positive
+                self.move.linear.x = 0.1
+                self.move.angular.z = -0.7 # might need to be positive
                 print('turning right')
 
             elif angle < 0.1 and angle > -0.1:
@@ -116,10 +134,8 @@ class path_tracker():
             self.move.angular.z = 0.0
             print('Goal reached')
 
-        # self.move.angular.z  = max(self.move.angular.z ,-0.5)         # Should not be limited in case we need to rotate more than 90 degrees
-        # self.move.angular.z  = min(self.move.angular.z ,0.5)
         
-        print(self.move)
+        
         self.cmd_pub.publish(self.move)   # publishing to cmd_vel_to_motors and not cmd_vel_to_motors_PID since it has some issues
                 
 
@@ -127,7 +143,7 @@ class path_tracker():
         # This is the distance the robot needs to stop from current velocity
         self.deceleration_distance = 0.5 * self.move.linear.x**2 / self.acceleration
         
-        if distance < self.deceleration_distance:
+        if distance <= self.deceleration_distance:
             self.move.linear.x -= self.acceleration
             self.move.linear.x  = max(self.move.linear.x ,0.0)
             print('Slowing down')
@@ -138,7 +154,6 @@ class path_tracker():
             self.move.linear.x  = min(self.move.linear.x ,0.5)
             print('Moving forward')
         return self.move.linear.x
-
 
     def spin(self):
         self.robots_location_in_map()
