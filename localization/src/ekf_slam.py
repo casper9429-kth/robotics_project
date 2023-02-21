@@ -47,7 +47,7 @@ class ekf_slam():
         self.debug = False
 
         # Define rate
-        self.update_rate = 100 # [Hz] Change this to the rate you want
+        self.update_rate = 5 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
         
@@ -99,9 +99,9 @@ class ekf_slam():
         self.slam_buffer = []
         self.latest_time_belif = rospy.Time.now()
         self.covariance_belif = np.zeros((3,3))        
-        self.R = np.array([[0.0001, 0, 0],
-                                [0, 0.0001, 0],
-                                [0, 0, 0.000001]])
+        self.R = np.array([[0.00001, 0, 0],
+                                [0, 0.00001, 0],
+                                [0, 0, 0.0000001]])
                 
         # Time var
         self.last_time = rospy.Time.now().to_sec()
