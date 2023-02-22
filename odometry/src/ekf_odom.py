@@ -220,7 +220,7 @@ class ekf_odom():
         t.header.stamp = time
         t.transform.translation.x = self.x
         t.transform.translation.y = self.y
-        t.transform.translation.z = 0 # z is always 0
+        #t.transform.translation.z = 0 # z is always 0
         q = tf_conversions.transformations.quaternion_from_euler(0, 0, self.theta) # transform yaw to quaternion
         t.transform.rotation.x = q[0]
         t.transform.rotation.y = q[1]

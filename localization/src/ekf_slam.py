@@ -43,6 +43,8 @@ class ekf_slam():
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
         self.br = tf2_ros.TransformBroadcaster()
 
+        self.reset_odom_time_sec = rospy.Time.now().to_sec()
+        
         # Settings
         self.debug = False
 
@@ -58,7 +60,8 @@ class ekf_slam():
 
         self.aruco_latest_time = defaultdict(lambda: rospy.Time.now().to_sec())
 
-
+        self.slam_ready = False
+        
         # Var to store aruco belief 
         self.aruco_belif_buffer = defaultdict()
         new_marker = defaultdict()
@@ -122,7 +125,10 @@ class ekf_slam():
                     t_map_goal_map = self.tfBuffer.lookup_transform("aruco/detected" + str(marker.id), "odom", rospy.Time(0))
                 except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                     continue
-                
+                rospy.loginfo("updated map-odom")
+                rospy.loginfo("aruco/detected" + str(marker.id))
+                reset_odom_time_sec = msg.header.stamp.to_sec()
+                self.slam_ready = True
                 new_t_map_odom = TransformStamped()
                 new_t_map_odom.header.stamp = t_map_goal_map.header.stamp
                 new_t_map_odom.header.frame_id = "map"
@@ -132,10 +138,10 @@ class ekf_slam():
                 new_t_map_odom.transform.translation.z = t_map_goal_map.transform.translation.z
                 q = [t_map_goal_map.transform.rotation.x, t_map_goal_map.transform.rotation.y, t_map_goal_map.transform.rotation.z, t_map_goal_map.transform.rotation.w]
                 q = q/np.linalg.norm(q)
-                new_t_map_odom.transform.rotation.x = q[0]
-                new_t_map_odom.transform.rotation.y = q[1]
-                new_t_map_odom.transform.rotation.z = q[2]
-                new_t_map_odom.transform.rotation.w = q[3]
+                new_t_map_odom.transform.rotation.x = t_map_goal_map.transform.rotation.x
+                new_t_map_odom.transform.rotation.y = t_map_goal_map.transform.rotation.y
+                new_t_map_odom.transform.rotation.z = t_map_goal_map.transform.rotation.z
+                new_t_map_odom.transform.rotation.w = t_map_goal_map.transform.rotation.w
                 self.br.sendTransform(new_t_map_odom)
                 
                 self.odom = new_t_map_odom
@@ -239,10 +245,17 @@ class ekf_slam():
         Main loop, instead of changing run function
         write your code here to make it more readable.
         """
+        if self.slam_ready == False:
+            self.slam_buffer = []
+            return
         
+        if rospy.Time.now().to_sec() - self.reset_odom_time_sec < 1:
+            self.slam_buffer = []
+            return
+            
         # slam
         # threshold for the number of messages in the buffer        
-        if len(self.slam_buffer) < 1000 or self.slam_buffer[-1]['type'] != 'odometry':
+        if len(self.slam_buffer) < 400 or self.slam_buffer[-1]['type'] != 'odometry':
             # sustain the transform
             self.odom.header.stamp = rospy.Time.now()
             self.br.sendTransform(self.odom)
@@ -335,6 +348,8 @@ class ekf_slam():
                 m_b_c = mark_belif['covariance']
                 r_b = [x,y]
                 r_b_c = self.slam_cov[0:2,0:2]
+
+
                 z_b = np.array([math.sqrt((m_b[0]-r_b[0])**2 + (m_b[1]-r_b[1])**2),np.arctan2(m_b[1]-r_b[1],m_b[0]-r_b[0])])
 
                 rospy.loginfo("belif: r %s m %s",r_b,m_b)
@@ -381,6 +396,12 @@ class ekf_slam():
         rospy.loginfo("############# SLAM BATCH UPDATE #############")
         rospy.loginfo("SLAM: " + str(x) + " " + str(y) + " " + str(theta))
         
+        try:
+            map_to_bs = self.tfBuffer.lookup_transform("map", "base_link", rospy.Time(latest_t), rospy.Duration(1.0))
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            return
+        
+        
         ## a new belif is created for the robot pose in the map_SLAM frame
         desired_base_link = TransformStamped()    
         desired_base_link.header.frame_id = "map"
@@ -388,7 +409,7 @@ class ekf_slam():
         desired_base_link.child_frame_id = "des_base_link"
         desired_base_link.transform.translation.x = x
         desired_base_link.transform.translation.y = y
-        desired_base_link.transform.translation.z = 0.0
+        desired_base_link.transform.translation.z = map_to_bs.transform.translation.z
         quaterion = tf.transformations.quaternion_from_euler(0,0,theta)
         desired_base_link.transform.rotation.x = quaterion[0]
         desired_base_link.transform.rotation.y = quaterion[1]

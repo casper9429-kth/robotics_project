@@ -56,7 +56,6 @@ def aruco_callback(msg):
 
         t.header.stamp = stamp
         
-        rospy.loginfo(msg)
 
         t.transform.rotation = pose_map.pose.orientation
         t.transform.translation = pose_map.pose.position

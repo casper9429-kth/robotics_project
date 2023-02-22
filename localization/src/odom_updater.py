@@ -43,7 +43,7 @@ class odom_updater():
         self.map_odom_quat = None
                 
         # Define rate
-        self.update_rate = 100 # [Hz] Change this to the rate you want
+        self.update_rate = 10 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
         
@@ -150,7 +150,7 @@ class odom_updater():
             else:
                 return
                 
-                
+        rospy.loginfo("No new map goal, publishing zero odom")
                          
         #rospy.loginfo("No new map goal, publishing zero odom")
         odom = TransformStamped()
@@ -164,7 +164,7 @@ class odom_updater():
         odom.transform.rotation.y = 0
         odom.transform.rotation.z = 0
         odom.transform.rotation.w = 1
-        # self.br.sendTransform(odom)
+        self.br.sendTransform(odom)
 
 
         return None
