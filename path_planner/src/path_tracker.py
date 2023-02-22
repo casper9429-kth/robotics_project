@@ -115,7 +115,8 @@ class PathTracker():
         self.max_angle = 0.1
         self.angle_speed = 0.7
         self.deceleration_distance = 0.0
-        self.in_goal_tolerance = 0.15
+        self.in_goal_tolerance = 0.02
+        self.orientaion_tolerance = 0.05
 
         # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
         self.aruco = Marker()
@@ -171,20 +172,20 @@ class PathTracker():
     def transforms(self):   
         
         stamp = self.pose.header.stamp  
-        # try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
-        #     transform_map_2_base_link = self.tfBuffer.lookup_transform('base_link','odom', stamp,rospy.Duration(0.5))     # give goal in base link frame
-        #     self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)   # TODO: use .transform() instead of .do_transform_pose()
-        # except:
-        #     print('No transform found')
-                        
-        #     # return None
-
-        try: 
-            transform_base_link_to_odom = self.tfBuffer.lookup_transform('odom','base_link', stamp,rospy.Duration(0.5))
-            self.robot_pose_in_odom = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_to_odom)
+        try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
+            transform_map_2_base_link = self.tfBuffer.lookup_transform('base_link','odom', stamp,rospy.Duration(0.5))     # give goal in base link frame
+            self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)   # TODO: use .transform() instead of .do_transform_pose()
         except:
             print('No transform found')
-            pass
+                        
+            # return None
+
+        # try: 
+        #     transform_base_link_to_odom = self.tfBuffer.lookup_transform('odom','base_link', stamp,rospy.Duration(0.5))
+        #     self.robot_pose_in_odom = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_to_odom)
+        # except:
+        #     print('No transform found')
+        #     pass
 
 
 
@@ -192,19 +193,23 @@ class PathTracker():
      # Calculate the direction the robot should go
     def math(self):
         
-        angle =  1 * math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
+        angle_to_goal =  1 * math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
         distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
+        robot_theta = tf.transformations.euler_from_quaternion([self.pose.pose.orientation.x, self.pose.pose.orientation.y, self.pose.pose.orientation.z, self.pose.pose.orientation.w])[2] 
+        goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
+        dtheta = goal_orientation - robot_theta
         
         # c
-        dx = self.goal.pose.position.x - self.robot_pose_in_odom.transform.translation.x
-        dy = self.goal.pose.position.y - self.robot_pose_in_odom.transform.translation.y
-        theta_robot = tf.transformations.euler_from_quaternion([self.robot_pose_in_odom.transform.rotation.x, self.robot_pose_in_odom.transform.rotation.y, self.robot_pose_in_odom.transform.rotation.z, self.robot_pose_in_odom.transform.rotation.w])[2]
-        theta_goal = tf.transformations.euler_from_quaternion([self.goal.pose.orientation.x, self.goal.pose.orientation.y, self.goal.pose.orientation.z, self.goal.pose.orientation.w])[2]
+        # dx = self.goal.pose.position.x - self.robot_pose_in_odom.pose.position.x
+        # dy = self.goal.pose.position.y - self.robot_pose_in_odom.pose.position.y
+        # theta_robot = tf.transformations.euler_from_quaternion([self.robot_pose_in_odom.pose.orientation.x, self.robot_pose_in_odom.pose.orientation.y, self.robot_pose_in_odom.pose.orientation.z, self.robot_pose_in_odom.pose.orientation.w])[2]
+        # theta_goal = tf.transformations.euler_from_quaternion([self.goal.pose.orientation.x, self.goal.pose.orientation.y, self.goal.pose.orientation.z, self.goal.pose.orientation.w])[2]
 
-        # errors in robot pose (odom frame)
-        dtheta = theta_goal - theta_robot
-        angle_to_goal =  1 * math.atan2(dy,dx)
-        distance = 1 * math.hypot(dx,dy)
+        # # errors in robot pose (odom frame)
+        # print(theta_goal)
+        # dtheta = theta_goal - theta_robot
+        # angle_to_goal =  1 * math.atan2(dy,dx)
+        # distance = 1 * math.hypot(dx,dy)
                 
 
         if distance > self.in_goal_tolerance:
@@ -224,18 +229,20 @@ class PathTracker():
                 self.move.angular.z = 0.0
                 
         else:
-            if abs(dtheta) >self.in_goal_tolerance:
+            print('Goal reached')
+            #print(dtheta)
+            if abs(dtheta) >= self.orientaion_tolerance:
                 self.move.linear.x = 0.0
                 if dtheta >= 0:
                     self.move.angular.z = self.angle_speed 
-                    print('turning left')
+                    print('rotating left')
                 elif dtheta < 0:
                     self.move.angular.z = -self.angle_speed
-                    print('turning right')
+                    print('rotating right')
             else:
                 self.move.linear.x = 0.0
                 self.move.angular.z = 0.0
-                print('Goal reached')
+                print('Goal orientation reached')
 
 
         
@@ -268,7 +275,7 @@ class PathTracker():
             self.transforms()
             self.math()
         else:
-            #print('Not in fence')
+            print('Not in fence')
             self.move.linear.x = 0.0
             self.move.angular.z = 0.0
             self.cmd_pub.publish(self.move)
