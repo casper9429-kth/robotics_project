@@ -49,7 +49,7 @@ class ekf_slam():
         self.debug = False
 
         # Define rate
-        self.update_rate = 100 # [Hz] Change this to the rate you want
+        self.update_rate = 10 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
         
@@ -127,7 +127,7 @@ class ekf_slam():
                     continue
                 rospy.loginfo("updated map-odom")
                 rospy.loginfo("aruco/detected" + str(marker.id))
-                reset_odom_time_sec = msg.header.stamp.to_sec()
+                self.reset_odom_time_sec = msg.header.stamp.to_sec()
                 self.slam_ready = True
                 new_t_map_odom = TransformStamped()
                 new_t_map_odom.header.stamp = t_map_goal_map.header.stamp
@@ -138,10 +138,10 @@ class ekf_slam():
                 new_t_map_odom.transform.translation.z = t_map_goal_map.transform.translation.z
                 q = [t_map_goal_map.transform.rotation.x, t_map_goal_map.transform.rotation.y, t_map_goal_map.transform.rotation.z, t_map_goal_map.transform.rotation.w]
                 q = q/np.linalg.norm(q)
-                new_t_map_odom.transform.rotation.x = t_map_goal_map.transform.rotation.x
-                new_t_map_odom.transform.rotation.y = t_map_goal_map.transform.rotation.y
-                new_t_map_odom.transform.rotation.z = t_map_goal_map.transform.rotation.z
-                new_t_map_odom.transform.rotation.w = t_map_goal_map.transform.rotation.w
+                new_t_map_odom.transform.rotation.x = q[0]#t_map_goal_map.transform.rotation.x
+                new_t_map_odom.transform.rotation.y = q[1]#t_map_goal_map.transform.rotation.y
+                new_t_map_odom.transform.rotation.z = q[2]#t_map_goal_map.transform.rotation.z
+                new_t_map_odom.transform.rotation.w = q[3]#t_map_goal_map.transform.rotation.w
                 self.br.sendTransform(new_t_map_odom)
                 
                 self.odom = new_t_map_odom
@@ -249,9 +249,8 @@ class ekf_slam():
             self.slam_buffer = []
             return
         
-        if rospy.Time.now().to_sec() - self.reset_odom_time_sec < 1:
+        if rospy.Time.now().to_sec() - self.reset_odom_time_sec < 5:
             self.slam_buffer = []
-            return
             
         # slam
         # threshold for the number of messages in the buffer        
