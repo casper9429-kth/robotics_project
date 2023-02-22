@@ -36,6 +36,9 @@ class path_tracker():
         # To control the robots movement
         self.move = Twist()
         self.acceleration = 0.05
+        self.max_speed = 0.5
+        self.max_angle = 0.1
+        self.angle_speed = 0.7
         self.deceleration_distance = 0.0
 
         # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
@@ -75,9 +78,8 @@ class path_tracker():
         # print(self.goal)
         
 
-
+    # Calculate vectors between the corners that make up the fence 
     def fence_callback(self, msg:PoseArray):
-
         self.fence = msg.poses
         edges = []
         for num in range(len(self.fence)-1):
@@ -99,7 +101,7 @@ class path_tracker():
         stamp = self.pose.header.stamp  
         try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
             transform_map_2_base_link = self.tfBuffer.lookup_transform(self.robot_frame,'odom', stamp,rospy.Duration(0.5)) # The transform that relate odom frame to base link frame
-            self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)
+            self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)   # TODO: use .transform() instead of .do_transform_pose()
         except:
             print('No transform found')
             pass
@@ -115,17 +117,17 @@ class path_tracker():
 
         if distance > in_goal_tolerance:
 
-            if angle >= 0.1:
-                self.move.linear.x = 0.1
-                self.move.angular.z = 0.7 # might need to be negative
+            if angle >= self.max_angle:
+                self.move.linear.x = 0.0
+                self.move.angular.z = self.angle_speed # might need to be negative
                 print('turning left')
 
-            elif angle <= -0.1:
-                self.move.linear.x = 0.1
-                self.move.angular.z = -0.7 # might need to be positive
+            elif angle <= -self.max_angle:
+                self.move.linear.x = 0.0
+                self.move.angular.z = -self.angle_speed # might need to be positive
                 print('turning right')
 
-            elif angle < 0.1 and angle > -0.1:
+            else:
                 self.move.linear.x = self.velocity_controller(distance)
                 self.move.angular.z = 0.0
                 
@@ -137,6 +139,7 @@ class path_tracker():
         
         
         self.cmd_pub.publish(self.move)   # publishing to cmd_vel_to_motors and not cmd_vel_to_motors_PID since it has some issues
+        
                 
 
     def velocity_controller(self,distance):
@@ -149,9 +152,9 @@ class path_tracker():
             print('Slowing down')
 
         # Makes it so that the robot always want to accelerate to a max speed of 0.5
-        elif self.move.linear.x < 0.5:
+        else:
             self.move.linear.x += self.acceleration
-            self.move.linear.x  = min(self.move.linear.x ,0.5)
+            self.move.linear.x  = min(self.move.linear.x ,self.max_speed) # max speed
             print('Moving forward')
         return self.move.linear.x
 
