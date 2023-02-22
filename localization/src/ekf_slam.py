@@ -47,7 +47,7 @@ class ekf_slam():
         self.debug = False
 
         # Define rate
-        self.update_rate = 5 # [Hz] Change this to the rate you want
+        self.update_rate = 100 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
         
@@ -148,8 +148,8 @@ class ekf_slam():
                                 
                 continue
 
-            if rospy.Time.now().to_sec() - self.aruco_latest_time[marker.id] < 0.2:
-                return
+            # if rospy.Time.now().to_sec() - self.aruco_latest_time[marker.id] < 0.2:
+            #     return
                 
             try:
                 new_aruco = self.tfBuffer.lookup_transform("map_SLAM", "aruco/detected" + str(marker.id), rospy.Time(0))                
@@ -347,7 +347,7 @@ class ekf_slam():
                 z_m = np.array([math.sqrt((m_m[0]-r_b[0])**2 + (m_m[1]-r_b[1])**2),np.arctan2(m_m[1]-r_b[1],m_m[0]-r_b[0])])
 
                 ## Linearize the measurement model around the belif
-                H = self.calc_H(r_b[0],r_b[1],m_b[0],m_b[1])
+                H = self.calc_H(r_b[0],r_b[1],m_m[0],m_m[1])
 
 
                 ## Create the state vector
