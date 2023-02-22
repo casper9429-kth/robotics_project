@@ -19,7 +19,7 @@ class workspace_manager():
         self.message_pub_point = rospy.Publisher("/workspace_poses/pose", PoseStamped, queue_size=10)
 
         # Define rate
-        self.update_rate = 1/2 # [Hz] Change this to the rate you want
+        self.update_rate = 10 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
         

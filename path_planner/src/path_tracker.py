@@ -7,6 +7,7 @@ import tf2_geometry_msgs
 from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose
+import tf
 
 class LineSegment():
     def __init__(self,x1,y1,x2,y2) -> None:
@@ -100,10 +101,13 @@ class PathTracker():
         self.pose.pose.orientation.z = 0.0
         self.pose.pose.orientation.w = 0.0
 
+
+
         # Goal position and orientation
         self.goal = PoseStamped()
         self.goal_in_base_link = PoseStamped()
-
+        self.goal_theta_in_odom = 0
+        
         # To control the robots movement
         self.move = Twist()
         self.acceleration = 0.05
@@ -124,12 +128,12 @@ class PathTracker():
         print('Tf2 stuff initialized')
 
         self.polygon = None
+
         #publishers
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         # self.duty_pub = rospy.Publisher('/motor/duty_cycles', DutyCycles, queue_size=10)
 
         # subscribers
-
         self.fence_sub = rospy.Subscriber('/workspace_poses/pose_array', PoseArray, self.fence_callback)
         self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  
         # self.aruco_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  
@@ -150,7 +154,7 @@ class PathTracker():
         # print(self.goal)
         
 
-    # Calculate vectors between the corners that make up the fence 
+    
     def fence_callback(self, msg:PoseArray):
         self.polygon = Polygon(msg.poses)
 
@@ -159,54 +163,60 @@ class PathTracker():
         if self.polygon:
             return self.polygon.contains(pose.position)
         else:
-            raise Exception('No fence set')
-
-    """def fence_callback(self, msg:PoseArray):
-        self.fence = msg.poses
-        edges = []
-        for num in range(len(self.fence)-1):
-            x_coord = self.fence[num+1].position.x-self.fence[num].position.x
-            y_coord = self.fence[num+1].position.y-self.fence[num].position.y
-            edges.append([x_coord,y_coord])
-        x_connec = self.fence[0].position.x-self.fence[-1].position.x
-        y_connec = self.fence[0].position.y-self.fence[-1].position.y
-        edges.append([x_connec,y_connec])
-        print(edges)"""
-        
-        
+            #raise Exception('No fence set')
+            return None
 
 
-
-    # give goal in base link frame
-    def robots_location_in_map(self):
+    
+    def transforms(self):   
         
         stamp = self.pose.header.stamp  
-        try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
-            transform_map_2_base_link = self.tfBuffer.lookup_transform(self.robot_frame,'odom', stamp,rospy.Duration(0.5)) # The transform that relate odom frame to base link frame
-            self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)   # TODO: use .transform() instead of .do_transform_pose()
+        # try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
+        #     transform_map_2_base_link = self.tfBuffer.lookup_transform('base_link','odom', stamp,rospy.Duration(0.5))     # give goal in base link frame
+        #     self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)   # TODO: use .transform() instead of .do_transform_pose()
+        # except:
+        #     print('No transform found')
+                        
+        #     # return None
+
+        try: 
+            transform_base_link_to_odom = self.tfBuffer.lookup_transform('odom','base_link', stamp,rospy.Duration(0.5))
+            self.robot_pose_in_odom = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_to_odom)
         except:
             print('No transform found')
             pass
-            
-            # return None
+
+
 
         
      # Calculate the direction the robot should go
     def math(self):
         
-        angle =  1 *   math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
+        angle =  1 * math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
         distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
+        
+        # c
+        dx = self.goal.pose.position.x - self.robot_pose_in_odom.transform.translation.x
+        dy = self.goal.pose.position.y - self.robot_pose_in_odom.transform.translation.y
+        theta_robot = tf.transformations.euler_from_quaternion([self.robot_pose_in_odom.transform.rotation.x, self.robot_pose_in_odom.transform.rotation.y, self.robot_pose_in_odom.transform.rotation.z, self.robot_pose_in_odom.transform.rotation.w])[2]
+        theta_goal = tf.transformations.euler_from_quaternion([self.goal.pose.orientation.x, self.goal.pose.orientation.y, self.goal.pose.orientation.z, self.goal.pose.orientation.w])[2]
+
+        # errors in robot pose (odom frame)
+        dtheta = theta_goal - theta_robot
+        angle_to_goal =  1 * math.atan2(dy,dx)
+        distance = 1 * math.hypot(dx,dy)
+                
 
         if distance > self.in_goal_tolerance:
 
-            if angle >= self.max_angle:
+            if angle_to_goal >= self.max_angle:
                 self.move.linear.x = 0.0
-                self.move.angular.z = self.angle_speed # might need to be negative
+                self.move.angular.z = self.angle_speed 
                 print('turning left')
 
-            elif angle <= -self.max_angle:
+            elif angle_to_goal <= -self.max_angle:
                 self.move.linear.x = 0.0
-                self.move.angular.z = -self.angle_speed # might need to be positive
+                self.move.angular.z = -self.angle_speed 
                 print('turning right')
 
             else:
@@ -214,15 +224,26 @@ class PathTracker():
                 self.move.angular.z = 0.0
                 
         else:
-            self.move.linear.x = 0.0
-            self.move.angular.z = 0.0
-            print('Goal reached')
+            if abs(dtheta) >self.in_goal_tolerance:
+                self.move.linear.x = 0.0
+                if dtheta >= 0:
+                    self.move.angular.z = self.angle_speed 
+                    print('turning left')
+                elif dtheta < 0:
+                    self.move.angular.z = -self.angle_speed
+                    print('turning right')
+            else:
+                self.move.linear.x = 0.0
+                self.move.angular.z = 0.0
+                print('Goal reached')
+
 
         
+        self.cmd_pub.publish(self.move)   
         
-        self.cmd_pub.publish(self.move)   # publishing to cmd_vel_to_motors and not cmd_vel_to_motors_PID since it has some issues
-        
-                
+
+
+
 
     def velocity_controller(self,distance):
         # This is the distance the robot needs to stop from current velocity
@@ -240,13 +261,14 @@ class PathTracker():
             print('Moving forward')
         return self.move.linear.x
 
+
     def spin(self):
         if self.check_if_in_fence(self.goal.pose):
-            print('In fence')
-            self.robots_location_in_map()
-            directions = self.math()
+            #print('In fence')
+            self.transforms()
+            self.math()
         else:
-            print('Not in fence')
+            #print('Not in fence')
             self.move.linear.x = 0.0
             self.move.angular.z = 0.0
             self.cmd_pub.publish(self.move)
