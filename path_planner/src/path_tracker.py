@@ -8,6 +8,76 @@ from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose
 
+class LineSegment():
+    def __init__(self,x1,y1,x2,y2) -> None:
+        self.x1 = x1
+        self.y1 = y1
+        self.x2 = x2
+        self.y2 = y2
+        self.k = self.get_slope()
+        self.m = self.get_y_intercept()
+        self.is_horizontal = False
+        self.is_vertical = False
+    
+    def get_slope(self):
+        try:
+            return (self.y2-self.y1)/(self.x2-self.x1)
+        except ZeroDivisionError:
+            self.is_vertical = True
+            return math.inf
+
+    def get_y_intercept(self):
+        return self.y1 - self.get_slope()*self.x1
+
+    def get_x_intercept(self,y):
+        try:
+            return (y-self.m)/self.k
+        except ZeroDivisionError:
+            self.is_horizontal = True
+            return math.inf
+
+    def ray_intersect(self, ray_start):
+        """
+        Returns True if the ray intersects the line segment, False otherwise.
+        The ray starts at ray_start and extends to the right.
+        """
+        if self.is_vertical:
+            return ray_start.x < self.x1
+        elif self.is_horizontal:
+            return False
+        else:
+            is_between_y = not (ray_start.y < self.y1 and ray_start.y < self.y2 or ray_start.y > self.y1 and ray_start.y > self.y2)
+            x_to_the_left = ray_start.x < self.get_x_intercept(ray_start.y)
+            return is_between_y and x_to_the_left
+        
+
+class Polygon():
+    def __init__(self, point_array) -> None:
+        self.segments = self.generate_line_segments(point_array)
+
+    def contains(self, point):
+        """
+        Returns True if the point is inside the polygon, False otherwise.
+        The point is something that has an x and y attribute, like a Point or a Pose.
+        """
+        # The point is inside the polygon if an imaginary ray starting at the point
+        # intersects the polygon an odd number of times.
+        intersections = 0
+        for segment in self.segments:
+            if segment.ray_intersect(point):
+                intersections += 1
+        return intersections % 2 == 1
+
+    def generate_line_segments(self, point_array):
+        segments = []
+        for num in range(len(point_array)-1):
+            x1 = self.points[num].position.x
+            y1 = self.points[num].position.y
+            x2 = self.points[num+1].position.x
+            y2 = self.points[num+1].position.y
+            segments.append(LineSegment(x1,y1,x2,y2))
+        return segments
+        
 
 class path_tracker():
     def __init__(self):
@@ -81,6 +151,10 @@ class path_tracker():
     # Calculate vectors between the corners that make up the fence 
     def fence_callback(self, msg:PoseArray):
         self.fence = msg.poses
+        line_segments = []
+
+    """def fence_callback(self, msg:PoseArray):
+        self.fence = msg.poses
         edges = []
         for num in range(len(self.fence)-1):
             x_coord = self.fence[num+1].position.x-self.fence[num].position.x
@@ -89,7 +163,7 @@ class path_tracker():
         x_connec = self.fence[0].position.x-self.fence[-1].position.x
         y_connec = self.fence[0].position.y-self.fence[-1].position.y
         edges.append([x_connec,y_connec])
-        print(edges)
+        print(edges)"""
         
         
 
