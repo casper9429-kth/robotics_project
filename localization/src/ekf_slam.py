@@ -124,10 +124,28 @@ class ekf_slam():
         """
         
         for marker in msg.markers:
+            
+            # lookup aruco in robot frame
+            try:
+                t_robot_aruco = self.tfBuffer.lookup_transform("base_link", "aruco/detected" + str(marker.id), msg.header.stamp)
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                continue
+            
+            # check if aruco marker is to far away from robot
+            dist_to_robot = np.sqrt(t_robot_aruco.transform.translation.x**2 + t_robot_aruco.transform.translation.y**2 + t_robot_aruco.transform.translation.z**2)
+            threshold = 2
+            if dist_to_robot > threshold:
+                continue
+            
+            
+
+            
+            
+            
             if marker.id == self.anchor_id:
                 # if marker is the anchor, update odom transformation 
                 try:
-                    t_map_goal_map = self.tfBuffer.lookup_transform("aruco/detected" + str(marker.id), "odom", rospy.Time(0))
+                    t_map_goal_map = self.tfBuffer.lookup_transform("aruco/detected" + str(marker.id), "odom", msg.header.stamp)
                 except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                     continue
                 rospy.loginfo("updated map-odom")
@@ -164,7 +182,7 @@ class ekf_slam():
                 return
                 
             try:
-                new_aruco = self.tfBuffer.lookup_transform("map", "aruco/detected" + str(marker.id), rospy.Time(0))                
+                new_aruco = self.tfBuffer.lookup_transform("map", "aruco/detected" + str(marker.id), msg.header.stamp)                
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 continue
 
