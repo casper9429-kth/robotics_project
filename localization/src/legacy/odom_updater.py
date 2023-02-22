@@ -11,26 +11,36 @@ import numpy as np
 from geometry_msgs.msg import TransformStamped
 from geometry_msgs.msg import PoseArray
 from geometry_msgs.msg import Pose
-
+from std_msgs.msg import Bool
 
 class odom_updater():
     def __init__(self):
         """
-        odom_updater
+        odom_updater node \\
         
-        Functionality
-        * When an odom is not established keep odom as zero
-        
-        * When an odom is established, change the odom to the estimated odom
-        from geometry_msgs.msg import MarkerArray
-        
-        * If odom is changed, publish the new odom
+        Functionality:
+        * Make aruco marker with id, the center of the map
+        * If it hasn't been seen, set map and odom to zero
+        * If seen, set odom so that the aruco marker is in the center of the map
         """
         rospy.init_node('odom_updater')
 
         # Subscribers 
-        self.aruco_update_sub = rospy.Subscriber("aruco/detected_list/update", MarkerArray, self.aruco_update_callback, queue_size=1)
-        self.aruco_belif_sub = rospy.Subscriber("aruco/detected_list/belif", MarkerArray, self.aruco_belif_callback, queue_size=1)
+        self.aruco_markers_sub = rospy.Subscriber("aruco/markers", MarkerArray, self.aruco_markers_callback, queue_size=1)
+                
+        # Publishers
+        self.odom_established_pub = rospy.Publisher("odom_updater/odom", TransformStamped, queue_size=1)
+
+        # Define a publisher that sends a bool msg 
+        self.reset_odom_cov_pub = rospy.Publisher("odom_updater/reset_odom_cov", Bool, queue_size=1)
+
+        # Define a publisher that sends a bool msg slam ready 
+        self.slam_ready_pub = rospy.Publisher("odom_updater/slam_ready", Bool, queue_size=1)
+
+
+                
+        # Rotation from map to odom first time:
+        self.map_odom_quat = None
                 
         # Define rate
         self.update_rate = 10 # [Hz] Change this to the rate you want
@@ -42,111 +52,127 @@ class odom_updater():
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
         self.br = tf2_ros.TransformBroadcaster()
 
-        self.odom_established_pose_new = Pose()
-        self.odom_established_pose = Pose()
-        self.odom_update_pose = None
+        self.map_goal = None
+
         
         # States 
-        self.odom_aruco_id = 0
+        self.odom_aruco_id = 500
+
+    def aruco_markers_callback(self,msg):
+        """
+        Callback aruco markers \\
         
-        # No established odom
-        self.odom_established = False
-        # Odom Changed 
-        self.odom_updated = False
-
-
-    def aruco_update_callback(self,msg):
+        Functionality:
+        * Saves the pose of the aruco marker with the odom id in map fraPoseStampedme
         """
-        Read in the update of the aruco marker with the odom id
-        """
-        for marker in msg.markers:
-            if marker.id == self.odom_aruco_id and self.odom_updated == False:
-                self.odom_updated = True
-                self.odom_update_pose = marker.pose.pose
-            elif marker.id == self.odom_aruco_id and self.odom_updated == True:
-                # Check distance between odom_update_pose and new odom
-                if np.sqrt((self.odom_update_pose.position.x - marker.pose.pose.position.x)**2 + (self.odom_update_pose.position.y - marker.pose.pose.position.y)**2) > 0.01:
-                    self.odom_update_pose = marker.pose.pose
+        
                 
+        for marker in msg.markers:
+            if marker.id == self.odom_aruco_id:                
+                pose_map = PoseStamped()
+                pose_map.header.frame_id = msg.header.frame_id
+                pose_map.header.stamp = msg.header.stamp
+                pose_map.pose = marker.pose.pose
+                
+                
+                            
+                try:
+                    pose_map = self.tfBuffer.transform(pose_map, "map", rospy.Duration(1.0))
+
+                except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                    rospy.loginfo("Could not transform aruco marker pose to map frame")
+                    rospy.logwarn(e)
+                    return   
+
+
+                self.new_aruco_marker = True
+                self.map_goal = pose_map.pose
+
 
 
 
     
-    def aruco_belif_callback(self,msg):
-        """
-        Read in the belif of the aruco marker with the odom id
-        """
-        # Iter through all markers
-        for marker in msg.markers:
-            if marker.id == self.odom_aruco_id and self.odom_established == False:
-                self.odom_established = True
-                self.odom_established_pose = marker.pose.pose
-            elif marker.id == self.odom_aruco_id and self.odom_established == True:
-                # Check distance between current and new odom
-                dist = np.sqrt((self.odom_established_pose.position.x - marker.pose.pose.position.x)**2 + (self.odom_established_pose.position.y - marker.pose.pose.position.y)**2)
-                if dist > 0.01:
-                    self.odom_established_pose = marker.pose.pose            
-                
-                
-                                
+        
+
 
     def main(self): # Do main stuff here    
         """
-        Main loop, instead of changing run function,
-        write your code here to make it more readable.
+        * If no aruco marker has been seen, set map and odom to zero
+        * If aruco marker has been seen, set odom so that the aruco marker is in the center of the map
+        * If not seen, set odom so that the aruco marker is in the center of the map the last time it was seen
         """
-
-        # No established odom, publish zero odom in map frame
-        if not self.odom_established:
-            odom = TransformStamped()
-            odom.header.stamp = rospy.Time.now()
-            odom.header.frame_id = "map"
-            odom.child_frame_id = "odom"
-            odom.transform.translation.x = 0
-            odom.transform.translation.y = 0
-            odom.transform.translation.z = 0
-            odom.transform.rotation.x = 0
-            odom.transform.rotation.y = 0
-            odom.transform.rotation.z = 0
-            odom.transform.rotation.w = 1
-            self.br.sendTransform(odom)
-            return
-
+        #rospy.loginfo("RUNNING main")
         
-        # if odom is established but hasn't been updated, publish the established odom
-        if not self.odom_updated:
-            odom = TransformStamped()
-            odom.header.stamp = rospy.Time.now()
-            odom.header.frame_id = "map"
-            odom.child_frame_id = "odom"
-            odom.transform.translation.x = self.odom_established_pose.position.x
-            odom.transform.translation.y = self.odom_established_pose.position.y
-            odom.transform.translation.z = self.odom_established_pose.position.z
-            odom.transform.rotation.x = self.odom_established_pose.orientation.x
-            odom.transform.rotation.y = self.odom_established_pose.orientation.y
-            odom.transform.rotation.z = self.odom_established_pose.orientation.z
-            odom.transform.rotation.w = self.odom_established_pose.orientation.w
-            self.br.sendTransform(odom)
-            return
+        # If a new map pos is read
+        if self.map_goal != None:
+            if self.new_aruco_marker:
+                # Get transform from map to aruco marker
+                # Get transform from map to odom
+                try:    
+                    t_map_goal_map = self.tfBuffer.lookup_transform("map_goal", "odom",  rospy.Time(),rospy.Duration(2.0))
+                except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+                    return None
+                
+                # And make them one transform from map to odom
+                new_t_map_odom = TransformStamped()
+                new_t_map_odom.header.stamp = rospy.Time.now()
+                new_t_map_odom.header.frame_id = "map"
+                new_t_map_odom.child_frame_id = "odom"
+                new_t_map_odom.transform.translation.x = t_map_goal_map.transform.translation.x
+                new_t_map_odom.transform.translation.y =  t_map_goal_map.transform.translation.y
+                new_t_map_odom.transform.translation.z = t_map_goal_map.transform.translation.z
+                
+                # Normalize quaternion
+                q = [t_map_goal_map.transform.rotation.x, t_map_goal_map.transform.rotation.y, t_map_goal_map.transform.rotation.z, t_map_goal_map.transform.rotation.w]
+                q = q/np.linalg.norm(q)
+
+                # Set the rotation of the final map_odom
+                new_t_map_odom.transform.rotation.x = q[0]
+                new_t_map_odom.transform.rotation.y = q[1]
+                new_t_map_odom.transform.rotation.z = q[2]
+                new_t_map_odom.transform.rotation.w = q[3]
+
+                # Reset odom covariance
+                reset_odom_cov_msg = Bool()
+                reset_odom_cov_msg.data = True
+                self.reset_odom_cov_pub.publish(reset_odom_cov_msg)
+                
+                self.new_aruco_marker = False
 
 
-        if self.odom_updated: # if odom is established and updated, publish the updated odom
-            odom = TransformStamped()
-            odom.header.stamp = rospy.Time.now()
-            odom.header.frame_id = "map"
-            odom.child_frame_id = "odom"
-            odom.transform.translation.x = self.odom_update_pose.position.x
-            odom.transform.translation.y = self.odom_update_pose.position.y
-            odom.transform.translation.z = self.odom_update_pose.position.z
-            odom.transform.rotation.x = self.odom_update_pose.orientation.x
-            odom.transform.rotation.y = self.odom_update_pose.orientation.y
-            odom.transform.rotation.z = self.odom_update_pose.orientation.z
-            odom.transform.rotation.w = self.odom_update_pose.orientation.w
-            self.br.sendTransform(odom)
-            return            
+                # Publish slam ready message, if seen once means slam is ready to go
+                temp = Bool()
+                temp.data = True
+                self.slam_ready_pub.publish(temp)
+
+
+                return None
+            else:
+                return
+                
+        rospy.loginfo("No new map goal, publishing zero odom")
+                         
+        #rospy.loginfo("No new map goal, publishing zero odom")
+        odom = TransformStamped()
+        odom.header.stamp = rospy.Time.now()
+        odom.header.frame_id = "map"
+        odom.child_frame_id = "odom"
+        odom.transform.translation.x = 0
+        odom.transform.translation.y = 0
+        odom.transform.translation.z = 0
+        odom.transform.rotation.x = 0
+        odom.transform.rotation.y = 0
+        odom.transform.rotation.z = 0
+        odom.transform.rotation.w = 1
+        self.br.sendTransform(odom)
+
+
+        return None
             
-        
+            
 
+            
+            
 
     def run(self):
         """
@@ -167,12 +193,6 @@ if __name__ == "__main__":
 
 
 
+# Everything in mapping should be defined in reference to odom
 
-
-# v1
-
-# Odom is defined in the map frame
-
-# when odom is reseen it is moved in the map frame to the correct position
-
-#
+# The robot should when odom is seen wit
