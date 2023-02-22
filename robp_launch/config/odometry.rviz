@@ -1,6 +1,6 @@
 Panels:
   - Class: rviz/Displays
-    Help Height: 114
+    Help Height: 70
     Name: Displays
     Property Tree Widget:
       Expanded:
@@ -25,7 +25,7 @@ Panels:
   - Class: rviz/Time
     Name: Time
     SyncMode: 0
-    SyncSource: Image
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:

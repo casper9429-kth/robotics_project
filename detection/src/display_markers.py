@@ -6,6 +6,7 @@ import tf_conversions
 import tf2_ros
 import aruco_ros
 from aruco_msgs.msg import MarkerArray
+from aruco_msgs.msg import Marker
 import math
 import tf
 
@@ -26,6 +27,11 @@ def aruco_callback(msg):
 
     for marker in msg.markers:
 
+    for marker in msg.markers:
+
+        pose_map = PoseStamped()
+        pose_map.header.frame_id = frame_id
+        pose_map.header.stamp = stamp
         pose_map = PoseStamped()
         pose_map.header.frame_id = frame_id
         pose_map.header.stamp = stamp
@@ -49,6 +55,7 @@ def aruco_callback(msg):
             rospy.logwarn(e)
             return   
         
+        pub.publish(transformed_pose)
 
         # Publish new tranform to aruco/detectedX
         
@@ -68,6 +75,7 @@ def aruco_callback(msg):
         br.sendTransform(t)
 
 sub_goal = rospy.Subscriber('/aruco/markers', MarkerArray, aruco_callback)
+pub = rospy.Publisher('/aruco/markers/transformed_pose', Marker, queue_size=1)
 
 if __name__ == '__main__':
     rospy.spin()
