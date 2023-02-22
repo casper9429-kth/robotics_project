@@ -36,9 +36,13 @@
 		<remap from="/image" to="/camera/color/image_raw"/>
 		
 		<param name="image_is_rectified" value="True"/>
-		<param name="marker_size"        value="0.174"/> 
+		<param name="marker_size"        value="0.133"/> 
 		<param name="reference_frame"    value="camera_color_optical_frame"/>
 		<param name="camera_frame"       value="camera_color_optical_frame"/>
+		<!-- <param name="adaptiveThreshWinSizeMin"  value="141"/>  
+		<param name="adaptiveThreshWinSizeMax"  value="251"/>  
+		<param name="adaptiveThreshWinSizeStep" value="20"/> 
+		<param name="adaptiveThreshConstant"    value="4"/>     -->
 	</node>
 
 	<param name="robot_description" command="$(find xacro)/xacro --inorder '$(find realsense2_description)/urdf/test_d435_camera.urdf.xacro' use_nominal_extrinsics:=false"/>

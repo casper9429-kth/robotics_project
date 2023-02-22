@@ -72,7 +72,7 @@ class ekf_slam():
 
         
         # Anchor id
-        self.anchor_id = 3
+        self.anchor_id = 500
         
         self.aruco_state_vector = defaultdict()
         self.seen_aruco_ids = set()
@@ -152,7 +152,7 @@ class ekf_slam():
             #     return
                 
             try:
-                new_aruco = self.tfBuffer.lookup_transform("map_SLAM", "aruco/detected" + str(marker.id), rospy.Time(0))                
+                new_aruco = self.tfBuffer.lookup_transform("map", "aruco/detected" + str(marker.id), rospy.Time(0))                
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
                 continue
 
@@ -383,7 +383,7 @@ class ekf_slam():
         
         ## a new belif is created for the robot pose in the map_SLAM frame
         desired_base_link = TransformStamped()    
-        desired_base_link.header.frame_id = "map_SLAM"
+        desired_base_link.header.frame_id = "map"
         desired_base_link.header.stamp = rospy.Time(latest_t)
         desired_base_link.child_frame_id = "des_base_link"
         desired_base_link.transform.translation.x = x

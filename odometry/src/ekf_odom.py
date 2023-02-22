@@ -230,7 +230,7 @@ class ekf_odom():
         
         # Publish the transform from map_SLAM to base_link 
         try:
-            tfs = self.tfBuffer.lookup_transform("map_SLAM", "base_link", rospy.Time())
+            tfs = self.tfBuffer.lookup_transform("map", "base_link", rospy.Time())
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
             return
         map_SLAM_to_base_link = self.transform_stamped_to_odom(tfs,self.mu[0],self.mu[1])
