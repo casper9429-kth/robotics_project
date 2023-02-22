@@ -123,6 +123,7 @@ class cmd_vel_to_motors:
         """
         self.linear_velocity = msg.linear.x
         self.angular_velocity = msg.angular.z
+        
 
     
     def run(self):
@@ -139,6 +140,13 @@ class cmd_vel_to_motors:
             if np.abs(v_left) > 1 or np.abs(v_right) > 1:
                 v_left = v_left / np.abs(v_left)
                 v_right = v_right / np.abs(v_right)
+
+
+
+            if self.linear_velocity == 0 and self.angular_velocity == 0:
+                v_left = 0
+                v_right = 0
+
 
             # Update the duty cycle message
             self.duty_cycle_msg.duty_cycle_left = v_left
