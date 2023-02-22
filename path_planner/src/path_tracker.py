@@ -58,7 +58,7 @@ class Polygon():
     def contains(self, point):
         """
         Returns True if the point is inside the polygon, False otherwise.
-        The point is something that has an x and y attribute, like a Point or a Pose.
+        The point is something that has an x and y attribute, like a Point.
         """
         # The point is inside the polygon if an imaginary ray starting at the point
         # intersects the polygon an odd number of times.
@@ -70,16 +70,17 @@ class Polygon():
 
     def generate_line_segments(self, point_array):
         segments = []
-        for num in range(len(point_array)-1):
-            x1 = self.points[num].position.x
-            y1 = self.points[num].position.y
-            x2 = self.points[num+1].position.x
-            y2 = self.points[num+1].position.y
+        point_array.append(point_array[0])
+        for i in range(len(point_array)-1):
+            x1 = point_array[i].position.x
+            y1 = point_array[i].position.y
+            x2 = point_array[i+1].position.x
+            y2 = point_array[i+1].position.y
             segments.append(LineSegment(x1,y1,x2,y2))
         return segments
         
 
-class path_tracker():
+class PathTracker():
     def __init__(self):
         rospy.init_node('path_tracker')
         print('path_tracker node initalized')
@@ -110,6 +111,7 @@ class path_tracker():
         self.max_angle = 0.1
         self.angle_speed = 0.7
         self.deceleration_distance = 0.0
+        self.in_goal_tolerance = 0.15
 
         # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
         self.aruco = Marker()
@@ -121,7 +123,7 @@ class path_tracker():
         rospy.sleep(2)
         print('Tf2 stuff initialized')
 
-
+        self.polygon = None
         #publishers
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         # self.duty_pub = rospy.Publisher('/motor/duty_cycles', DutyCycles, queue_size=10)
@@ -150,8 +152,14 @@ class path_tracker():
 
     # Calculate vectors between the corners that make up the fence 
     def fence_callback(self, msg:PoseArray):
-        self.fence = msg.poses
-        line_segments = []
+        self.polygon = Polygon(msg.poses)
+
+
+    def check_if_in_fence(self, pose: Pose):
+        if self.polygon:
+            return self.polygon.contains(pose.position)
+        else:
+            raise Exception('No fence set')
 
     """def fence_callback(self, msg:PoseArray):
         self.fence = msg.poses
@@ -185,7 +193,7 @@ class path_tracker():
         
      # Calculate the direction the robot should go
     def math(self):
-        in_goal_tolerance = 0.15
+        
         angle =  1 *   math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
         distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
 
@@ -233,8 +241,15 @@ class path_tracker():
         return self.move.linear.x
 
     def spin(self):
-        self.robots_location_in_map()
-        directions = self.math()
+        if self.check_if_in_fence(self.goal.pose):
+            print('In fence')
+            self.robots_location_in_map()
+            directions = self.math()
+        else:
+            print('Not in fence')
+            self.move.linear.x = 0.0
+            self.move.angular.z = 0.0
+            self.cmd_pub.publish(self.move)
 
                 
     def main(self):
@@ -247,5 +262,5 @@ class path_tracker():
 
 
 if __name__ == '__main__':
-    node = path_tracker()
+    node = PathTracker()
     node.main()
