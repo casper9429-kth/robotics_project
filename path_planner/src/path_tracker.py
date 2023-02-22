@@ -197,7 +197,7 @@ class PathTracker():
         angle =  1 *   math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
         distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
 
-        if distance > in_goal_tolerance:
+        if distance > self.in_goal_tolerance:
 
             if angle >= self.max_angle:
                 self.move.linear.x = 0.0
