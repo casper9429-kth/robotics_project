@@ -17,13 +17,6 @@ from std_msgs.msg import Bool
 from collections import defaultdict
 
 
-# alt 2
-# Semi offline EKF SLAM
-# collect data from aruco markers and odometry for 0.5 seconds
-# associate odometry with aruco markers and create data time line 
-# run EKF SLAM on the data time line, and publish the result, correct odometry location with the result
-
-
 
 
 class ekf_slam():
@@ -39,7 +32,7 @@ class ekf_slam():
         self.aruco_marker_sub = rospy.Subscriber("aruco/markers", MarkerArray, self.aruco_marker_callback)
 
         # TF Stuff
-        self.tfBuffer = tf2_ros.Buffer(rospy.Duration(60))
+        self.tfBuffer = tf2_ros.Buffer(rospy.Duration(100))
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
         self.br = tf2_ros.TransformBroadcaster()
 
@@ -84,6 +77,8 @@ class ekf_slam():
                                 [0, 0.1]])
 
         # map to odom transform
+
+        self.new_anchor = False
         self.odom = TransformStamped()
         self.odom.header.frame_id = "map"
         self.odom.child_frame_id = "odom"
@@ -95,6 +90,16 @@ class ekf_slam():
         self.odom.transform.rotation.z = 0
         self.odom.transform.rotation.w = 1
 
+        self.odom_belif = TransformStamped()
+        self.odom_belif.header.frame_id = "map"
+        self.odom_belif.child_frame_id = "odom"
+        self.odom_belif.transform.translation.x = 0
+        self.odom_belif.transform.translation.y = 0
+        self.odom_belif.transform.translation.z = 0
+        self.odom_belif.transform.rotation.x = 0
+        self.odom_belif.transform.rotation.y = 0
+        self.odom_belif.transform.rotation.z = 0
+        self.odom_belif.transform.rotation.w = 1
 
         # Odometry var 
         self.odometry_buffer = []
@@ -127,7 +132,6 @@ class ekf_slam():
                     continue
                 rospy.loginfo("updated map-odom")
                 rospy.loginfo("aruco/detected" + str(marker.id))
-                self.reset_odom_time_sec = msg.header.stamp.to_sec()
                 self.slam_ready = True
                 new_t_map_odom = TransformStamped()
                 new_t_map_odom.header.stamp = t_map_goal_map.header.stamp
@@ -142,9 +146,11 @@ class ekf_slam():
                 new_t_map_odom.transform.rotation.y = q[1]#t_map_goal_map.transform.rotation.y
                 new_t_map_odom.transform.rotation.z = q[2]#t_map_goal_map.transform.rotation.z
                 new_t_map_odom.transform.rotation.w = q[3]#t_map_goal_map.transform.rotation.w
-                self.br.sendTransform(new_t_map_odom)
-                
+                # self.br.sendTransform(new_t_map_odom)
+
                 self.odom = new_t_map_odom
+                self.odom_belif = new_t_map_odom 
+                self.new_anchor = True
 
                 # Create reset msg
                 new_msg = defaultdict()
@@ -245,20 +251,40 @@ class ekf_slam():
         Main loop, instead of changing run function
         write your code here to make it more readable.
         """
-        if self.slam_ready == False:
-            self.slam_buffer = []
+        
+        # if new anchor is found update the map odom transform
+        if self.new_anchor == True:            
+            self.br.sendTransform(self.odom)
+            self.new_anchor = False
             return
         
-        if rospy.Time.now().to_sec() - self.reset_odom_time_sec < 5:
-            self.slam_buffer = []
-            
-        # slam
-        # threshold for the number of messages in the buffer        
-        if len(self.slam_buffer) < 400 or self.slam_buffer[-1]['type'] != 'odometry':
-            # sustain the transform
+
+        
+
+        # Check if SLAM is ready, that means that the initial anchor has been found at least once
+        # if not, clear the buffer and return 
+        # only time it is allowed to publish rospy.Time.now() is when the buffer is cleared. Then all messages afterward are new and have a newer timestamp
+        if self.slam_ready == False:
             self.odom.header.stamp = rospy.Time.now()
             self.br.sendTransform(self.odom)
+            self.slam_buffer = []
             return
+
+
+        
+        # check if enough new messages have been received to do a SLAM update
+        # if not, get the timestamp of the next newest message and publish that
+        if len(self.slam_buffer) < 500 or self.slam_buffer[-1]['type'] != 'odometry':
+            # sustain the transform
+            if len(self.slam_buffer) > 10:
+                self.odom_belif.header.stamp = rospy.Time(self.slam_buffer[-2]['t'])
+            else:
+                self.odom_belif.header.stamp = rospy.Time.now()
+            self.br.sendTransform(self.odom_belif)
+            return
+
+
+
 
         # Clear the buffer
         slam_buffer = sorted(self.slam_buffer, key=lambda k: k['t'])
@@ -446,18 +472,19 @@ class ekf_slam():
             return
         
         ## publish the transform from map to des_odom to odom
-        self.odom = TransformStamped()
-        self.odom.header.frame_id = "map"
-        self.odom.child_frame_id = "odom"
-        self.odom.header.stamp = rospy.Time.now()
-        self.odom.transform.translation.x = map_to_new_odom.transform.translation.x
-        self.odom.transform.translation.y = map_to_new_odom.transform.translation.y 
-        self.odom.transform.translation.z = map_to_new_odom.transform.translation.z
-        self.odom.transform.rotation.x = map_to_new_odom.transform.rotation.x
-        self.odom.transform.rotation.y = map_to_new_odom.transform.rotation.y
-        self.odom.transform.rotation.z = map_to_new_odom.transform.rotation.z
-        self.odom.transform.rotation.w = map_to_new_odom.transform.rotation.w
-        self.br.sendTransform(self.odom)
+        #self.anchor_transform = defaultdict()
+        self.odom_belif = TransformStamped()
+        self.odom_belif.header.frame_id = "map"
+        self.odom_belif.child_frame_id = "odom"
+        self.odom_belif.header.stamp = rospy.Time(latest_t)
+        self.odom_belif.transform.translation.x = map_to_new_odom.transform.translation.x
+        self.odom_belif.transform.translation.y = map_to_new_odom.transform.translation.y 
+        self.odom_belif.transform.translation.z = map_to_new_odom.transform.translation.z
+        self.odom_belif.transform.rotation.x = map_to_new_odom.transform.rotation.x
+        self.odom_belif.transform.rotation.y = map_to_new_odom.transform.rotation.y
+        self.odom_belif.transform.rotation.z = map_to_new_odom.transform.rotation.z
+        self.odom_belif.transform.rotation.w = map_to_new_odom.transform.rotation.w
+        self.br.sendTransform(self.odom_belif)
 
         
         
