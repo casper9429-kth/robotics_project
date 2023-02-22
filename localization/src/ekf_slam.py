@@ -78,7 +78,7 @@ class ekf_slam():
 
         # map to odom transform
 
-        self.new_anchor = False
+        self.latest_anchor_time = rospy.Time.now()
         self.odom = TransformStamped()
         self.odom.header.frame_id = "map"
         self.odom.child_frame_id = "odom"
@@ -168,7 +168,7 @@ class ekf_slam():
 
                 self.odom = new_t_map_odom
                 self.odom_belif = new_t_map_odom 
-                self.new_anchor = True
+                self.latest_anchor_time = rospy.Time.now().to_sec()
 
                 # Create reset msg
                 new_msg = defaultdict()
@@ -270,13 +270,14 @@ class ekf_slam():
         write your code here to make it more readable.
         """
         
-        # if new anchor is found update the map odom transform
-        if self.new_anchor == True:            
-            self.br.sendTransform(self.odom)
-            self.new_anchor = False
-            return
-        
 
+
+
+
+        # if new anchor is found update the map odom transform
+        if rospy.Time.now().to_sec() - self.latest_anchor_time < 1.0:
+            self.br.sendTransform(self.odom)
+            return
         
 
         # Check if SLAM is ready, that means that the initial anchor has been found at least once
@@ -326,12 +327,8 @@ class ekf_slam():
         i = -1
         for i_int,_ in enumerate(slam_buffer):
             i += 1
-
             if i >= len(slam_buffer):
                 break
-
-
-
             msg = slam_buffer[i]
 
 
