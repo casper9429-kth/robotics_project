@@ -76,7 +76,7 @@ class ekf_slam():
         self.base = 0.3 
 
         # Aruco Slam Setting
-        self.anchor_id = 3
+        self.anchor_id = 500
         self.seen_aruco_ids = set()
         self.aruco_state_vector = defaultdict()
         

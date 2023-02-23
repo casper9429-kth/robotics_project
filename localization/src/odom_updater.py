@@ -49,7 +49,7 @@ class odom_updater():
 
         
         # States 
-        self.odom_aruco_id = 3
+        self.odom_aruco_id = 500
 
     def aruco_markers_callback(self,msg):
         """
