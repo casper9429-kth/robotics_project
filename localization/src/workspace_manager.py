@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import rospy
-from geometry_msgs.msg import PoseStamped, PoseArray, Pose
+from geometry_msgs.msg import PoseStamped, PoseArray, Pose, Point
 import tf2_ros
 import tf2_geometry_msgs
+from visualization_msgs.msg import Marker, MarkerArray
 
 
 
@@ -16,18 +17,14 @@ class workspace_manager():
         
         # Publisher
         self.message_pub = rospy.Publisher("/workspace_poses/pose_array", PoseArray, queue_size=10)
-        self.message_pub_point = rospy.Publisher("/workspace_poses/pose", PoseStamped, queue_size=10)
+        self.marker_pub = rospy.Publisher("/workspace_poses/marker", Marker, queue_size=10)
+        #self.message_pub_point = rospy.Publisher("/workspace_poses/pose", PoseStamped, queue_size=10)
 
         # Define rate
         self.update_rate = 10 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
         
-
-        # Tf 
-        # self.tf_buffer = tf2_ros.Buffer()
-        # self.br = tf2_ros.TransformBroadcaster()
-        # self.listner = tf2_ros.TransformListener(self.tf_buffer)
 
         # Paramethers HERE
         self.pose_array = PoseArray()
@@ -42,12 +39,6 @@ class workspace_manager():
 
     ###### All your other methods here #######
 
-    # def publish(self):
-    #     """Publish your messages here"""
-    # 
-    #     pass
-    #     # self.message_pub.publish('')
-
     def is_valid_decimal(self,num):
         try:
             float(num)
@@ -55,6 +46,34 @@ class workspace_manager():
             return False
         else:
             return True
+        
+
+
+    def visualize_point(self):
+        poselist = [(pose.position.x, pose.position.y, pose.position.z) for pose in self.pose_array.poses]
+
+        mark = Marker()
+        mark.header.frame_id = "map"
+        mark.header.stamp = rospy.Time.now()
+        mark.type = mark.LINE_STRIP
+        mark.action = mark.ADD
+        mark.scale.x = 0.01
+        mark.color.a = 1.0
+        mark.color.r = 0.0
+        mark.color.g = 1.0
+        mark.color.b = 0.0
+        mark.pose.orientation.w = 1.0
+        mark.pose.position.x = 0.0#poselist[0][0]
+        mark.pose.position.y = 0.0#poselist[0][1]
+        mark.pose.position.z = 0.0#poselist[0][2]
+
+        mark.id = 0
+        mark.lifetime = rospy.Duration(0)
+        mark.points = [Point(x=x, y=y, z=z) for x, y, z in poselist]
+        mark.points.append(Point(x=poselist[0][0], y=poselist[0][1], z=poselist[0][2]))
+
+        self.marker_pub.publish(mark)
+
 
     def main(self): # Do main stuff here    
         """
@@ -72,19 +91,12 @@ class workspace_manager():
                     point.position.x = float(value[0])
                     point.position.y = float(value[1])
                     self.pose_array.poses.append(point)
-                    #self.message_pub_point.publish(point)
-                    
-                    #print(point)
-        #print(workspace_points)
-
-        #self.pose_array = PoseArray()
+                
         self.pose_array.header.frame_id = 'map'
-        #self.pose_array.poses = self.workspace_points
-        #print(self.pose_array)
-        #print(1)
         self.message_pub.publish(self.pose_array)
+        self.visualize_point()
+
         self.pose_array = PoseArray()
-        #print(2)
 
     def run(self):
         """
