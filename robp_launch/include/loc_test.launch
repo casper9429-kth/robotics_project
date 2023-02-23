@@ -6,7 +6,7 @@
 
 
 	<!-- Include odom_intit-->
-	<node name="odom_init" pkg="localization" type="odom_updater.py" output='screen'/>
+	<!-- <node name="odom_init" pkg="localization" type="odom_updater.py" output='screen'/> -->
 
 	<node name="ekf_slam" pkg="localization" type="ekf_slam.py" output='screen'/>
 

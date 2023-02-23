@@ -80,7 +80,7 @@ class ekf_slam():
 
         # map to odom transform
 
-        self.latest_anchor_time = rospy.Time.now()
+        self.latest_anchor_time = rospy.Time.now().to_sec()
         self.odom = TransformStamped()
         self.odom.header.frame_id = "map"
         self.odom.child_frame_id = "odom"
@@ -131,12 +131,14 @@ class ekf_slam():
             try:
                 t_robot_aruco = self.tfBuffer.lookup_transform("base_link", "aruco/detected" + str(marker.id), msg.header.stamp)
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                rospy.loginfo("fail")
                 continue
             
             # check if aruco marker is to far away from robot
             dist_to_robot = np.sqrt(t_robot_aruco.transform.translation.x**2 + t_robot_aruco.transform.translation.y**2 + t_robot_aruco.transform.translation.z**2)
             threshold = 2
             if dist_to_robot > threshold:
+                rospy.loginfo(dist_to_robot)
                 continue
             
             
@@ -171,7 +173,8 @@ class ekf_slam():
                 self.odom = new_t_map_odom
                 self.odom_belif = new_t_map_odom 
                 self.latest_anchor_time = rospy.Time.now().to_sec()
-
+                rospy.loginfo("reset main odom transform")
+                
                 # Create reset msg
                 new_msg = defaultdict()
                 new_msg['type'] = "reset_odom_cov"
@@ -278,6 +281,7 @@ class ekf_slam():
 
         # if new anchor is found update the map odom transform
         if rospy.Time.now().to_sec() - self.latest_anchor_time < 1.0:
+            self.odom.header.stamp = rospy.Time.now()
             self.br.sendTransform(self.odom)
             return
         
