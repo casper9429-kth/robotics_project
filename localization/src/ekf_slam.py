@@ -183,7 +183,7 @@ class ekf_slam():
                                 
                 continue
 
-            if rospy.Time.now().to_sec() - self.aruco_latest_time[marker.id] < 0.5:
+            if rospy.Time.now().to_sec() - self.aruco_latest_time[marker.id] < 1.0:
                 return
                 
             try:
@@ -300,7 +300,7 @@ class ekf_slam():
         
         # check if enough new messages have been received to do a SLAM update
         # if not, get the timestamp of the next newest message and publish that
-        if len(self.slam_buffer) < 1000 or self.slam_buffer[-1]['type'] != 'odometry':
+        if len(self.slam_buffer) < 800 or self.slam_buffer[-1]['type'] != 'odometry':
             # sustain the transform
             # if len(self.slam_buffer) > 10:
             #     self.odom_belif.header.stamp = rospy.Time(self.slam_buffer[-2]['t'])
