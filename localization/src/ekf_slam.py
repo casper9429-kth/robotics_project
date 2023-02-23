@@ -44,7 +44,7 @@ class ekf_slam():
         self.debug = False
 
         # Define rate
-        self.update_rate = 10 # [Hz] Change this to the rate you want
+        self.update_rate = 20 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
         
@@ -129,9 +129,9 @@ class ekf_slam():
             
             # lookup aruco in robot frame
             try:
-                t_robot_aruco = self.tfBuffer.lookup_transform("base_link", "aruco/detected" + str(marker.id), msg.header.stamp)
+                t_robot_aruco = self.tfBuffer.lookup_transform("base_link", "aruco/detected" + str(marker.id),rospy.Time(0))
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-                rospy.loginfo("fail")
+                rospy.loginfo(e)
                 continue
             
             # check if aruco marker is to far away from robot
@@ -149,7 +149,7 @@ class ekf_slam():
             if marker.id == self.anchor_id:
                 # if marker is the anchor, update odom transformation 
                 try:
-                    t_map_goal_map = self.tfBuffer.lookup_transform("aruco/detected" + str(marker.id), "odom", msg.header.stamp)
+                    t_map_goal_map = self.tfBuffer.lookup_transform("aruco/detected" + str(marker.id), "odom", rospy.Time(0))
                 except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                     continue
                 rospy.loginfo("updated map-odom")
@@ -187,8 +187,9 @@ class ekf_slam():
                 return
                 
             try:
-                new_aruco = self.tfBuffer.lookup_transform("map", "aruco/detected" + str(marker.id), msg.header.stamp)                
+                new_aruco = self.tfBuffer.lookup_transform("map", "aruco/detected" + str(marker.id), rospy.Time(0))                
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+                
                 continue
 
             if self.aruco_belif_buffer[marker.id]['first_measurement']:
@@ -299,12 +300,14 @@ class ekf_slam():
         
         # check if enough new messages have been received to do a SLAM update
         # if not, get the timestamp of the next newest message and publish that
-        if len(self.slam_buffer) < 500 or self.slam_buffer[-1]['type'] != 'odometry':
+        if len(self.slam_buffer) < 1000 or self.slam_buffer[-1]['type'] != 'odometry':
             # sustain the transform
-            if len(self.slam_buffer) > 10:
-                self.odom_belif.header.stamp = rospy.Time(self.slam_buffer[-2]['t'])
-            else:
-                self.odom_belif.header.stamp = rospy.Time.now()
+            # if len(self.slam_buffer) > 10:
+            #     self.odom_belif.header.stamp = rospy.Time(self.slam_buffer[-2]['t'])
+            # else:
+            #     self.odom_belif.header.stamp = rospy.Time.now()
+            self.odom_belif.header.stamp = rospy.Time.now()
+            
             self.br.sendTransform(self.odom_belif)
             return
 
@@ -350,7 +353,7 @@ class ekf_slam():
                 found_new_odom = False
                 for new_index,temp_msg in enumerate(slam_buffer[i:]):
                     if temp_msg['type'] == 'odometry':
-                        latest_t = temp_msg['t']
+                        #latest_t = temp_msg['t']
                         x = temp_msg['x']
                         y = temp_msg['y']
                         theta = temp_msg['theta']
@@ -437,14 +440,19 @@ class ekf_slam():
                 rospy.loginfo("new belif: r %s m %s",aruco_mu[0:2],aruco_mu[2:4])
 
         # When done, update the position of odom to correct the position of the robot in the map_SLAM frame
+        # rospy.sleep(1.0)
         
         # Print 
         rospy.loginfo("############# SLAM BATCH UPDATE #############")
         rospy.loginfo("SLAM: " + str(x) + " " + str(y) + " " + str(theta))
         
+        
+        # wath here
         try:
-            map_to_bs = self.tfBuffer.lookup_transform("map", "base_link", rospy.Time(latest_t), rospy.Duration(1.0))
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            map_to_bs = self.tfBuffer.lookup_transform("map", "base_link", rospy.Time(0), rospy.Duration(1.0))
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.loginfo("error at 1")
+            rospy.loginfo(e)
             return
         
         
@@ -468,7 +476,9 @@ class ekf_slam():
         ## look up transfrom from base_link to odom
         try:
             bs_to_odom = self.tfBuffer.lookup_transform("base_link", "odom", rospy.Time(latest_t), rospy.Duration(1.0))
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.loginfo("error at 2")
+            rospy.loginfo(e)
             return
         
         ## apply the transform to des_base_link to get des_odom
@@ -489,7 +499,9 @@ class ekf_slam():
         ## lookup the transform from map to des_odom
         try:
             map_to_new_odom = self.tfBuffer.lookup_transform("map", "des_odom", rospy.Time(latest_t), rospy.Duration(1.0))
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.loginfo("error at 3")
+            rospy.loginfo(e)
             return
         
         ## publish the transform from map to des_odom to odom
@@ -497,7 +509,7 @@ class ekf_slam():
         self.odom_belif = TransformStamped()
         self.odom_belif.header.frame_id = "map"
         self.odom_belif.child_frame_id = "odom"
-        self.odom_belif.header.stamp = rospy.Time(latest_t)
+        self.odom_belif.header.stamp = rospy.Time.now()#rospy.Time(latest_t)
         self.odom_belif.transform.translation.x = map_to_new_odom.transform.translation.x
         self.odom_belif.transform.translation.y = map_to_new_odom.transform.translation.y 
         self.odom_belif.transform.translation.z = map_to_new_odom.transform.translation.z
@@ -507,10 +519,10 @@ class ekf_slam():
         self.odom_belif.transform.rotation.w = map_to_new_odom.transform.rotation.w
         self.br.sendTransform(self.odom_belif)
 
-        
+        rospy.loginfo("############# SLAM BATCH UPDATE DONE #############")
         
         # wait for the new position of odom to be published
-        rospy.sleep(0.05)
+        # rospy.sleep(1.0)
                 
         # Clear the slam buffer and the aruco buffer and the odometry buffer, no new data is allowed to be collected until the EKF SLAM is done
         self.slam_buffer = []
