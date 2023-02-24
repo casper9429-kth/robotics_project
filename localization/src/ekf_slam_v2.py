@@ -75,8 +75,9 @@ class ekf_slam():
         self.aruco_state_vector = defaultdict()
         self.seen_aruco_ids = set()
         self.slam_cov = np.zeros((3,3))
-        self.Q = np.array([[0.2, 0],
-                                [0, 0.2]])
+        # base 0.2
+        self.Q = np.array([[0.02, 0],
+                                [0, 0.02]]) 
 
         # map to odom transform
 
@@ -136,9 +137,9 @@ class ekf_slam():
             
             # check if aruco marker is to far away from robot
             dist_to_robot = np.sqrt(t_robot_aruco.transform.translation.x**2 + t_robot_aruco.transform.translation.y**2 + t_robot_aruco.transform.translation.z**2)
-            threshold = 3.5
+            threshold = 3.0
             if dist_to_robot > threshold:
-                rospy.loginfo(dist_to_robot)
+                rospy.loginfo("marker to far away %s with id %s", dist_to_robot, marker.id)
                 continue
             
             
@@ -183,8 +184,8 @@ class ekf_slam():
                                 
                 continue
 
-            #if rospy.Time.now().to_sec() - self.aruco_latest_time[marker.id] < 0.3:
-            #    return
+            if rospy.Time.now().to_sec() - self.aruco_latest_time[marker.id] < 0.5:
+                return
                 
             try:
                 new_aruco = self.tfBuffer.lookup_transform("map", "aruco/detected" + str(marker.id), rospy.Time(0))                
