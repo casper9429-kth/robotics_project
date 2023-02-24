@@ -163,6 +163,9 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   src/ekf_slam.py
+  src/ekf_slam_v2.py
+  src/map_keeper.py
+
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
