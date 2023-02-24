@@ -75,8 +75,8 @@ class ekf_slam():
         self.aruco_state_vector = defaultdict()
         self.seen_aruco_ids = set()
         self.slam_cov = np.zeros((3,3))
-        self.Q = np.array([[0.3, 0],
-                                [0, 0.3]])
+        self.Q = np.array([[0.2, 0],
+                                [0, 0.2]])
 
         # map to odom transform
 
@@ -109,8 +109,8 @@ class ekf_slam():
         self.slam_buffer = []
         self.latest_time_belif = rospy.Time.now()
         self.covariance_belif = np.zeros((3,3))        
-        self.R = np.array([[0.000001, 0, 0],
-                                [0, 0.000001, 0],
+        self.R = np.array([[0.0000001, 0, 0],
+                                [0, 0.0000001, 0],
                                 [0, 0, 0.00000001]])
                 
         # Time var
