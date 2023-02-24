@@ -35,6 +35,8 @@ class ekf_slam():
         self.br = tf2_ros.TransformBroadcaster()
         self.sbr = tf2_ros.StaticTransformBroadcaster()
 
+        # sleep
+        #rospy.sleep(1)
         
         # Robot parameters
         self.ticks_per_rev = 3072
@@ -69,7 +71,7 @@ class ekf_slam():
 
         self.latest_anchor_time = rospy.Time.now().to_sec()
         self.odom = TransformStamped()
-        self.odom.header.stamp = rospy.Time.now() #maybe change this
+        # self.odom.header.stamp = rospy.Time.now() #maybe change this
         self.odom.header.frame_id = "map"
         self.odom.child_frame_id = "odom"
         self.odom.transform.translation.x = 0
@@ -396,7 +398,7 @@ class ekf_slam():
         new_odom['dt'] = dt
         new_odom['v'] = v
         new_odom['omega'] = omega
-        new_odom['covariance'] = self.covariance_belif
+        new_odom['covariance'] = self.cov
         self.buffer.append(new_odom)
         if len(self.buffer) > 1000:
             self.buffer.pop(0)
