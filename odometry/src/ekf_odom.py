@@ -228,12 +228,25 @@ class ekf_odom():
         t.transform.rotation.w = q[3]
         self.br.sendTransform(t)
         
-        # Publish the transform from map_SLAM to base_link 
+        # Create pose stampes 
+        odom_bl = PoseStamped()
+        odom_bl.header.stamp = rospy.Time(0)
+        odom_bl.header.frame_id = "odom"
+        odom_bl.pose.position.x = self.x
+        odom_bl.pose.position.y = self.y
+        q = tf.transformations.quaternion_from_euler(0, 0, self.theta)
+        odom_bl.pose.orientation.x = q[0]
+        odom_bl.pose.orientation.y= q[1]
+        odom_bl.pose.orientation.z = q[2]
+        odom_bl.pose.orientation.w= q[3]
+
         try:
-            tfs = self.tfBuffer.lookup_transform("map", "base_link", rospy.Time())
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            map_to_odom_bl = self.tfBuffer.transform(odom_bl, "map")
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.loginfo(e)
             return
-        map_SLAM_to_base_link = self.transform_stamped_to_odom(tfs,self.mu[0],self.mu[1])
+
+        map_SLAM_to_base_link = self.PoseStamped_to_Odometry(map_to_odom_bl,self.mu[0],self.mu[1])
         map_SLAM_to_base_link.header.stamp = time
         self.odom_slam_pub.publish(map_SLAM_to_base_link)
         
@@ -254,8 +267,22 @@ class ekf_odom():
         odom.pose.pose.orientation.w = tfs.transform.rotation.w
         return odom
 
-
-                
+    def PoseStamped_to_Odometry(self,ps,v,omega):
+        """
+        Convert Pose stamped to Odometry
+        """
+        odom = Odometry()
+        odom.header = ps.header
+        odom.twist.twist.linear.x = v
+        odom.twist.twist.angular.z = omega
+        odom.pose.pose.position.x = ps.pose.position.x
+        odom.pose.pose.position.y = ps.pose.position.y
+        odom.pose.pose.position.z = ps.pose.position.z
+        odom.pose.pose.orientation.x = ps.pose.orientation.x
+        odom.pose.pose.orientation.y = ps.pose.orientation.y
+        odom.pose.pose.orientation.z = ps.pose.orientation.z
+        odom.pose.pose.orientation.w = ps.pose.orientation.w
+        return odom                
     def transformed_stamped_to_PoseStamped(self,tfs):
         """
         Convert tf stamped to Pose stamped
