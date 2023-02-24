@@ -75,8 +75,8 @@ class ekf_slam():
         self.aruco_state_vector = defaultdict()
         self.seen_aruco_ids = set()
         self.slam_cov = np.zeros((3,3))
-        self.Q = np.array([[0.1, 0],
-                                [0, 0.1]])
+        self.Q = np.array([[0.3, 0],
+                                [0, 0.3]])
 
         # map to odom transform
 
@@ -109,9 +109,9 @@ class ekf_slam():
         self.slam_buffer = []
         self.latest_time_belif = rospy.Time.now()
         self.covariance_belif = np.zeros((3,3))        
-        self.R = np.array([[0.00001, 0, 0],
-                                [0, 0.00001, 0],
-                                [0, 0, 0.0000001]])
+        self.R = np.array([[0.000001, 0, 0],
+                                [0, 0.000001, 0],
+                                [0, 0, 0.00000001]])
                 
         # Time var
         self.last_time = rospy.Time.now().to_sec()
@@ -136,7 +136,7 @@ class ekf_slam():
             
             # check if aruco marker is to far away from robot
             dist_to_robot = np.sqrt(t_robot_aruco.transform.translation.x**2 + t_robot_aruco.transform.translation.y**2 + t_robot_aruco.transform.translation.z**2)
-            threshold = 2
+            threshold = 3.5
             if dist_to_robot > threshold:
                 rospy.loginfo(dist_to_robot)
                 continue
@@ -183,8 +183,8 @@ class ekf_slam():
                                 
                 continue
 
-            if rospy.Time.now().to_sec() - self.aruco_latest_time[marker.id] < 1.0:
-                return
+            #if rospy.Time.now().to_sec() - self.aruco_latest_time[marker.id] < 0.3:
+            #    return
                 
             try:
                 new_aruco = self.tfBuffer.lookup_transform("map", "aruco/detected" + str(marker.id), rospy.Time(0))                
@@ -300,7 +300,7 @@ class ekf_slam():
         
         # check if enough new messages have been received to do a SLAM update
         # if not, get the timestamp of the next newest message and publish that
-        if len(self.slam_buffer) < 800 or self.slam_buffer[-1]['type'] != 'odometry':
+        if len(self.slam_buffer) < 200 or self.slam_buffer[-1]['type'] != 'odometry':
             # sustain the transform
             # if len(self.slam_buffer) > 10:
             #     self.odom_belif.header.stamp = rospy.Time(self.slam_buffer[-2]['t'])
@@ -399,7 +399,7 @@ class ekf_slam():
                 r_b_c = self.slam_cov[0:2,0:2]
 
 
-                z_b = np.array([math.sqrt((m_b[0]-r_b[0])**2 + (m_b[1]-r_b[1])**2),np.arctan2(m_b[1]-r_b[1],m_b[0]-r_b[0])])
+                z_b = np.array([m_b[0]-r_b[0],m_b[1]-r_b[1]])
 
                 rospy.loginfo("belif: r %s m %s",r_b,m_b)
                 
@@ -408,7 +408,7 @@ class ekf_slam():
                 ## get measurement
                 m_m = [msg['x'],msg['y']]
                 rospy.loginfo("measurement: %s",m_m)
-                z_m = np.array([math.sqrt((m_m[0]-r_b[0])**2 + (m_m[1]-r_b[1])**2),np.arctan2(m_m[1]-r_b[1],m_m[0]-r_b[0])])
+                z_m = np.array([m_m[0]-r_b[0],m_m[1]-r_b[1]])
 
                 ## Linearize the measurement model around the belif
                 H = self.calc_H(r_b[0],r_b[1],m_b[0],m_b[1])
@@ -533,15 +533,17 @@ class ekf_slam():
         """
         Calculates the linearized messurement model for the aruco marker
         """
+
         # Linearize the messurement model with respect to x_belif,y_belif,m1x_belif,m1y_belif and construct H
-        h_0_0 = (1/np.sqrt((x - mx)**2 + (y - my)**2))*(x - mx)
-        h_0_1 = (1/np.sqrt((x - mx)**2 + (y - my)**2))*(y - my)
-        h_0_2 = (1/np.sqrt((x - mx)**2 + (y - my)**2))*(-x + mx)
-        h_0_3 = (1/np.sqrt((x - mx)**2 + (y - my)**2))*(-y + my)
-        h_1_0 = (1/(1+((my - y)/ (mx - x))**2))*((my - y)/ ((mx - x)**2))
-        h_1_1 = (1/(1+((my - y)/ (mx - x))**2))*((-y)/ (mx - x))
-        h_1_2 =-(1/(1+((my - y)/ (mx - x))**2))*((my - y)/ ((mx - x)**2))
-        h_1_3 = (1/(1+((my - y)/ (mx - x))**2))*((my)/ (mx - x))
+
+        h_0_0 = -1
+        h_0_1 = 0
+        h_0_2 = 1
+        h_0_3 = 0
+        h_1_0 = 0
+        h_1_1 = -1
+        h_1_2 = 0
+        h_1_3 = 1
         H = np.array([[h_0_0,h_0_1,h_0_2,h_0_3],[h_1_0,h_1_1,h_1_2,h_1_3]])
         
         return H

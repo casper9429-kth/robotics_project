@@ -230,12 +230,22 @@ class ekf_odom():
         
         # Create pose stampes 
         odom_bl = PoseStamped()
-        odom_bl.header.stamp = time
+        odom_bl.header.stamp = rospy.Time(0)
         odom_bl.header.frame_id = "odom"
         odom_bl.pose.position.x = self.x
         odom_bl.pose.position.y = self.y
-        odom_bl.pose.orientation = tf.transformations.quaternion_from_euler(0, 0, self.theta)
-        map_to_odom_bl = self.tfBuffer.transform(odom_bl, "map")
+        q = tf.transformations.quaternion_from_euler(0, 0, self.theta)
+        odom_bl.pose.orientation.x = q[0]
+        odom_bl.pose.orientation.y= q[1]
+        odom_bl.pose.orientation.z = q[2]
+        odom_bl.pose.orientation.w= q[3]
+
+        try:
+            map_to_odom_bl = self.tfBuffer.transform(odom_bl, "map")
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.loginfo(e)
+            return
+
         map_SLAM_to_base_link = self.PoseStamped_to_Odometry(map_to_odom_bl,self.mu[0],self.mu[1])
         map_SLAM_to_base_link.header.stamp = time
         self.odom_slam_pub.publish(map_SLAM_to_base_link)
