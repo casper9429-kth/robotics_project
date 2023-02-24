@@ -62,7 +62,7 @@ class ekf_slam():
         new_marker['theta'] =  0# tf.transformations.euler_from_quaternion([new_aruco.transform.rotation.x,new_aruco.transform.rotation.y,new_aruco.transform.rotation.z,new_aruco.transform.rotation.w])[2]
         new_marker['covariance'] = np.eye(2)*100000000000000000000000000000000000000 # high covariance, robot will pin the marker to its location when seen next time
         self.aruco_belif_buffer = defaultdict(lambda: new_marker) 
-        self.cov = np.zeros((2,2))
+        self.cov = np.zeros((3,3))
         # base 0.2
         self.Q = np.array([[0.02, 0],
                                 [0, 0.02]]) 
@@ -86,8 +86,8 @@ class ekf_slam():
         # Odometry var 
         self.buffer = []
         self.latest_odom_time = rospy.Time.now()
-        self.R = np.array([[0.0000001, 0],
-                                [0, 0.0000001]])
+        self.R = np.array([[0.0000001, 0,0],
+                                [0, 0.0000001, 0], [0,0,0.000000001]])
                 
                 
                 
@@ -278,7 +278,7 @@ class ekf_slam():
             # Update mu and sigma for robot
             x_r = mu[0]
             y_r = mu[1]
-            self.cov = sigma[0:2,0:2]
+            self.cov[0:2,0:2] = sigma[0:2,0:2]
             
             # Update mu and sigma for aruco markers
             mu = mu[2:]
@@ -425,10 +425,9 @@ class ekf_slam():
         """
         
         ### Calculate/Update G_odom, used for odometry covariance
-        self.G_odom = np.eye(2)
-        #np.array([[1, 0, -v * math.sin(theta) * dt],
-        #               [0, 1, v * math.cos(theta) * dt],
-        #               [0, 0, 1]])
+        self.G_odom = np.array([[1, 0, -v * math.sin(theta) * dt],
+                       [0, 1, v * math.cos(theta) * dt],
+                       [0, 0, 1]])
         
         ### If time since last reset odom cov is less than 0.1, reset odom cov, will be reset when anchor is found 
         if np.abs(v)<0.01 and np.abs(omega)<0.01: ### If robot is not moving, don't update/increase odom cov
