@@ -36,7 +36,7 @@ class ekf_slam():
         self.sbr = tf2_ros.StaticTransformBroadcaster()
 
         # sleep
-        #rospy.sleep(1)
+        rospy.sleep(2)
         
         # Robot parameters
         self.ticks_per_rev = 3072
@@ -62,7 +62,7 @@ class ekf_slam():
         new_marker['theta'] =  0# tf.transformations.euler_from_quaternion([new_aruco.transform.rotation.x,new_aruco.transform.rotation.y,new_aruco.transform.rotation.z,new_aruco.transform.rotation.w])[2]
         new_marker['covariance'] = np.eye(2)*100000000000000000000000000000000000000 # high covariance, robot will pin the marker to its location when seen next time
         self.aruco_belif_buffer = defaultdict(lambda: new_marker) 
-        self.cov = np.zeros((3,3))
+        self.cov = np.zeros((2,2))
         # base 0.2
         self.Q = np.array([[0.02, 0],
                                 [0, 0.02]]) 
@@ -86,9 +86,8 @@ class ekf_slam():
         # Odometry var 
         self.buffer = []
         self.latest_odom_time = rospy.Time.now()
-        self.R = np.array([[0.0000001, 0, 0],
-                                [0, 0.0000001, 0],
-                                [0, 0, 0.00000001]])
+        self.R = np.array([[0.0000001, 0],
+                                [0, 0.0000001]])
                 
                 
                 
@@ -96,7 +95,6 @@ class ekf_slam():
         self.bl_in_map_slam_sub = rospy.Subscriber("odom_slam", Odometry, self.bl_in_map_slam_callback)
         self.aruco_marker_sub = rospy.Subscriber("aruco/markers", MarkerArray, self.aruco_marker_callback)
 
-                
 
 
     def aruco_marker_callback(self,msg):
@@ -105,7 +103,7 @@ class ekf_slam():
         Save the data in a buffer, 
         only allow one update per marker per second
         """
-        
+        rospy.loginfo("aruco marker callback")
         for marker in msg.markers:
             
             # check if aruco marker is to far away from robot
@@ -118,6 +116,7 @@ class ekf_slam():
             dist_to_robot = np.sqrt(t_robot_aruco.transform.translation.x**2 + t_robot_aruco.transform.translation.y**2 + t_robot_aruco.transform.translation.z**2)
             threshold = 3.0
             if dist_to_robot > threshold:
+                rospy.loginfo("Aruco marker to far away from robot")
                 continue
             
             
@@ -147,17 +146,23 @@ class ekf_slam():
                 
                 # update odom transform
                 self.odom = TransformStamped()
-                self.odom.header.stamp = rospy.Time.now()
+                #self.odom.header.stamp = rospy.Time.now()
                 self.odom.header.frame_id = "map"
                 self.odom.child_frame_id = "odom"
                 self.odom.transform.translation.x = t_map_goal_map.transform.translation.x
                 self.odom.transform.translation.y = t_map_goal_map.transform.translation.y
                 self.odom.transform.translation.z = t_map_goal_map.transform.translation.z
-                self.odom.transform.rotation.x = t_map_goal_map.transform.rotation.x
-                self.odom.transform.rotation.y = t_map_goal_map.transform.rotation.y
-                self.odom.transform.rotation.z = t_map_goal_map.transform.rotation.z
-                self.odom.transform.rotation.w = t_map_goal_map.transform.rotation.w
+                
+                # 
+                q = [t_map_goal_map.transform.rotation.x,t_map_goal_map.transform.rotation.y,t_map_goal_map.transform.rotation.z,t_map_goal_map.transform.rotation.w]
+                q = q / np.linalg.norm(q)
+                self.odom.transform.rotation.x = q[0]# t_map_goal_map.transform.rotation.x
+                self.odom.transform.rotation.y = q[1]# t_map_goal_map.transform.rotation.y
+                self.odom.transform.rotation.z = q[2]# t_map_goal_map.transform.rotation.z
+                self.odom.transform.rotation.w = q[3]# t_map_goal_map.transform.rotation.w
                 self.sbr.sendTransform(self.odom)
+                
+                rospy.loginfo("Updated odom transform")
                 
                 # set slam ready
                 self.slam_ready = True
@@ -239,6 +244,7 @@ class ekf_slam():
             for i,id in enumerate(aruco_seen_list):
                 x = self.aruco_belif_buffer[id]['x']
                 y = self.aruco_belif_buffer[id]['y']
+                rospy.loginfo(x)
                 mu_bel[0,2*i+2] = x
                 mu_bel[0,2*i+3] = y
 
@@ -275,7 +281,8 @@ class ekf_slam():
             self.cov = sigma[0:2,0:2]
             
             # Update mu and sigma for aruco markers
-            mu = mu[2:]
+            mu = mu[:,2:]
+            rospy.loginfo("mu: {}".format(mu))
             sigma = sigma[2:,2:]
             for i,id in enumerate(aruco_seen_list):
                 self.aruco_belif_buffer[id]['x'] = mu[2*i]
@@ -359,7 +366,7 @@ class ekf_slam():
             self.odom_belif = TransformStamped()
             self.odom_belif.header.frame_id = "map"
             self.odom_belif.child_frame_id = "odom"
-            self.odom_belif.header.stamp = rospy.Time.now()#rospy.Time(latest_t)
+            #self.odom_belif.header.stamp = rospy.Time.now()#rospy.Time(latest_t)
             self.odom_belif.transform.translation.x = map_to_new_odom.transform.translation.x
             self.odom_belif.transform.translation.y = map_to_new_odom.transform.translation.y 
             self.odom_belif.transform.translation.z = map_to_new_odom.transform.translation.z
@@ -418,9 +425,10 @@ class ekf_slam():
         """
         
         ### Calculate/Update G_odom, used for odometry covariance
-        self.G_odom = np.array([[1, 0, -v * math.sin(theta) * dt],
-                       [0, 1, v * math.cos(theta) * dt],
-                       [0, 0, 1]])
+        self.G_odom = np.eye(2)
+        #np.array([[1, 0, -v * math.sin(theta) * dt],
+        #               [0, 1, v * math.cos(theta) * dt],
+        #               [0, 0, 1]])
         
         ### If time since last reset odom cov is less than 0.1, reset odom cov, will be reset when anchor is found 
         if np.abs(v)<0.01 and np.abs(omega)<0.01: ### If robot is not moving, don't update/increase odom cov
@@ -456,3 +464,4 @@ class ekf_slam():
 
 if __name__ == "__main__":
     node=ekf_slam()
+    rospy.spin()
