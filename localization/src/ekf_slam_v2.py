@@ -238,15 +238,15 @@ class ekf_slam():
             Fx[1,1] = 1
 
             # Construct mu_bel
-            mu_bel = np.zeros((1,2*N+2))
-            mu_bel[0,0] = r_b[0]
-            mu_bel[0,1] = r_b[1]
+            mu_bel = np.zeros(2*N+2)
+            mu_bel[0] = r_b[0]
+            mu_bel[1] = r_b[1]
             for i,id in enumerate(aruco_seen_list):
                 x = self.aruco_belif_buffer[id]['x']
                 y = self.aruco_belif_buffer[id]['y']
                 rospy.loginfo(x)
-                mu_bel[0,2*i+2] = x
-                mu_bel[0,2*i+3] = y
+                mu_bel[2*i+2] = x
+                mu_bel[2*i+3] = y
 
             Gt = np.eye(2*N+2)
             
@@ -281,7 +281,7 @@ class ekf_slam():
             self.cov = sigma[0:2,0:2]
             
             # Update mu and sigma for aruco markers
-            mu = mu[:,2:]
+            mu = mu[2:]
             rospy.loginfo("mu: {}".format(mu))
             sigma = sigma[2:,2:]
             for i,id in enumerate(aruco_seen_list):
