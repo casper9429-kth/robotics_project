@@ -277,7 +277,7 @@ class ekf_slam():
             
             # Update mu and sigma for robot
             x_r = mu[0]
-            y_r = mu[0]
+            y_r = mu[1]
             self.cov = sigma[0:2,0:2]
             
             # Update mu and sigma for aruco markers
@@ -319,8 +319,8 @@ class ekf_slam():
             desired_base_link.header.frame_id = "map"
             desired_base_link.header.stamp = time_internal
             desired_base_link.child_frame_id = "des_base_link"
-            desired_base_link.transform.translation.x = x
-            desired_base_link.transform.translation.y = y
+            desired_base_link.transform.translation.x = x_r
+            desired_base_link.transform.translation.y = y_r
             desired_base_link.transform.translation.z = map_to_bs.transform.translation.z
             quaterion = tf.transformations.quaternion_from_euler(0,0,theta)
             desired_base_link.transform.rotation.x = quaterion[0]
