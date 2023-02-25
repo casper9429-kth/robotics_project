@@ -16,6 +16,10 @@ from aruco_msgs.msg import MarkerArray
 from std_msgs.msg import Bool
 from collections import defaultdict
 
+# TODO:
+# Test how good it works
+# Extend to utilize angle of aruco marker
+# Extend to utilize anchor position in SLAM 
 
 
 
@@ -24,7 +28,8 @@ from collections import defaultdict
 class ekf_slam():
     def __init__(self):
         """
-        EKF SLAM
+        EKF SLAM Node
+        
         """
         rospy.init_node('ekf_slam')
 
@@ -35,7 +40,7 @@ class ekf_slam():
         self.br = tf2_ros.TransformBroadcaster()
         self.sbr = tf2_ros.StaticTransformBroadcaster()
 
-        # sleep
+        # sleep, inital to let the system settle
         rospy.sleep(2)
         
         # Robot parameters
@@ -43,6 +48,7 @@ class ekf_slam():
         self.wheel_r = 0.04921
         self.base = 0.3 
 
+        # Slam parameters
         self.latest_time = rospy.Time.now()
         self.slam_ready = False
         self.anchor_id = 500
@@ -62,16 +68,15 @@ class ekf_slam():
         new_marker['theta'] =  0# tf.transformations.euler_from_quaternion([new_aruco.transform.rotation.x,new_aruco.transform.rotation.y,new_aruco.transform.rotation.z,new_aruco.transform.rotation.w])[2]
         new_marker['covariance'] = np.eye(2)*100000000000000000000000000000000000000 # high covariance, robot will pin the marker to its location when seen next time
         self.aruco_belif_buffer = defaultdict(lambda: new_marker) 
+
         self.cov = np.zeros((3,3))
         # base 0.2
         self.Q = np.array([[0.02, 0],
                                 [0, 0.02]]) 
 
-        # map to odom transform
-
+        # map to odom transform (inital)
         self.latest_anchor_time = rospy.Time.now().to_sec()
         self.odom = TransformStamped()
-        # self.odom.header.stamp = rospy.Time.now() #maybe change this
         self.odom.header.frame_id = "map"
         self.odom.child_frame_id = "odom"
         self.odom.transform.translation.x = 0
@@ -91,7 +96,7 @@ class ekf_slam():
                 
                 
                 
-        # Subscribe to odometry topic
+        # Subscribe to odometry topic, do last to avoid using not initalized variables
         self.bl_in_map_slam_sub = rospy.Subscriber("odom_slam", Odometry, self.bl_in_map_slam_callback)
         self.aruco_marker_sub = rospy.Subscriber("aruco/markers", MarkerArray, self.aruco_marker_callback)
 
@@ -99,11 +104,8 @@ class ekf_slam():
 
     def aruco_marker_callback(self,msg):
         """
-        Aruco Callback, lookup aruco marker in map_SLAM frame
-        Save the data in a buffer, 
-        only allow one update per marker per second
+        Aruco Slam callback:
         """
-        rospy.loginfo("aruco marker callback")
         for marker in msg.markers:
             
             # check if aruco marker is to far away from robot
@@ -116,7 +118,6 @@ class ekf_slam():
             dist_to_robot = np.sqrt(t_robot_aruco.transform.translation.x**2 + t_robot_aruco.transform.translation.y**2 + t_robot_aruco.transform.translation.z**2)
             threshold = 3.0
             if dist_to_robot > threshold:
-                rospy.loginfo("Aruco marker to far away from robot")
                 continue
             
             
@@ -162,7 +163,6 @@ class ekf_slam():
                 self.odom.transform.rotation.w = q[3]# t_map_goal_map.transform.rotation.w
                 self.sbr.sendTransform(self.odom)
                 
-                rospy.loginfo("Updated odom transform")
                 
                 # set slam ready
                 self.slam_ready = True
@@ -223,7 +223,7 @@ class ekf_slam():
 
 
             # H
-            H = self.calc_H(r_b[0],r_b[1],m_b[0],m_b[1])
+            H = np.array([[-1,0,1,0],[0,-1,0,1]])
 
             # N
             N = len(self.aruco_seen)
@@ -267,7 +267,7 @@ class ekf_slam():
             H = H @ Fx
             
             # Calculate Kalman Gain
-            K = sigma_bel @ H.T @ np.linalg.inv(H @ sigma_bel @ H.T + self.Q)
+            K = sigma_bel @ H.T @ np.linalg.inv(H @ sigma_bel @ H.T + Q)
 
             # Calculate mu
             mu = mu_bel + K @ (z_m - z_b)
@@ -437,27 +437,6 @@ class ekf_slam():
 
 
 
-
-
-    def calc_H(self,x,y,mx,my):
-        """
-        Calculates the linearized messurement model for the aruco marker
-        """
-
-        # Linearize the messurement model with respect to x_belif,y_belif,m1x_belif,m1y_belif and construct H
-
-        h_0_0 = -1
-        h_0_1 = 0
-        h_0_2 = 1
-        h_0_3 = 0
-        h_1_0 = 0
-        h_1_1 = -1
-        h_1_2 = 0
-        h_1_3 = 1
-        H = np.array([[h_0_0,h_0_1,h_0_2,h_0_3],[h_1_0,h_1_1,h_1_2,h_1_3]])
-        
-        return H
-    
 
 
 
