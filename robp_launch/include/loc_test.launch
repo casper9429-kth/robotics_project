@@ -8,7 +8,9 @@
 	<!-- Include odom_intit-->
 	<!-- <node name="odom_init" pkg="localization" type="odom_updater.py" output='screen'/> -->
 
-	<node name="ekf_slam" pkg="localization" type="ekf_slam_v2.py" output='screen'/>
+	<node name="ekf_slam" pkg="localization" type="ekf_slam_v2.py" output='screen'>
+		<param name='anchor_id' value='500'/>
+	</node>
 
 	<!-- Include phidgets-->
 	<include file="$(find robp_phidgets)/launch/phidgets.launch" />

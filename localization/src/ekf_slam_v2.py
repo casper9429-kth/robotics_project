@@ -51,7 +51,14 @@ class ekf_slam():
         # Slam parameters
         self.latest_time = rospy.Time.now()
         self.slam_ready = False
-        self.anchor_id = 500
+
+        try:
+            self.anchor_id = int(rospy.get_param("anchor_id"))
+        except:
+            self.anchor_id = 500
+
+
+
         self.time_threshold = 0.5
 
         
