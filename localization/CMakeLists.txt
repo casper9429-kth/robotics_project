@@ -164,6 +164,7 @@ include_directories(
 catkin_install_python(PROGRAMS
   src/ekf_slam.py
   src/ekf_slam_v2.py
+  src/ekf_slam_v3.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

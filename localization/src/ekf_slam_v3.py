@@ -16,13 +16,6 @@ from aruco_msgs.msg import MarkerArray
 from std_msgs.msg import Bool
 from collections import defaultdict
 
-# TODO:
-# Test how good it works
-# Extend to utilize angle of aruco marker
-# Extend to utilize anchor position in SLAM 
-
-
-
 
 
 class ekf_slam():
@@ -70,6 +63,10 @@ class ekf_slam():
         new_marker['x'] = 0
         new_marker['y'] = 0
         new_marker['z'] = 0
+        new_marker['q0'] = 0
+        new_marker['q1'] = 0
+        new_marker['q2'] = 0
+        new_marker['q3'] = 1
         new_marker['theta'] = 0
         new_marker['first_measurement'] = True
         new_marker['theta'] =  0# tf.transformations.euler_from_quaternion([new_aruco.transform.rotation.x,new_aruco.transform.rotation.y,new_aruco.transform.rotation.z,new_aruco.transform.rotation.w])[2]
@@ -132,49 +129,11 @@ class ekf_slam():
 
             
             
-            # if anchor is seen, update odom transformation
+            # if anchor is seen, allow slam
             if marker.id == self.anchor_id:
-                # set latest time
-                self.latest_time = rospy.Time.now()
-
-                # get latest odom message
-                r_b = min(self.buffer, key=lambda x:abs(x['t']-msg.header.stamp.to_sec()))
-
-                # reset cov first time
-                self.cov = self.cov*0
-                
-                # Lookup transform from aruco to odom
-                try:
-                    t_map_goal_map = self.tfBuffer.lookup_transform("aruco/detected" + str(marker.id), "odom", rospy.Time(0))
-                except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-                    rospy.loginfo(e)
-                    continue
-                
-                # update odom transform
-                self.odom = TransformStamped()
-                #self.odom.header.stamp = rospy.Time.now()
-                self.odom.header.frame_id = "map"
-                self.odom.child_frame_id = "odom"
-                self.odom.transform.translation.x = t_map_goal_map.transform.translation.x
-                self.odom.transform.translation.y = t_map_goal_map.transform.translation.y
-                self.odom.transform.translation.z = t_map_goal_map.transform.translation.z
-                
-                # 
-                q = [t_map_goal_map.transform.rotation.x,t_map_goal_map.transform.rotation.y,t_map_goal_map.transform.rotation.z,t_map_goal_map.transform.rotation.w]
-                q = q / np.linalg.norm(q)
-                self.odom.transform.rotation.x = q[0]# t_map_goal_map.transform.rotation.x
-                self.odom.transform.rotation.y = q[1]# t_map_goal_map.transform.rotation.y
-                self.odom.transform.rotation.z = q[2]# t_map_goal_map.transform.rotation.z
-                self.odom.transform.rotation.w = q[3]# t_map_goal_map.transform.rotation.w
-                self.sbr.sendTransform(self.odom)
-                
-                
                 # set slam ready
                 self.slam_ready = True
                                                 
-                # reset cov second time
-                self.cov = self.cov*0                                
-                continue
 
 
             # if allow slam
@@ -211,6 +170,24 @@ class ekf_slam():
                 self.aruco_belif_buffer[marker.id]['x'] = aruco_m.transform.translation.x
                 self.aruco_belif_buffer[marker.id]['y'] = aruco_m.transform.translation.y
                 self.aruco_belif_buffer[marker.id]['z'] = aruco_m.transform.translation.z
+                self.aruco_belif_buffer[marker.id]['q0'] = aruco_m.transform.rotation.x
+                self.aruco_belif_buffer[marker.id]['q1'] = aruco_m.transform.rotation.y
+                self.aruco_belif_buffer[marker.id]['q2'] = aruco_m.transform.rotation.z
+                self.aruco_belif_buffer[marker.id]['q3'] = aruco_m.transform.rotation.w
+
+
+            # edge case, if anchor is seen, set anchor belief to 0,0,0,0,0,0,1 even if anchor is not first measurement
+            if marker.id == self.anchor_id:
+                self.aruco_belif_buffer[marker.id]['first_measurement'] = False
+                self.aruco_belif_buffer[marker.id]['x']  = 0 
+                self.aruco_belif_buffer[marker.id]['y']  = 0 
+                self.aruco_belif_buffer[marker.id]['z']  = 0 
+                self.aruco_belif_buffer[marker.id]['q0'] = 0
+                self.aruco_belif_buffer[marker.id]['q1'] = 0
+                self.aruco_belif_buffer[marker.id]['q2'] = 0
+                self.aruco_belif_buffer[marker.id]['q3'] = 1
+                self.aruco_belif_buffer[marker.id]['covariance'] = np.eye(2)*0
+
                                                                                              
             # measurement belief 
             mark_belif = self.aruco_belif_buffer[marker.id]
@@ -293,7 +270,8 @@ class ekf_slam():
                 self.aruco_belif_buffer[id]['x'] = mu[2*i]
                 self.aruco_belif_buffer[id]['y'] = mu[2*i+1]
                 self.aruco_belif_buffer[id]['covariance'] = sigma[2*i:2*i+2,2*i:2*i+2]
-            
+                            
+                
             # Publish new pose of all aruco markers in map frame
             for id in aruco_seen_list:
                 marker_pose = TransformStamped()
@@ -310,76 +288,104 @@ class ekf_slam():
                 self.br.sendTransform(marker_pose)
             
             
-            # Find transform that corrects map->odom such that base_link is given the new pose mu in map frame
-            try:
-                map_to_bs = self.tfBuffer.lookup_transform("map", "base_link", rospy.Time(0), rospy.Duration(1.0))
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-                rospy.loginfo("error at 1")
-                rospy.loginfo(e)
-                return
-            
-            time_internal = rospy.Time.now()
-            ## a new belif is created for the robot pose in the map_SLAM frame
-            desired_base_link = TransformStamped()    
-            desired_base_link.header.frame_id = "map"
-            desired_base_link.header.stamp = time_internal
-            desired_base_link.child_frame_id = "des_base_link"
-            desired_base_link.transform.translation.x = x_r
-            desired_base_link.transform.translation.y = y_r
-            desired_base_link.transform.translation.z = map_to_bs.transform.translation.z
-            quaterion = tf.transformations.quaternion_from_euler(0,0,theta)
-            desired_base_link.transform.rotation.x = quaterion[0]
-            desired_base_link.transform.rotation.y = quaterion[1]
-            desired_base_link.transform.rotation.z = quaterion[2]
-            desired_base_link.transform.rotation.w = quaterion[3]
-            self.br.sendTransform(desired_base_link)
+            # Publish custom transform for robot if anchor is seen
+            if marker.id == self.anchor_id:
+                try:
+                    t_map_goal_map = self.tfBuffer.lookup_transform("aruco/detected" + str(marker.id), "odom", rospy.Time(0))
+                except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                    rospy.loginfo(e)
+                    return
+                
+                # update odom transform
+                map_odom = TransformStamped()
+                #self.odom.header.stamp = rospy.Time.now()
+                map_odom.frame_id = "map"
+                map_odom.child_frame_id = "odom"
+                map_odom.transform.translation.x = t_map_goal_map.transform.translation.x
+                map_odom.transform.translation.y = t_map_goal_map.transform.translation.y
+                map_odom.transform.translation.z = t_map_goal_map.transform.translation.z
+                q = [t_map_goal_map.transform.rotation.x,t_map_goal_map.transform.rotation.y,t_map_goal_map.transform.rotation.z,t_map_goal_map.transform.rotation.w]
+                q = q / np.linalg.norm(q)
+                map_odom.transform.rotation.x = q[0]# t_map_goal_map.transform.rotation.x
+                map_odom.transform.rotation.y = q[1]# t_map_goal_map.transform.rotation.y
+                map_odom.transform.rotation.z = q[2]# t_map_goal_map.transform.rotation.z
+                map_odom.transform.rotation.w = q[3]# t_map_goal_map.transform.rotation.w
+                self.sbr.sendTransform(map_odom)
+                return    
+
+
+            else:
+                
+                # Find transform that corrects map->odom such that base_link is given the new pose mu in map frame
+                try:
+                    map_to_bs = self.tfBuffer.lookup_transform("map", "base_link", rospy.Time(0), rospy.Duration(1.0))
+                except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                    rospy.loginfo("error at 1")
+                    rospy.loginfo(e)
+                    return
+                
+                time_internal = rospy.Time.now()
+                ## a new belif is created for the robot pose in the map_SLAM frame
+                desired_base_link = TransformStamped()    
+                desired_base_link.header.frame_id = "map"
+                desired_base_link.header.stamp = time_internal
+                desired_base_link.child_frame_id = "des_base_link"
+                desired_base_link.transform.translation.x = x_r
+                desired_base_link.transform.translation.y = y_r
+                desired_base_link.transform.translation.z = map_to_bs.transform.translation.z
+                quaterion = tf.transformations.quaternion_from_euler(0,0,theta)
+                desired_base_link.transform.rotation.x = quaterion[0]
+                desired_base_link.transform.rotation.y = quaterion[1]
+                desired_base_link.transform.rotation.z = quaterion[2]
+                desired_base_link.transform.rotation.w = quaterion[3]
+                self.br.sendTransform(desired_base_link)
 
 
 
-            ## look up transfrom from base_link to odom
-            try:
-                bs_to_odom = self.tfBuffer.lookup_transform("base_link", "odom", rospy.Time(time_odom), rospy.Duration(1.0))
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-                rospy.loginfo("error at 2")
-                rospy.loginfo(e)
-                return
-            
-            ## apply the transform to des_base_link to get des_odom
-            desired_odom =  TransformStamped()
-            desired_odom.header.frame_id = "des_base_link"
-            desired_odom.child_frame_id = "des_odom"
-            desired_odom.header.stamp = rospy.Time(time_odom)
-            desired_odom.transform.translation.x = bs_to_odom.transform.translation.x
-            desired_odom.transform.translation.y = bs_to_odom.transform.translation.y
-            desired_odom.transform.translation.z = bs_to_odom.transform.translation.z
-            desired_odom.transform.rotation.x = bs_to_odom.transform.rotation.x
-            desired_odom.transform.rotation.y = bs_to_odom.transform.rotation.y
-            desired_odom.transform.rotation.z = bs_to_odom.transform.rotation.z
-            desired_odom.transform.rotation.w = bs_to_odom.transform.rotation.w
-            self.br.sendTransform(desired_odom)
+                ## look up transfrom from base_link to odom
+                try:
+                    bs_to_odom = self.tfBuffer.lookup_transform("base_link", "odom", rospy.Time(time_odom), rospy.Duration(1.0))
+                except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                    rospy.loginfo("error at 2")
+                    rospy.loginfo(e)
+                    return
+                
+                ## apply the transform to des_base_link to get des_odom
+                desired_odom =  TransformStamped()
+                desired_odom.header.frame_id = "des_base_link"
+                desired_odom.child_frame_id = "des_odom"
+                desired_odom.header.stamp = rospy.Time(time_odom)
+                desired_odom.transform.translation.x = bs_to_odom.transform.translation.x
+                desired_odom.transform.translation.y = bs_to_odom.transform.translation.y
+                desired_odom.transform.translation.z = bs_to_odom.transform.translation.z
+                desired_odom.transform.rotation.x = bs_to_odom.transform.rotation.x
+                desired_odom.transform.rotation.y = bs_to_odom.transform.rotation.y
+                desired_odom.transform.rotation.z = bs_to_odom.transform.rotation.z
+                desired_odom.transform.rotation.w = bs_to_odom.transform.rotation.w
+                self.br.sendTransform(desired_odom)
 
 
-            ## lookup the transform from map to des_odom
-            try:
-                map_to_new_odom = self.tfBuffer.lookup_transform("map", "des_odom", rospy.Time(time_odom), rospy.Duration(1.0))
-            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-                rospy.loginfo("error at 3")
-                rospy.loginfo(e)
-                return
-            
-            ## publish the transform from map to des_odom to odom, make it static
-            self.odom_belif = TransformStamped()
-            self.odom_belif.header.frame_id = "map"
-            self.odom_belif.child_frame_id = "odom"
-            #self.odom_belif.header.stamp = rospy.Time.now()#rospy.Time(latest_t)
-            self.odom_belif.transform.translation.x = map_to_new_odom.transform.translation.x
-            self.odom_belif.transform.translation.y = map_to_new_odom.transform.translation.y 
-            self.odom_belif.transform.translation.z = map_to_new_odom.transform.translation.z
-            self.odom_belif.transform.rotation.x = map_to_new_odom.transform.rotation.x
-            self.odom_belif.transform.rotation.y = map_to_new_odom.transform.rotation.y
-            self.odom_belif.transform.rotation.z = map_to_new_odom.transform.rotation.z
-            self.odom_belif.transform.rotation.w = map_to_new_odom.transform.rotation.w
-            self.sbr.sendTransform(self.odom_belif)
+                ## lookup the transform from map to des_odom
+                try:
+                    map_to_new_odom = self.tfBuffer.lookup_transform("map", "des_odom", rospy.Time(time_odom), rospy.Duration(1.0))
+                except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                    rospy.loginfo("error at 3")
+                    rospy.loginfo(e)
+                    return
+                
+                ## publish the transform from map to des_odom to odom, make it static
+                self.odom_belif = TransformStamped()
+                self.odom_belif.header.frame_id = "map"
+                self.odom_belif.child_frame_id = "odom"
+                #self.odom_belif.header.stamp = rospy.Time.now()#rospy.Time(latest_t)
+                self.odom_belif.transform.translation.x = map_to_new_odom.transform.translation.x
+                self.odom_belif.transform.translation.y = map_to_new_odom.transform.translation.y 
+                self.odom_belif.transform.translation.z = map_to_new_odom.transform.translation.z
+                self.odom_belif.transform.rotation.x = map_to_new_odom.transform.rotation.x
+                self.odom_belif.transform.rotation.y = map_to_new_odom.transform.rotation.y
+                self.odom_belif.transform.rotation.z = map_to_new_odom.transform.rotation.z
+                self.odom_belif.transform.rotation.w = map_to_new_odom.transform.rotation.w
+                self.sbr.sendTransform(self.odom_belif)
 
                 
 
