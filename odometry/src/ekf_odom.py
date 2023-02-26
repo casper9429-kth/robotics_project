@@ -28,7 +28,6 @@ class ekf_odom():
         Peforms EKF odometry
         
         The x,y,theta predict and v,omega predict and update is done in run 
-        
         """
         rospy.init_node('ekf_odom')
 
