@@ -19,7 +19,6 @@ tfBuffer = tf2_ros.Buffer(rospy.Duration(60))
 listener = tf2_ros.TransformListener(tfBuffer)
 
 def aruco_callback(msg):
-    rospy.loginfo('New aruco marker detected:\n%s', msg)
     
     stamp = msg.header.stamp
     frame_id = msg.header.frame_id
