@@ -57,7 +57,6 @@ class ekf_slam():
         
         # Var to store aruco belief 
         self.aruco_seen = set() # set to keep track of seen aruco markers
-        self.aruco_belif_buffer = defaultdict() # save latest aruco belif for each marker
         new_marker = defaultdict()
         new_marker['type'] = 'aruco'
         new_marker['x'] = 0
@@ -75,7 +74,7 @@ class ekf_slam():
 
         self.cov = np.zeros((3,3)) # covariance matrix of robot pose
         # base 0.2
-        self.Q = np.eye(2)*0.07
+        self.Q = np.eye(2)*0.01 # process noise covariance matrix
 
         # inital map to odom transform 
         self.odom = TransformStamped()
@@ -93,8 +92,8 @@ class ekf_slam():
         # Odometry var 
         self.buffer = [] # buffer to store latest odometry messages, used to get most recent odometry message when aruco marker is seen
         self.latest_odom_time = rospy.Time.now() # time of latest odometry message
-        self.R = np.array([[0.0000001, 0,0],
-                                [0, 0.0000001, 0], [0,0,0.000000001]])
+        self.R = np.array([[0.000001, 0,0],
+                                [0, 0.000001, 0], [0,0,0.000000001]])
                 
                 
                 
@@ -110,6 +109,9 @@ class ekf_slam():
         """
         for marker in msg.markers:
             
+            if self.anchor_id in [marker.id for marker in msg.markers] and marker.id != self.anchor_id:
+                continue
+            
             # check if aruco marker is to far away from robot
             try:
                 t_robot_aruco = self.tfBuffer.lookup_transform("base_link", "aruco/detected" + str(marker.id),rospy.Time(0))
@@ -118,12 +120,15 @@ class ekf_slam():
                 continue
             
             dist_to_robot = np.sqrt(t_robot_aruco.transform.translation.x**2 + t_robot_aruco.transform.translation.y**2 + t_robot_aruco.transform.translation.z**2)
-            threshold = 3.0
+            threshold = 2.0
             if dist_to_robot > threshold:
                 continue
             
             
-            
+            # if time since latest reading is over threshold
+            if rospy.Time.now().to_sec() - self.latest_time.to_sec() < self.time_threshold:                
+                continue
+
             
             
 
@@ -140,9 +145,6 @@ class ekf_slam():
             if not self.slam_ready:
                 continue
 
-            # if time since latest reading is over threshold
-            if rospy.Time.now().to_sec() - self.latest_time.to_sec() < self.time_threshold:                
-                continue
 
             # if survived this far, update slam
             self.latest_time = rospy.Time.now()
@@ -165,29 +167,34 @@ class ekf_slam():
 
             # make sure if first measurement, then update aruco belief buffer and add to aruco seen set
             if self.aruco_belif_buffer[marker.id]['first_measurement']:
+                
+                rospy.loginfo("First measurement of aruco marker: " + str(marker.id))
                 self.aruco_seen.add(marker.id)
-                self.aruco_belif_buffer[marker.id]['first_measurement'] = False
-                self.aruco_belif_buffer[marker.id]['x'] = aruco_m.transform.translation.x
-                self.aruco_belif_buffer[marker.id]['y'] = aruco_m.transform.translation.y
-                self.aruco_belif_buffer[marker.id]['z'] = aruco_m.transform.translation.z
-                self.aruco_belif_buffer[marker.id]['q0'] = aruco_m.transform.rotation.x
-                self.aruco_belif_buffer[marker.id]['q1'] = aruco_m.transform.rotation.y
-                self.aruco_belif_buffer[marker.id]['q2'] = aruco_m.transform.rotation.z
-                self.aruco_belif_buffer[marker.id]['q3'] = aruco_m.transform.rotation.w
-
+                new_mark = defaultdict()
+                new_mark['first_measurement'] = False
+                new_mark['x'] = aruco_m.transform.translation.x
+                new_mark['y'] = aruco_m.transform.translation.y
+                new_mark['z'] = aruco_m.transform.translation.z
+                new_mark['q0'] = aruco_m.transform.rotation.x
+                new_mark['q1'] = aruco_m.transform.rotation.y
+                new_mark['q2'] = aruco_m.transform.rotation.z
+                new_mark['q3'] = aruco_m.transform.rotation.w
+                new_mark['covariance'] = np.eye(2)*100000000000000000000 # high covariance, robot will pin the marker to its location when seen next time
+                self.aruco_belif_buffer[marker.id] = new_mark
 
             # edge case, if anchor is seen, set anchor belief to 0,0,0,0,0,0,1 even if anchor is not first measurement
             if marker.id == self.anchor_id:
-                self.aruco_belif_buffer[marker.id]['first_measurement'] = False
-                self.aruco_belif_buffer[marker.id]['x']  = 0 
-                self.aruco_belif_buffer[marker.id]['y']  = 0 
-                self.aruco_belif_buffer[marker.id]['z']  = 0 
-                self.aruco_belif_buffer[marker.id]['q0'] = 0
-                self.aruco_belif_buffer[marker.id]['q1'] = 0
-                self.aruco_belif_buffer[marker.id]['q2'] = 0
-                self.aruco_belif_buffer[marker.id]['q3'] = 1
-                self.aruco_belif_buffer[marker.id]['covariance'] = np.eye(2)*0
-
+                new_mark = defaultdict()
+                new_mark['first_measurement'] = False
+                new_mark['x']  = 0 
+                new_mark['y']  = 0 
+                new_mark['z']  = 0 
+                new_mark['q0'] = 0
+                new_mark['q1'] = 0
+                new_mark['q2'] = 0
+                new_mark['q3'] = 1
+                new_mark['covariance'] = np.eye(2)*0
+                self.aruco_belif_buffer[marker.id] = new_mark
                                                                                              
             # measurement belief 
             mark_belif = self.aruco_belif_buffer[marker.id]
@@ -214,6 +221,8 @@ class ekf_slam():
             # Construct Fx
             aruco_seen_list = list(self.aruco_seen)
             # find index of marker.id in aruco_seen_list
+            rospy.loginfo(aruco_seen_list)
+            rospy.loginfo(self.aruco_belif_buffer[marker.id])
             j = aruco_seen_list.index(marker.id)
             Fx = np.zeros((4,2*N+2))
             Fx[0,0] = 1
@@ -299,7 +308,7 @@ class ekf_slam():
                 # update odom transform
                 map_odom = TransformStamped()
                 #self.odom.header.stamp = rospy.Time.now()
-                map_odom.frame_id = "map"
+                map_odom.header.frame_id = "map"
                 map_odom.child_frame_id = "odom"
                 map_odom.transform.translation.x = t_map_goal_map.transform.translation.x
                 map_odom.transform.translation.y = t_map_goal_map.transform.translation.y

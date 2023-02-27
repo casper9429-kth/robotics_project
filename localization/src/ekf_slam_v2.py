@@ -125,7 +125,10 @@ class ekf_slam():
             if dist_to_robot > threshold:
                 continue
             
-            
+            # if time since latest reading is over threshold
+            if rospy.Time.now().to_sec() - self.latest_time.to_sec() < self.time_threshold:                
+                continue
+
             
             
             
@@ -159,13 +162,14 @@ class ekf_slam():
                 self.odom.transform.translation.y = t_map_goal_map.transform.translation.y
                 self.odom.transform.translation.z = t_map_goal_map.transform.translation.z
                 
-                # 
+                # normalize quaternion with high precision                 
                 q = [t_map_goal_map.transform.rotation.x,t_map_goal_map.transform.rotation.y,t_map_goal_map.transform.rotation.z,t_map_goal_map.transform.rotation.w]
-                q = q / np.linalg.norm(q)
-                self.odom.transform.rotation.x = q[0]# t_map_goal_map.transform.rotation.x
-                self.odom.transform.rotation.y = q[1]# t_map_goal_map.transform.rotation.y
-                self.odom.transform.rotation.z = q[2]# t_map_goal_map.transform.rotation.z
-                self.odom.transform.rotation.w = q[3]# t_map_goal_map.transform.rotation.w
+                q = np.divide(q, np.linalg.norm(q)) 
+                
+                self.odom.transform.rotation.x =  q[0]# t_map_goal_map.transform.rotation.x
+                self.odom.transform.rotation.y =  q[1]# t_map_goal_map.transform.rotation.y
+                self.odom.transform.rotation.z =  q[2]# t_map_goal_map.transform.rotation.z
+                self.odom.transform.rotation.w =  q[3]# t_map_goal_map.transform.rotation.w
                 self.sbr.sendTransform(self.odom)
                 
                 
@@ -181,9 +185,6 @@ class ekf_slam():
             if not self.slam_ready:
                 continue
 
-            # if time since latest reading is over threshold
-            if rospy.Time.now().to_sec() - self.latest_time.to_sec() < self.time_threshold:                
-                continue
 
             # if survived this far, update slam
             self.latest_time = rospy.Time.now()
@@ -203,6 +204,8 @@ class ekf_slam():
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                 rospy.loginfo(e)
                 continue
+
+            self.aruco_seen.add(marker.id)
 
             # make sure if first measurement, then update aruco belief buffer and add to aruco seen set
             if self.aruco_belif_buffer[marker.id]['first_measurement']:
@@ -235,6 +238,7 @@ class ekf_slam():
 
 
             # Construct Fx
+            rospy.loginfo(self.aruco_seen)
             aruco_seen_list = list(self.aruco_seen)
             # find index of marker.id in aruco_seen_list
             j = aruco_seen_list.index(marker.id)
