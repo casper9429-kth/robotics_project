@@ -249,12 +249,14 @@ class PathTracker():
 
 
     def spin(self):
+        #print(self.goal.pose)
+        #print(self.check_if_in_fence(self.goal.pose))
         if self.check_if_in_fence(self.goal.pose):
             #print('In fence')
             self.transforms()
             self.math()
         else:
-            print('Not in fence')
+            print('Goal Pose not inside workspace')
             self.move.linear.x = 0.0
             self.move.angular.z = 0.0
             self.cmd_pub.publish(self.move)
