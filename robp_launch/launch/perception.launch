@@ -11,7 +11,11 @@
     <include file="$(find teleop_twist_joy)/launch/teleop.launch" />
 
 	<!-- Include realsense2_camera -->
-	<include file="$(find robp_launch)/launch/rs_camera.launch" />
+
+	<include file="$(find robp_launch)/launch/rs_camera.launch">
+      <arg name="align_depth" value="true"/>
+    </include>
+	<!-- https://github.com/IntelRealSense/realsense-ros/issues/714 -->
 
 	<!-- run the motors -->
     <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
@@ -43,9 +47,6 @@
 		<param name="reference_frame"    value="camera_color_optical_frame"/>
 		<param name="camera_frame"       value="camera_color_optical_frame"/>
 	</node>
-
-	<param name="robot_description" command="$(find xacro)/xacro --inorder '$(find realsense2_description)/urdf/test_d435_camera.urdf.xacro' use_nominal_extrinsics:=false"/>
-	
 
 
 </launch>
