@@ -28,6 +28,8 @@
 	<!-- run aruco detection -->
 	<node name="display_markers" pkg="detection" type="display_markers.py" output='screen'/>
 
+	<node name="object_classifier" pkg="detection" type="object_classification.py" output='screen'/>
+
 	<!-- run rviz -->
 	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/odometry.rviz" />
 
