@@ -47,7 +47,7 @@ class Object_classifier():
 
         self.mapping = ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie", "Cube", "Sphere"]
 
-        #self.count = 0
+        self.count = 0
         
         
 
@@ -55,8 +55,7 @@ class Object_classifier():
         
     def image_callback(self, msg): 
         """Callback function for the topic"""
-        rospy.loginfo("image received")
-
+       
         try:
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
             np_arr = np.asarray(cv_image)
@@ -66,12 +65,12 @@ class Object_classifier():
         except CvBridgeError as e:
             print(e)
 
-        (rows,cols,channels) = cv_image.shape
-        if cols > 60 and rows > 60 :
-            cv2.circle(cv_image, (50,50), 10, 255)
+        # (rows,cols,channels) = cv_image.shape
+        # if cols > 60 and rows > 60 :
+        #     cv2.circle(cv_image, (50,50), 10, 255)
 
-            cv2.imshow("Image window", cv_image)
-            cv2.waitKey(3)
+        #     cv2.imshow("Image window", cv_image)
+        #     cv2.waitKey(3)
 
         
        
@@ -106,13 +105,11 @@ class Object_classifier():
             out = self.detector(test_image).cpu()
             bbs = self.detector.decode_output(out, 0.5)
             # rospy.loginfo(bbs)
-            # if self.count % 15 == 0:
+            # if self.count % 40 == 0:
             #     image1 = ImageDraw.Draw(image)
             #     for bb in bbs[0]:
             #         shape = [(bb["x"], bb["y"]), ( bb["x"]+bb["width"], bb["y"]+bb["height"])]
             #         image1.rectangle(shape, outline ="red")
-            #         rospy.loginfo("category =")
-            #         rospy.loginfo(bb["category"])
             #     image.show()
 
             # self.count+=1
