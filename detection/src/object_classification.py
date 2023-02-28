@@ -15,6 +15,7 @@ import numpy as np
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
 from detection.msg import BoundingBox
+# import time
 
 class Object_classifier():
 
@@ -46,7 +47,6 @@ class Object_classifier():
         self.bridge = CvBridge()
 
         self.mapping = ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie", "Cube", "Sphere"]
-
         #self.count = 0
         
         
@@ -55,26 +55,18 @@ class Object_classifier():
         
     def image_callback(self, msg): 
         """Callback function for the topic"""
-        rospy.loginfo("image received")
 
         try:
+            # t0 = time.time()
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
             np_arr = np.asarray(cv_image)
             im = pil_image.fromarray(np_arr)
             self.compute_bb(im, msg.header.stamp, msg.header.frame_id)
+            
 
         except CvBridgeError as e:
             print(e)
 
-        (rows,cols,channels) = cv_image.shape
-        if cols > 60 and rows > 60 :
-            cv2.circle(cv_image, (50,50), 10, 255)
-
-            cv2.imshow("Image window", cv_image)
-            cv2.waitKey(3)
-
-        
-       
 
 
     def load_model(self,model: torch.nn.Module, path: str, device: str) -> torch.nn.Module:
@@ -94,7 +86,7 @@ class Object_classifier():
 
 
 
-    def compute_bb(self,image, stamp, frame_id): # Do main stuff here    
+    def compute_bb(self,image, stamp, frame_id):     
         
         test_images = []
         torch_image, _  = self.detector.input_transform(image, [])
@@ -106,7 +98,7 @@ class Object_classifier():
             out = self.detector(test_image).cpu()
             bbs = self.detector.decode_output(out, 0.5)
             # rospy.loginfo(bbs)
-            # if self.count % 15 == 0:
+            # if self.count % 40 == 0:
             #     image1 = ImageDraw.Draw(image)
             #     for bb in bbs[0]:
             #         shape = [(bb["x"], bb["y"]), ( bb["x"]+bb["width"], bb["y"]+bb["height"])]
@@ -129,6 +121,8 @@ class Object_classifier():
                 bb_msg.category_id = bb["category"]
                 bb_msg.category_name = self.mapping[bb["category"]]
                 self.bb_pub.publish(bb_msg)
+                # tinfer = time.time() - t0
+                # rospy.loginfo(tinfer)
 
 
 
