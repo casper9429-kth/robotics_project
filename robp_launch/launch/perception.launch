@@ -11,7 +11,7 @@
     <include file="$(find teleop_twist_joy)/launch/teleop.launch" />
 
 	<!-- Include realsense2_camera -->
-	<include file="$(find robp_launch)/include/rs_camera.launch" />
+	<include file="$(find robp_launch)/launch/rs_camera.launch" />
 
 	<!-- run the motors -->
     <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
@@ -20,7 +20,7 @@
 	<node name="arm_camera" pkg="arm_camera" type="arm_camera.py" output='screen'/>
 
 	<!-- run odometry -->
-	<node name="odometry" pkg="odometry" type="odometry.py" output='screen'/>
+	<node name="odometry" pkg="odometry" type="ekf_odom.py" output='screen'/>
 
 	<!-- run detection -->
 	<!-- <node name="detection" pkg="detection" type="detection.py" output='screen'/> -->

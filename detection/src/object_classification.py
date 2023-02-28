@@ -55,7 +55,6 @@ class Object_classifier():
         
     def image_callback(self, msg): 
         """Callback function for the topic"""
-
         try:
             # t0 = time.time()
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
@@ -103,8 +102,6 @@ class Object_classifier():
             #     for bb in bbs[0]:
             #         shape = [(bb["x"], bb["y"]), ( bb["x"]+bb["width"], bb["y"]+bb["height"])]
             #         image1.rectangle(shape, outline ="red")
-            #         rospy.loginfo("category =")
-            #         rospy.loginfo(bb["category"])
             #     image.show()
 
             # self.count+=1
