@@ -3,7 +3,7 @@ import rospy
 
 
 class Node_name():
-    def __init__(self) -> None:
+    def __init__(self):
         """ Put the node name here, and description of the node"""
         rospy.init_node('Node_name')
 

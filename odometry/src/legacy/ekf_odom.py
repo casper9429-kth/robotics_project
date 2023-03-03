@@ -6,8 +6,6 @@
 import rospy
 from tf2_geometry_msgs import PoseStamped
 #from tf2_geometry_msgs import TransformStamped
-from tf2_geometry_msgs import PoseStamped
-#from tf2_geometry_msgs import TransformStamped
 from geometry_msgs.msg import TransformStamped
 from robp_msgs.msg import Encoders
 import tf_conversions
@@ -22,12 +20,6 @@ from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray
 from std_msgs.msg import Bool
 from collections import defaultdict
-# from geometry_msgs.msg import PoseStamped
-
-# EKF Aruco Slam, v,omega fusion, odometry in one script
-# This node pefors EKF Aruco Slam with odometry, v,omega fusion 
-# When the aruco marker with id 3 is seen, the odom is set to the center of the map
-
 
 
 class ekf_odom():
@@ -36,6 +28,7 @@ class ekf_odom():
         Peforms EKF odometry
         
         The x,y,theta predict and v,omega predict and update is done in run 
+        
         """
         rospy.init_node('ekf_odom')
 
@@ -98,7 +91,6 @@ class ekf_odom():
         # Time var
         self.last_time = rospy.Time.now().to_sec()
         self.current_time_sec = rospy.Time.now().to_sec()
-        self.current_time_sec = rospy.Time.now().to_sec()
 
         
 
@@ -106,15 +98,12 @@ class ekf_odom():
     def main(self): # Do main stuff here    
         """
         Main loop, instead of changing run function
-        Main loop, instead of changing run function
         write your code here to make it more readable.
         """
         
         
         ########## Init state v,omega:  sensor fusion ##########
-        ########## Init state v,omega:  sensor fusion ##########
         if self.count == 0:
-            self.init_sensor_fusion()
             self.init_sensor_fusion()
             return
         
