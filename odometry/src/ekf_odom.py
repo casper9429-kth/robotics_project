@@ -46,7 +46,7 @@ class ekf_odom():
                                           
         # Publish the map and the odometry
         self.odom_pub = rospy.Publisher("odom", Odometry, queue_size=50)
-        self.odom_slam_pub = rospy.Publisher("odom_slam", Odometry, queue_size=50)
+        self.odom_slam_pub = rospy.Publisher("odom_slam", Odometry, queue_size=50) # remove
         
 
 
@@ -106,15 +106,12 @@ class ekf_odom():
     def main(self): # Do main stuff here    
         """
         Main loop, instead of changing run function
-        Main loop, instead of changing run function
         write your code here to make it more readable.
         """
         
         
         ########## Init state v,omega:  sensor fusion ##########
-        ########## Init state v,omega:  sensor fusion ##########
         if self.count == 0:
-            self.init_sensor_fusion()
             self.init_sensor_fusion()
             return
         
@@ -143,7 +140,7 @@ class ekf_odom():
         self.current_time_sec = self.current_time.to_sec()
         self.dt = self.current_time_sec - self.last_time
         ## Time warning
-        if self.dt > self.update_dt*1.2:
+        if self.dt > self.update_dt*1.2 and self.debug:
             rospy.logwarn("refresh rate to high: %f", self.dt)
             rospy.logwarn("refresh rate should be: %f", self.update_dt)
 

@@ -33,7 +33,8 @@ class ekf_slam():
         self.br = tf2_ros.TransformBroadcaster()
         self.sbr = tf2_ros.StaticTransformBroadcaster()
 
-        # sleep, inital to let the system settle
+        # sleep, initial to let the system settle
+        # investigate if possible to wait for the bottleneck system to start TODO
         rospy.sleep(2)
         
         # Robot parameters
@@ -42,6 +43,7 @@ class ekf_slam():
         self.base = 0.3 
 
         # Slam parameters
+        # extend to flag as service TODO
         self.latest_time = rospy.Time.now()
         self.slam_ready = False
 
@@ -51,13 +53,13 @@ class ekf_slam():
             self.anchor_id = 500
 
 
-
+        self.aruco_dist_threshold = 2.0 #m
         self.time_threshold = 0.5 #s
 
         
         # Var to store aruco belief 
         self.aruco_seen = set() # set to keep track of seen aruco markers
-        new_marker = defaultdict()
+        new_marker = defaultdict() # replace bt dict TODO
         new_marker['type'] = 'aruco'
         new_marker['x'] = 0
         new_marker['y'] = 0
@@ -70,7 +72,7 @@ class ekf_slam():
         new_marker['first_measurement'] = True
         new_marker['theta'] =  0# tf.transformations.euler_from_quaternion([new_aruco.transform.rotation.x,new_aruco.transform.rotation.y,new_aruco.transform.rotation.z,new_aruco.transform.rotation.w])[2]
         new_marker['covariance'] = np.eye(2)*100000000000000000000000000000000000000 # high covariance, robot will pin the marker to its location when seen next time
-        self.aruco_belif_buffer = defaultdict(lambda: new_marker) 
+        self.aruco_belif_buffer = defaultdict(lambda: new_marker) # copy of new?marker to not overwrite the same dict for all markers TODO 
 
         self.cov = np.zeros((3,3)) # covariance matrix of robot pose
         # base 0.2
@@ -93,7 +95,8 @@ class ekf_slam():
         self.buffer = [] # buffer to store latest odometry messages, used to get most recent odometry message when aruco marker is seen
         self.latest_odom_time = rospy.Time.now() # time of latest odometry message
         self.R = np.array([[0.000001, 0,0],
-                                [0, 0.000001, 0], [0,0,0.000000001]])
+                            [0, 0.000001, 0],
+                            [0,0,0.000000001]])
                 
                 
                 
@@ -109,38 +112,29 @@ class ekf_slam():
         """
         for marker in msg.markers:
             
+            # if anchor is seen as the same time as other markers, don't run slam on the other ones
             if self.anchor_id in [marker.id for marker in msg.markers] and marker.id != self.anchor_id:
                 continue
             
-            # check if aruco marker is to far away from robot
+            # check if aruco marker is too far away from robot
             try:
                 t_robot_aruco = self.tfBuffer.lookup_transform("base_link", "aruco/detected" + str(marker.id),rospy.Time(0))
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                 rospy.loginfo(e)
                 continue
-            
             dist_to_robot = np.sqrt(t_robot_aruco.transform.translation.x**2 + t_robot_aruco.transform.translation.y**2 + t_robot_aruco.transform.translation.z**2)
-            threshold = 2.0
-            if dist_to_robot > threshold:
+            if dist_to_robot > self.aruco_dist_threshold:
                 continue
-            
             
             # if time since latest reading is over threshold
             if rospy.Time.now().to_sec() - self.latest_time.to_sec() < self.time_threshold:                
-                continue
-
-            
-            
-
-            
+                continue # maybe change to return TODO
             
             # if anchor is seen, allow slam
             if marker.id == self.anchor_id:
                 # set slam ready
                 self.slam_ready = True
                                                 
-
-
             # if allow slam
             if not self.slam_ready:
                 continue
@@ -159,7 +153,7 @@ class ekf_slam():
             
             
             # Lookup measurement transform in map
-            try:
+            try: # change m,r,b to full name TODO
                 aruco_m = self.tfBuffer.lookup_transform("map", "aruco/detected" + str(marker.id), rospy.Time(0))                
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                 rospy.loginfo(e)
@@ -183,7 +177,7 @@ class ekf_slam():
 
             # edge case, if anchor is seen, set anchor belief to 0,0,0,0,0,0,1 even if anchor is not first measurement
             if marker.id == self.anchor_id:
-                new_mark = defaultdict()
+                new_mark = defaultdict() # ordinary dict TODO
                 new_mark['first_measurement'] = False
                 new_mark['x']  = 0 
                 new_mark['y']  = 0 
@@ -192,15 +186,15 @@ class ekf_slam():
                 new_mark['q1'] = 0
                 new_mark['q2'] = 0
                 new_mark['q3'] = 1
-                new_mark['covariance'] = np.eye(2)*0
+                new_mark['covariance'] = np.eye(2)*0 # change to np.zeros TODO
                 self.aruco_belif_buffer[marker.id] = new_mark
                                                                                              
-            # measurement belief 
+            # measurement belief , speeling belief TODO
             mark_belif = self.aruco_belif_buffer[marker.id]
             m_b = [mark_belif['x'],mark_belif['y']]
             m_b_c = mark_belif['covariance']            
 
-            # measurement belief            
+            # measurement, marker measurement fix TODO            
             m_m = [aruco_m.transform.translation.x, aruco_m.transform.translation.y]
             
 
@@ -281,7 +275,7 @@ class ekf_slam():
                 marker_pose = TransformStamped()
                 marker_pose.header.stamp = rospy.Time.now()
                 marker_pose.header.frame_id = "map"
-                marker_pose.child_frame_id = "marker_belif_" + str(id)
+                marker_pose.child_frame_id = "marker_belief_" + str(id)
                 marker_pose.transform.translation.x = self.aruco_belif_buffer[id]['x']
                 marker_pose.transform.translation.y = self.aruco_belif_buffer[id]['y']
                 marker_pose.transform.translation.z = self.aruco_belif_buffer[id]['z']
@@ -377,7 +371,7 @@ class ekf_slam():
                     rospy.loginfo(e)
                     return
                 
-                ## publish the transform from map to des_odom to odom, make it static
+                ## publish the transform from map to de new_odom = defaultdict()s_odom to odom, make it static
                 self.odom_belif = TransformStamped()
                 self.odom_belif.header.frame_id = "map"
                 self.odom_belif.child_frame_id = "odom"
@@ -411,7 +405,7 @@ class ekf_slam():
         self.cov = self.calc_odom_sigma_bel(dt,x_belif,y_belif,theta_belif,v,omega,t,self.cov,self.R)        
         
         # Save the data 
-        new_odom = defaultdict()
+        new_odom = defaultdict() # change to dict TODO
         new_odom['type'] = "odometry"
         new_odom['x'] = x_belif
         new_odom['y'] = y_belif
