@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import rospy
-from detection.msg import BoundingBox
+from detection.msg import BoundingBox, BoundingBoxArray
+import tf2_ros
+from tf2_geometry_msgs import  PointStamped
+from geometry_msgs.msg import TransformStamped, Point, Quaternion
 
 class Object_computations():
     def __init__(self):
@@ -8,7 +11,7 @@ class Object_computations():
         rospy.init_node('object_computations')
 
         # Subscribers 
-        self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBox, self.bb_callback)
+        self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBoxArray, self.bb_callback)
         
         # Publisher
         # self.message_pub = rospy.Publisher("topic", type, queue_size=10)
@@ -19,18 +22,58 @@ class Object_computations():
         # self.rate = rospy.Rate(self.update_rate) 
 
         # Tf 
-        # self.tf_buffer = tf2_ros.Buffer()
-        # self.br = tf2_ros.TransformBroadcaster()
-        # self.listner = tf2_ros.TransformListener(self.tf_buffer)
+        
+        self.tfBuffer = tf2_ros.Buffer(rospy.Duration(60))
+        listener = tf2_ros.TransformListener(self.tfBuffer)
 
         # Paramethers HERE
 
     ###### All your callbacks here ######
         
-    def bb_callback(self): 
+    def bb_callback(self, msg): 
         """Callback function for the topic"""
         # do callback stuff
-        pass
+        
+        
+        #rospy.loginfo('New object detected:\n%s', msg.category_name)
+        for bb in msg.bounding_boxes:
+            #stamp = msg.header.stamp
+            stamp = rospy.Time.now()
+            frame_id = msg.header.frame_id
+
+            #pose_map = PoseStamped()
+            pose_map = PointStamped()
+            pose_map.header.frame_id = frame_id
+            pose_map.header.stamp = stamp
+
+            point = Point(bb.bb_center.x, bb.bb_center.y, bb.bb_center.z)
+
+            pose_map.point = point
+            
+            try:
+                pose_map = self.tfBuffer.transform(pose_map, "map", rospy.Duration(1.0))
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                rospy.logwarn(e)
+                return   
+            
+
+            # Publish new tranform to object/detected
+            # Deals only with ONE object at the time
+            
+            br = tf2_ros.TransformBroadcaster()
+
+            t = TransformStamped()
+            t.header.frame_id = "map"
+            pose_map.point.z = 0
+            t.child_frame_id = "object/detected/"+bb.category_name
+
+            t.header.stamp = stamp
+            
+            
+            t.transform.rotation = Quaternion(0,0,0,1)
+            t.transform.translation = pose_map.point
+            br.sendTransform(t)
+
 
     def color_object(self):
         pass

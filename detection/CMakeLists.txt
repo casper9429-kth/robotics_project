@@ -56,6 +56,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   BoundingBox.msg
+  BoundingBoxArray.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -169,6 +170,7 @@ include_directories(
 catkin_install_python(PROGRAMS
   src/display_markers.py
   src/object_classification.py
+  src/object_computations.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

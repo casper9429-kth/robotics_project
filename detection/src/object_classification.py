@@ -15,7 +15,7 @@ from detection.detector import Detector
 import numpy as np
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
-from detection.msg import BoundingBox
+from detection.msg import BoundingBox, BoundingBoxArray
 # import time
 
 class Object_classifier():
@@ -31,7 +31,7 @@ class Object_classifier():
         self.sub_camera_info= rospy.Subscriber("/camera/color/camera_info", CameraInfo, self.camera_info_callback)  
         
         # Publisher
-        self.bb_pub = rospy.Publisher("/detection/bounding_boxes", BoundingBox, queue_size=10)
+        self.bb_pub = rospy.Publisher("/detection/bounding_boxes", BoundingBoxArray, queue_size=10)
         self.image_bb_pub = rospy.Publisher("/detection/image_with_bounding_boxes", Image, queue_size=10)
 
          # Define rate
@@ -67,7 +67,8 @@ class Object_classifier():
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
             np_arr = np.asarray(cv_image)
             im = pil_image.fromarray(np_arr)
-            self.compute_bb(im, msg.header.stamp, msg.header.frame_id, self.depth, cv_image) 
+            if self.depth is not None:
+                self.compute_bb(im, msg.header.stamp, msg.header.frame_id, self.depth, cv_image) 
 
         except CvBridgeError as e:
             print(e)
@@ -78,7 +79,6 @@ class Object_classifier():
             cv_image = self.bridge.imgmsg_to_cv2(msg, "16UC1")
             np_arr = np.asarray(cv_image)
             self.depth = np_arr
-            
 
         except CvBridgeError as e:
             print(e)
@@ -130,21 +130,24 @@ class Object_classifier():
             bbs = self.detector.decode_output(out, 0.5)
 
             #publish bb
+            
+            bb_list_msg = BoundingBoxArray()
+            bb_list_msg.header.stamp = stamp
+            #bb_list_msg.header.frame_id = frame_id
+            bb_list_msg.header.frame_id = "camera_depth_optical_frame"
+            #camera_color_optical_frame
+            
             for bb in bbs[0]:
                 
                 x = int(bb["x"])
                 y = int(bb["y"])
                 bb_msg = BoundingBox()
-                bb_msg.header.stamp = stamp
-                bb_msg.header.frame_id = frame_id
                 bb_msg.x = x
                 bb_msg.y = y
                 bb_msg.width = bb["width"]
                 bb_msg.height = bb["height"]
                 bb_msg.category_id = bb["category"]
                 bb_msg.category_name = self.mapping[bb["category"]]
-                
-                
                 
                 start_point = (x, y)
                 end_point = (int(x+bb["width"]), int(y+bb["height"]))
@@ -169,7 +172,9 @@ class Object_classifier():
                 point.y = y
                 point.z = depth
                 bb_msg.bb_center = point
-                self.bb_pub.publish(bb_msg)
+                bb_list_msg.bounding_boxes.append(bb_msg)
+            
+            self.bb_pub.publish(bb_list_msg)
                 
               
                 # tinfer = time.time() - t0
@@ -178,13 +183,14 @@ class Object_classifier():
 
 
     def compute_point(self, depth, bb, depth_image):
-        depth = depth_image[int(bb["y"]+bb["width"]/2), int(bb["x"]+bb["height"]/2)]
+        depth = depth_image[int(bb["y"]+bb["width"]/2), int(bb["x"]+bb["height"]/2)]/1000
 
         x=0
         y=0
         if self.camera_info is not None:      
             x = depth*(int(bb["x"]) - self.camera_info[2]) / self.camera_info[0] 
             y = depth*(int(bb["y"]) - self.camera_info[3]) / self.camera_info[1]
+        
         
         return x, y, depth
 
