@@ -12,36 +12,19 @@ class Object_computations():
 
         # Subscribers 
         self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBoxArray, self.bb_callback)
-        
-        # Publisher
-        # self.message_pub = rospy.Publisher("topic", type, queue_size=10)
-
-        # Define rate
-        # self.update_rate = 10 # [Hz] Change this to the rate you want
-        # self.update_dt = 1.0/self.update_rate # [s]
-        # self.rate = rospy.Rate(self.update_rate) 
 
         # Tf 
-        
         self.tfBuffer = tf2_ros.Buffer(rospy.Duration(60))
         listener = tf2_ros.TransformListener(self.tfBuffer)
-
-        # Paramethers HERE
-
-    ###### All your callbacks here ######
         
     def bb_callback(self, msg): 
-        """Callback function for the topic"""
-        # do callback stuff
-        
         
         #rospy.loginfo('New object detected:\n%s', msg.category_name)
         for bb in msg.bounding_boxes:
-            #stamp = msg.header.stamp
+            #stamp = msg.header.stamp # This generate an annoying warning in the terminal but would be better!
             stamp = rospy.Time.now()
             frame_id = msg.header.frame_id
-
-            #pose_map = PoseStamped()
+            
             pose_map = PointStamped()
             pose_map.header.frame_id = frame_id
             pose_map.header.stamp = stamp
@@ -57,9 +40,7 @@ class Object_computations():
                 return   
             
 
-            # Publish new tranform to object/detected
-            # Deals only with ONE object at the time
-            
+            # Publish new tranform to object/detected/category_name : do not deal with several objects at the same time
             br = tf2_ros.TransformBroadcaster()
 
             t = TransformStamped()
@@ -69,18 +50,9 @@ class Object_computations():
 
             t.header.stamp = stamp
             
-            
             t.transform.rotation = Quaternion(0,0,0,1)
             t.transform.translation = pose_map.point
             br.sendTransform(t)
-
-
-    def color_object(self):
-        pass
-
-    def main(self): 
-
-        pass
 
 
 

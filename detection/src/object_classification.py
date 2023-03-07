@@ -25,7 +25,6 @@ class Object_classifier():
         rospy.init_node('object_classifier')
 
         # Subscribers 
-        # Or use compressed image?
         self.sub_image = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback) 
         self.sub_depth= rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image, self.depth_image_callback)
         self.sub_camera_info= rospy.Subscriber("/camera/color/camera_info", CameraInfo, self.camera_info_callback)  
@@ -39,12 +38,11 @@ class Object_classifier():
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
 
-        # Paramethers HERE
-
+        # Paramethers 
         self.device = "cuda"
         self.detector = Detector().to(self.device)
-        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-02-18_15-46-29-649082.pt"
-        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-02-18_15-46-29-649082.pt"
+        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-02-18_15-46-29-649082.pt" #for robot
+        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-02-18_15-46-29-649082.pt" #for computer
         model= self.load_model(self.detector, model_path, self.device)
         self.detector.eval()
 
@@ -54,9 +52,6 @@ class Object_classifier():
         self.depth = None
         
         self.camera_info = [None, None, None, None]
-
-        
-        
 
 
         
@@ -90,7 +85,6 @@ class Object_classifier():
         self.camera_info[1] = msg.K[4] #fy
         self.camera_info[2] = msg.K[2] #cx
         self.camera_info[3] = msg.K[5] #cy
-        
         
         # **Intrinsic camera matrix for the raw (distorted) images.**
             #      [fx  0 cx]
@@ -129,13 +123,11 @@ class Object_classifier():
             out = self.detector(test_image).cpu()
             bbs = self.detector.decode_output(out, 0.5)
 
-            #publish bb
             
             bb_list_msg = BoundingBoxArray()
             bb_list_msg.header.stamp = stamp
             #bb_list_msg.header.frame_id = frame_id
-            bb_list_msg.header.frame_id = "camera_depth_optical_frame"
-            #camera_color_optical_frame
+            bb_list_msg.header.frame_id = "camera_depth_optical_frame" # seems to be better but map is not at the good spot rn
             
             for bb in bbs[0]:
                 
@@ -149,20 +141,16 @@ class Object_classifier():
                 bb_msg.category_id = bb["category"]
                 bb_msg.category_name = self.mapping[bb["category"]]
                 
+                # visualize image with bb in Rviz
                 start_point = (x, y)
                 end_point = (int(x+bb["width"]), int(y+bb["height"]))
                 color = (255, 0, 0)
                 thickness = 2
-                
-                
-                # visualize image with bb
                 cv_image = cv2.rectangle(cv_image, start_point, end_point, color, thickness)
                 cv_image = cv2.putText(cv_image, self.mapping[bb["category"]], (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 
                    1, color, thickness, cv2.LINE_AA)
                 imgMsg = self.bridge.cv2_to_imgmsg(cv_image, "rgb8")
                 self.image_bb_pub.publish(imgMsg)
-                
-                
                 
                 
                 # Call function to compute point and depth
@@ -175,10 +163,9 @@ class Object_classifier():
                 bb_list_msg.bounding_boxes.append(bb_msg)
             
             self.bb_pub.publish(bb_list_msg)
-                
               
-                # tinfer = time.time() - t0
-                # rospy.loginfo(tinfer)
+            # tinfer = time.time() - t0
+            # rospy.loginfo(tinfer)
 
 
 
