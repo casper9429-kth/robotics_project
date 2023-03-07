@@ -179,47 +179,6 @@ class PathTracker():
             print('No transform found')
                         
 
-    def pure_pursuit(self):
-            k = 0.4
-            L = 0.30 
-            z= 0.3
-            
-            angle_to_goal =  1 * math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
-            distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
-            robot_theta = tf.transformations.euler_from_quaternion([self.pose.pose.orientation.x, self.pose.pose.orientation.y, self.pose.pose.orientation.z, self.pose.pose.orientation.w])[2] 
-            goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
-            dtheta = goal_orientation - robot_theta
-            print(f'goal pos {self.goal_in_base_link.pose.position}')
-            v=k*distance
-            w=2*v*math.sin(angle_to_goal)/L
-            print(w)
-            self.move.linear.x = v
-            self.move.linear.x  = max(self.move.linear.x ,0.0)
-            self.move.linear.x  = min(self.move.linear.x ,self.max_speed) # max speed
-            
-            
-            self.move.angular.z= w
-            self.move.angular.z  = max(self.move.angular.z ,0.0)
-            self.move.angular.z  = min(self.move.angular.z ,self.max_angle) # max angular speed
-            
-            
-            
-            if distance<= self.in_goal_tolerance:
-                if abs(dtheta) >= self.orientaion_tolerance:
-                    self.move.linear.x = 0.0
-                    if dtheta >= 0:
-                        self.move.angular.z = self.angle_speed
-                        # print('rotating left')
-                    elif dtheta < 0:
-                        self.move.angular.z = -self.angle_speed
-                        # print('rotating right')
-                else:
-                    self.move.linear.x = 0.0
-                    self.move.angular.z = 0.0
-                    print('Goal orientation reached')
-                    
-                    
-            self.cmd_pub.publish(self.move)
 
 
         
@@ -295,7 +254,7 @@ class PathTracker():
         if self.check_if_in_fence(self.goal.pose):
             #print('In fence')
             self.transforms()
-            self.pure_pursuit()
+            self.math()
         else:
             print('Goal Pose not inside workspace')
             self.move.linear.x = 0.0
