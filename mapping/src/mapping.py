@@ -15,6 +15,12 @@ from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray
 from std_msgs.msg import Bool
 from collections import defaultdict
+from sensor_msgs.msg import PointCloud2
+from open3d import open3d as o3d
+from open3d_ros_helper import open3d_ros_helper as o3drh
+import pcl_ros
+from tf import TransformListener
+from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 
 # Mapping node
 
@@ -225,6 +231,12 @@ class GridMap():
         
         self.set_value_of_index(i,j,value)
 
+    def set_value_of_pose_array(self,pose_array,count,threshold=0):
+        for c,pose in zip(count,pose_array):
+            if c > threshold:
+                self.set_value_of_pos(pose[0],pose[1],1)            
+            
+        
 
     def get_OccupancyGrid(self):
         """
@@ -269,11 +281,8 @@ class Mapping():
         rospy.init_node('mapping')
 
         # Subscribers 
-        # self.sub_topic = rospy.Subscriber("topic", type, self.callback_topic)
         self.geo_fence_sub = rospy.Subscriber("/geofence/pose_array", PoseArray, self.callback_geofence)   
-
-        
-        
+        self.sub_goal = rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.cloud_callback)
         
         # Publisher
         self.OccupancyGrid_pub = rospy.Publisher("/occupancy_grid/walls", OccupancyGrid, queue_size=10)
@@ -287,14 +296,78 @@ class Mapping():
         self.tf_buffer = tf2_ros.Buffer()
         self.br = tf2_ros.TransformBroadcaster()
         self.listner = tf2_ros.TransformListener(self.tf_buffer)
+        self.tf_listner = TransformListener()
 
+        # Resolution
+        self.resolution = 0.05 # [m]
         
         # Robot pose in map frame [x,y,theta]
         self.robot_pose = [0,0,0]
         
         # define grid_map
-        resolution = 0.1 # [m]
-        self.grid_map = GridMap(resolution)
+        self.grid_map = GridMap(self.resolution)
+
+
+    def cloud_callback(self, msg: PointCloud2):
+
+        t1 = rospy.Time.now().to_sec()
+
+        # Wait for the transform from the pointcloud's frame to the target frame
+        target_frame = "map"
+        transform = self.tf_buffer.lookup_transform(target_frame, msg.header.frame_id, rospy.Time(0))
+
+        # Transform the pointcloud to the target frame
+        map_pc = do_transform_cloud(msg,transform)
+
+        # Convert ROS -> Open3D
+        cloud = o3drh.rospc_to_o3dpc(map_pc)
+        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -100.0, 0.0]), max_bound=np.array([100.0, 100.0, 0.9 ])))
+
+        # Downsample the point cloud to 1/10 of resolution 
+        ds_cloud = cropped.voxel_down_sample(voxel_size=self.resolution/10)
+
+        # # Convert Open3D -> NumPy
+        points = np.asarray(ds_cloud.points)
+        colors = np.asarray(ds_cloud.colors)
+
+        
+        # import points in to grid map 
+                
+        if len(points) == 0:
+            return
+        
+        # Get bbox
+        minx = np.min(points[:,0])
+        maxx = np.max(points[:,0])
+        miny = np.min(points[:,1])
+        maxy = np.max(points[:,1])
+        bbox = [minx, maxx, miny, maxy]    
+        
+        # Create grid with self.resolution and bbox
+        grid = np.zeros((int((maxx-minx)/self.resolution), int((maxy-miny)/self.resolution)))
+        
+        # Fill grid with points
+        points[:,0] = ((points[:,0] - minx)/self.resolution)
+        points[:,1] = ((points[:,1] - miny)/self.resolution)
+        # remove last dimension [:,2]
+        points = points[:,:2]
+        points = points.astype(int)
+        # Count number of identical points and save as dict
+
+        unique, counts = np.unique(points, axis=0, return_counts=True)
+
+        # Transform into points 
+        unique_points = np.zeros((len(unique),2))
+        unique_points[:,0] = unique[:,0]*self.resolution + minx
+        unique_points[:,1] = unique[:,1]*self.resolution + miny
+
+        rospy.loginfo(rospy.Time.now().to_sec() - t1)
+
+        self.grid_map.set_value_of_pose_array(unique_points, counts,10)
+        
+        rospy.loginfo(rospy.Time.now().to_sec() - t1)        
+        return
+
 
 
     def callback_geofence(self, msg):
