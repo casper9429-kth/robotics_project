@@ -46,7 +46,7 @@ class GridMap():
         self.resolution = resolution
         
         # map grid (tuples)
-        self.map_grid = defaultdict(lambda: 0)
+        self.map_grid = defaultdict(lambda: -1)
         
         # Geofence coord 
         self.given_geofence = False
@@ -76,7 +76,7 @@ class GridMap():
             for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
                 for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
                     if not self.is_point_in_polygon(x,y,self.geofence_list):
-                        self.map_grid[(i,j)] = 0
+                        self.map_grid[(i,j)] = -1
 
         # save new geofence
         self.geofence_list = self.geofence_list_new 
@@ -130,7 +130,15 @@ class GridMap():
     def update_robot_pose(self,msg):
         """Update robot pose, takes transformed stamped message as input"""
         self.robot_pose_time = msg.header.stamp
-        self.robot_pose = [msg.transform.translation.x, msg.transform.translation.y, tf.transformations.euler_from_quaternion([msg.transform.rotation.x, msg.transform.rotation.y, msg.transform.rotation.z, msg.transform.rotation.w])[2]]
+        self.robot_pose_new = [msg.transform.translation.x, msg.transform.translation.y, tf.transformations.euler_from_quaternion([msg.transform.rotation.x, msg.transform.rotation.y, msg.transform.rotation.z, msg.transform.rotation.w])[2]]
+
+        # add robot pose to map
+        if self.robot_pose != self.robot_pose_new:
+            self.set_value_of_pos(self.robot_pose[0],self.robot_pose[1],-1)
+            self.robot_pose = self.robot_pose_new
+            self.set_value_of_pos(self.robot_pose[0],self.robot_pose[1],1)
+        
+    
     
     
     def get_grid_map_raw(self):
@@ -228,21 +236,26 @@ class GridMap():
         
         occupancy_grid = OccupancyGrid()
         occupancy_grid.header.frame_id = "map"
+        occupancy_grid.header.stamp = rospy.Time.now()
         occupancy_grid.info.resolution = self.resolution
         occupancy_grid.info.width = int((self.bounding_box[1]-self.bounding_box[0])/self.resolution)
         occupancy_grid.info.height = int((self.bounding_box[3]-self.bounding_box[2])/self.resolution)
-        occupancy_grid.info.origin.position.x = 0
-        occupancy_grid.info.origin.position.y = 0
+        occupancy_grid.info.origin.position.x = self.bounding_box[0]
+        occupancy_grid.info.origin.position.y = self.bounding_box[2]
         occupancy_grid.info.origin.position.z = 0
         occupancy_grid.info.origin.orientation.x = 0
         occupancy_grid.info.origin.orientation.y = 0
         occupancy_grid.info.origin.orientation.z = 0
         occupancy_grid.info.origin.orientation.w = 1
+    
+
+
         
         occupancy_grid.data = []
         
-        for i in range(occupancy_grid.info.width):
-            for j in range(occupancy_grid.info.height):
+        for j in range(occupancy_grid.info.height):
+            for i in range(occupancy_grid.info.width):
+
                 occupancy_grid.data.append(self.get_value_of_index(i,j))
         
         return occupancy_grid
@@ -263,7 +276,7 @@ class Mapping():
         
         
         # Publisher
-        # self.message_pub = rospy.Publisher("topic", type, queue_size=10)
+        self.OccupancyGrid_pub = rospy.Publisher("/occupancy_grid/walls", OccupancyGrid, queue_size=10)
 
         # Define rate
         self.update_rate = 20 # [Hz] Change this to the rate you want
@@ -291,19 +304,6 @@ class Mapping():
 
 
 
-    # def callback_topic(self): 
-    #     """Callback function for the topic"""
-    #     # do callback stuff
-    #     pass
-
-    ###### All your other methods here #######
-
-    # def publish(self):
-    #     """Publish your messages here"""
-    # 
-    #     pass
-    #     # self.message_pub.publish('')
-
 
     def main(self): # Do main stuff here    
         """
@@ -318,7 +318,10 @@ class Mapping():
             rospy.logwarn(e)
                 
 
-
+        # if geofence is give
+        Occupancy_Grid = self.grid_map.get_OccupancyGrid()
+        if Occupancy_Grid != None:
+            self.OccupancyGrid_pub.publish(Occupancy_Grid)
         
 
     def run(self):
