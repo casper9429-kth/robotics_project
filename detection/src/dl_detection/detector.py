@@ -10,8 +10,10 @@ import torch
 import torch.nn as nn
 from PIL import Image, ImageDraw
 from torchvision import models, transforms
+from torchvision.ops import nms
+import albumentations as A
 
-
+import rospy
 
 class BoundingBox(TypedDict):
     """Bounding box dictionary.
@@ -118,11 +120,15 @@ class Detector(nn.Module):
                     np.unravel_index(flattened_indices.numpy(), o[4, :, :].shape)
                 ).T
 
+            boxes = []
+            scores = []
+
             # loop over all cells with bounding box center
             for bb_index in bb_indices:
+                
                 bb_coeffs = o[0:4, bb_index[0], bb_index[1]]
                 bb_category = torch.argmax(o[5:13, bb_index[0], bb_index[1]]).item()
-
+                
                 # decode bounding box size and position
                 width = self.img_width * abs(bb_coeffs[2].item())
                 height = self.img_height * abs(bb_coeffs[3].item())
@@ -145,7 +151,17 @@ class Detector(nn.Module):
                         "category": bb_category,
                     }
                 )
+                boxes.append([x,y,x+width, y+height])
+                scores.append(o[4, bb_index[0], bb_index[1]])
+
+            scores_tensor = torch.tensor(scores)
+            boxes_tensor = torch.tensor(boxes)
+            
+            nms_bbs = nms(boxes = boxes_tensor, scores = scores_tensor, iou_threshold=0.1)
+
+            img_bbs = [img_bbs[i] for i in nms_bbs]
             bbs.append(img_bbs)
+
 
         return bbs
 
@@ -184,13 +200,32 @@ class Detector(nn.Module):
             boxes = torch.Tensor(list(boxes))
             image, boxes = self.resize(image, boxes, (self.img_height, self.img_width),False)
 
-            
+            #image augmentation 
+            transform = A.Compose([
+                    A.GaussNoise(p=0.2),
+                    A.OneOf([
+                        A.MotionBlur(p=0.2),
+                        A.MedianBlur(blur_limit=3, p=0.1),
+                        A.Blur(blur_limit=3, p=0.1),
+                    ], p=0.2),
+                    A. OneOf([
+                        A.CLAHE(clip_limit=2),
+                        A.Sharpen(),
+                        A.RandomBrightnessContrast(),
+                    ], p=0.3),
+            ], p=0.3)
+
+            image = np.array(image)
+            transformed = transform(image=image)
+            image = transformed["image"]
+            image = Image.fromarray(image, 'RGB')
+
             for i in range(len(anns)):
                 x = boxes[i][0][0]
                 y = boxes[i][0][1]
                 width = boxes[i][0][2]
                 height = boxes[i][0][3]
-                # shape = [(x, y), (x +width, y+height)]
+                shape = [(x, y), (x +width, y+height)]
                 # image1 = ImageDraw.Draw(image) 
                 # image1.rectangle(shape, outline ="red")
                 # image.show()
@@ -228,40 +263,6 @@ class Detector(nn.Module):
             mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
         )(image)
 
-        # Convert bounding boxes to target format
-
-        # First two channels contain relativ x and y offset of bounding box center
-        # Channel 3 & 4 contain relative width and height, respectively
-        # Last channel is 1 for cell with bounding box center and 0 without
-
-        # If there is no bb, the first 4 channels will not influence the loss
-        # -> can be any number (will be kept at 0)
-        #target = torch.zeros(5, self.out_cells_y, self.out_cells_x)
-        # for i in range(anns):
-        #     x = boxes[i][0]
-        #     y = boxes[i][1]
-        #     width = boxes[i][2]
-        #     height = boxes[i][3]
-
-        #     x_center = x + width / 2.0
-        #     y_center = y + height / 2.0
-        #     x_center_rel = x_center / self.img_width * self.out_cells_x
-        #     y_center_rel = y_center / self.img_height * self.out_cells_y
-        #     x_ind = int(x_center_rel)
-        #     y_ind = int(y_center_rel)
-        #     x_cell_pos = x_center_rel - x_ind
-        #     y_cell_pos = y_center_rel - y_ind
-        #     rel_width = width / self.img_width
-        #     rel_height = height / self.img_height
-
-        #     # channels, rows (y cells), cols (x cells)
-        #     target[4, y_ind, x_ind] = 1
-
-        #     # bb size
-        #     target[0, y_ind, x_ind] = x_cell_pos
-        #     target[1, y_ind, x_ind] = y_cell_pos
-        #     target[2, y_ind, x_ind] = rel_width
-        #     target[3, y_ind, x_ind] = rel_height
         return image, target
 
     def resize(self, image, boxes, dims=(480, 640), return_percent_coords=True):
@@ -288,5 +289,3 @@ class Detector(nn.Module):
             return new_image, new_boxes
 
         return new_image
-
-    

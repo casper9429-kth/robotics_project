@@ -5,6 +5,8 @@ import tf2_ros
 from tf2_geometry_msgs import  PointStamped
 from geometry_msgs.msg import TransformStamped, Point, Quaternion
 
+
+
 class Object_computations():
     def __init__(self):
         """ Put the node name here, and description of the node"""
@@ -12,10 +14,14 @@ class Object_computations():
 
         # Subscribers 
         self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBoxArray, self.bb_callback)
-
+       
         # Tf 
         self.tfBuffer = tf2_ros.Buffer(rospy.Duration(60))
         listener = tf2_ros.TransformListener(self.tfBuffer)
+
+        # Parameters
+        
+
         
     def bb_callback(self, msg): 
         
@@ -54,6 +60,9 @@ class Object_computations():
             t.transform.translation = pose_map.point
             br.sendTransform(t)
 
+    
+
+        
 
 
 if __name__ == "__main__":

@@ -17,14 +17,17 @@ model_path = "det_2023-02-18_15-46-29-649082.pt"
 
 model= utils.load_model(detector, model_path, device)
 
-# load test images
-# these will be evaluated in regular intervals
 test_images = []
 directory = "./test_images2"
 if not os.path.exists(directory):
     os.makedirs(directory)
 for file_name in sorted(os.listdir(directory)):
     if file_name.endswith(".jpg"):
+        file_path = os.path.join(directory, file_name)
+        test_image = Image.open(file_path)
+        torch_image, _  = detector.input_transform(test_image, [])
+        test_images.append(torch_image)
+    if file_name.endswith(".jpeg"):
         file_path = os.path.join(directory, file_name)
         test_image = Image.open(file_path)
         torch_image, _  = detector.input_transform(test_image, [])

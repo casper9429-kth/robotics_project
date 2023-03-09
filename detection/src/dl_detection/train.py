@@ -251,7 +251,8 @@ def validate(
             for img_bbs in imgs_bbs:
                 for img_bb in img_bbs:
                     coco_pred.dataset["annotations"].append(
-                        {
+                        {   
+                            #"id": val_dataloader.dataset.coco.dataset["annotations"][ann_id]["id"],
                             "id": ann_id,
                             "bbox": [
                                 img_bb["x"],
@@ -260,17 +261,24 @@ def validate(
                                 img_bb["height"],
                             ],
                             "area": img_bb["width"] * img_bb["height"],
-                            "category_id": img_bb["category"],  # TODO replace with predicted category id
+                            "category_id": img_bb["category"],  
                             "score": img_bb["score"],
                             "image_id": val_dataloader.dataset.ids[image_id],
                         }
                     )
+                    
                     ann_id += 1
                 image_id += 1
+                
             count += len(val_img_batch) / BATCH_SIZE
         coco_pred.createIndex()
         coco_eval = COCOeval(val_dataloader.dataset.coco, coco_pred, iouType="bbox")
-        coco_eval.params.useCats = 1  # TODO replace with 1 when categories are added
+        #print("coco gt: ", val_dataloader.dataset.coco.dataset["annotations"])
+        #print("coco dt: ", coco_pred.dataset["annotations"])
+        # print("ids = ",val_dataloader.dataset.coco.dataset["annotations"][0]["id"])
+        # print("ids = ",val_dataloader.dataset.coco.dataset["annotations"][1]["id"])
+        # print("ids = ",val_dataloader.dataset.coco.dataset["annotations"][2]["id"])
+        coco_eval.params.useCats = 1 
         coco_eval.evaluate()
         coco_eval.accumulate()
         coco_eval.summarize()

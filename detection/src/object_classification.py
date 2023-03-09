@@ -2,7 +2,7 @@
 import rospy
 
 from typing import Dict, List
-from sensor_msgs.msg import Image, CameraInfo
+from sensor_msgs.msg import Image, CameraInfo, PointCloud2
 from geometry_msgs.msg import Point
 
 import matplotlib.patches as patches
@@ -18,6 +18,11 @@ import cv2
 from detection.msg import BoundingBox, BoundingBoxArray
 # import time
 
+from open3d import open3d as o3d
+from open3d_ros_helper import open3d_ros_helper as o3drh
+
+
+
 class Object_classifier():
 
     def __init__(self):
@@ -27,7 +32,9 @@ class Object_classifier():
         # Subscribers 
         self.sub_image = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback) 
         self.sub_depth= rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image, self.depth_image_callback)
-        self.sub_camera_info= rospy.Subscriber("/camera/color/camera_info", CameraInfo, self.camera_info_callback)  
+        self.sub_camera_info= rospy.Subscriber("/camera/color/camera_info", CameraInfo, self.camera_info_callback)
+        self.sub_cloud = rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.cloud_callback)
+  
         
         # Publisher
         self.bb_pub = rospy.Publisher("/detection/bounding_boxes", BoundingBoxArray, queue_size=10)
@@ -41,14 +48,18 @@ class Object_classifier():
         # Paramethers 
         self.device = "cuda"
         self.detector = Detector().to(self.device)
-        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-02-18_15-46-29-649082.pt" #for robot
-        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-02-18_15-46-29-649082.pt" #for computer
+        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-09_16-47-53-692698.pt" #for robot
+        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-09_16-47-53-692698.pt" #for computer
         model= self.load_model(self.detector, model_path, self.device)
         self.detector.eval()
+        
+        self.cloud = None
 
         self.bridge = CvBridge()
 
         self.mapping = ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie", "Cube", "Sphere"]
+        self.sub_mapping_cube = ["red cube", "green cube", "blue cube", "wooden cube"]
+        self.sub_mapping_sphere = ["red ball", "green ball", "blue ball"]
         self.depth = None
         
         self.camera_info = [None, None, None, None]
@@ -68,6 +79,8 @@ class Object_classifier():
         except CvBridgeError as e:
             print(e)
             
+
+
     def depth_image_callback(self, msg): 
         """Callback function for the topic"""
         try:
@@ -77,6 +90,8 @@ class Object_classifier():
 
         except CvBridgeError as e:
             print(e)
+
+
 
     def camera_info_callback(self, msg): 
         """Callback function for the topic"""
@@ -93,6 +108,13 @@ class Object_classifier():
             #  Projects 3D points in the camera coordinate frame to 2D pixel
             #  coordinates using the focal lengths (fx, fy) and principal point
             # (cx, cy).
+
+
+
+    def cloud_callback(self, msg: PointCloud2):
+        self.cloud = msg
+
+
 
     def load_model(self,model: torch.nn.Module, path: str, device: str) -> torch.nn.Module:
         """Load model weights from disk.
@@ -139,7 +161,15 @@ class Object_classifier():
                 bb_msg.width = bb["width"]
                 bb_msg.height = bb["height"]
                 bb_msg.category_id = bb["category"]
-                bb_msg.category_name = self.mapping[bb["category"]]
+
+                if bb["category"] == 6 or bb["category"] == 7:
+                    category_color = self.compute_color(bb)
+                    if category_color is not None:
+                        bb_msg.category_name = category_color
+                    else:
+                        bb_msg.category_name = self.mapping[bb["category"]]
+                else:
+                    bb_msg.category_name = self.mapping[bb["category"]]
                 
                 # visualize image with bb in Rviz
                 start_point = (x, y)
@@ -178,8 +208,96 @@ class Object_classifier():
             x = depth*(int(bb["x"]) - self.camera_info[2]) / self.camera_info[0] 
             y = depth*(int(bb["y"]) - self.camera_info[3]) / self.camera_info[1]
         
-        
         return x, y, depth
+    
+
+
+    def compute_color(self, bb):
+
+        # Convert ROS -> Open3D
+        cloud = o3drh.rospc_to_o3dpc(self.cloud)
+
+        #Crop according to BB TODO
+        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -100.0, 0.0]), max_bound=np.array([100.0, 100.0, 0.9 ])))
+
+        # Downsample the point cloud to 1 cm
+        ds_cloud = cropped.voxel_down_sample(voxel_size=0.01)
+
+        # # Convert Open3D -> NumPy
+        points = np.asarray(ds_cloud.points)
+        colors = np.asarray(ds_cloud.colors)
+        
+        # Filter Colors
+        #TODO: remove loginfo after tests
+
+        filter_r, filter_b, filter_g, filter_w = []
+        count_red, count_blue, count_green, count_wooden = 0
+        for color in colors:
+        # if the element is red, green or blue, set the value to True, otherwise False:
+            if color[0] > 1.2*(color[1] + color[2]) and color[0] > 0.75 : 
+                # filter_r.append(True)
+                # filter_g.append(False)
+                # filter_b.append(False)
+                # filter_w.append(False)
+                rospy.loginfo("RED Object detected")
+                count_red+=1
+            
+            elif color[1] > (color[0] + color[2]) and color[1] > 0.4:
+                # filter_r.append(False)
+                # filter_g.append(True)
+                # filter_b.append(False)
+                # filter_w.append(False)
+                rospy.loginfo("GREEN Object detected")
+                count_green+=1
+            
+            elif color[2] > (color[0] + color[1])and color[1] > 0.5:
+                # filter_r.append(False)
+                # filter_g.append(False)
+                # filter_b.append(True)
+                # filter_w.append(False)
+                rospy.loginfo("BLUE Object detected")
+                count_blue+=1
+            elif color[2] > (color[0] + color[1])and color[1] > 0.5: # TODO: wooden color to define!
+                # filter_r.append(False)
+                # filter_g.append(False)
+                # filter_b.append(False)
+                # filter_w.append(True)
+                rospy.loginfo("WOODEN Object detected")
+                count_wooden+=1
+            # else:
+            #     filter_r.append(False)
+            #     filter_g.append(False)
+            #     filter_b.append(False)
+            #     filter_w.append(False)
+        
+        max_color = max(count_red, count_green, count_blue, count_wooden)
+        mapping = None
+        if bb["category"]== 6:
+            mapping = self.sub_mapping_cube
+        else:
+            mapping = self.sub_mapping_sphere
+
+        category_name = ""
+        if max_color == 0:
+            return None
+
+        if max_color == count_red:
+            category_name = mapping[0]
+        elif max_color == count_green:
+            category_name = mapping[1]
+        elif max_color == count_blue:
+            category_name = mapping[2]
+        elif max_color == count_wooden and bb["category"]== 6:
+            category_name = mapping[3]
+
+        return category_name
+
+        # ds_cloud.points = o3d.utility.Vector3dVector(points[filter_r])
+        # ds_cloud.colors = o3d.utility.Vector3dVector(colors[filter_r])
+        # Convert Open3D -> ROS
+        #out_msg = o3drh.o3dpc_to_rospc(ds_cloud)
+           
+
 
                 
     def run(self):

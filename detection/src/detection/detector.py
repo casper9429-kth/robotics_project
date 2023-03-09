@@ -11,7 +11,7 @@ import torch.nn as nn
 from PIL import Image, ImageDraw
 from torchvision import models, transforms
 
-import rospy
+
 
 class BoundingBox(TypedDict):
     """Bounding box dictionary.
