@@ -16,16 +16,16 @@ class BrainNode:
     def _context_callback(self, message):
         context_str = message.data
         key_value_pairs = context_str.split(',')
-        context = {}
+        context_updates = {}
         for key_value_pair in key_value_pairs:
             key, value = key_value_pair.split(':')
             key = key.strip()
             value = value.strip()
-            context[key] = value
+            context_updates[key] = value
         rospy.loginfo('----------------------------------------')
-        rospy.loginfo(f'Updating Context Values: {context}')
+        rospy.loginfo(f'Updating Context Values: {context_updates}')
         rospy.loginfo('----------------------------------------')
-        self.behavior_tree.context = {**self.behavior_tree.context, **context}
+        self.behavior_tree.context = {**self.behavior_tree.context, **context_updates}
         result = self.behavior_tree.run()
         rospy.loginfo('----------------------------------------')
         rospy.loginfo(f'Behavior Tree Result: {result}')
