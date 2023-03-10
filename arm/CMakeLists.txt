@@ -163,6 +163,7 @@ catkin_install_python(PROGRAMS
   src/yeet.py
   src/arm_services.py
   src/kinematics.py
+  src/arm_actions.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
