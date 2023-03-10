@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<launch>
+
+	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
+    <include file="$(find teleop_twist_joy)/launch/teleop.launch" />
+
+	<!-- run the motors -->
+	<!-- <node pkg="robp_boot_camp_motors" type="motors_node" name="motors_node">
+		<remap from="/kobuki_motors/pwm" to="/kobuki/pwm" />
+		<remap from="/kobuki_motors/encoders" to="/kobuki/encoders" />
+	</node> -->
+
+	<!-- run the arm -->
+	<node name="arm_services" pkg="arm" type="arm_services.py" output='screen'/>
+	<node name="teleop_arm" pkg="teleop_arm" type="teleop_arm.py" output='screen'/>
+
+    <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
+
+	<!-- run rviz -->
+	<!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/part3.rviz" /> -->
+
+	<param name="robot_description" command="$(find xacro)/xacro --inorder '$(find realsense2_description)/urdf/test_d435_camera.urdf.xacro' use_nominal_extrinsics:=false"/>
+	<node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
+
+</launch>
