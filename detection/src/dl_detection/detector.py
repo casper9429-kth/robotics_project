@@ -157,7 +157,7 @@ class Detector(nn.Module):
             scores_tensor = torch.tensor(scores)
             boxes_tensor = torch.tensor(boxes)
             
-            nms_bbs = nms(boxes = boxes_tensor, scores = scores_tensor, iou_threshold=0.1)
+            nms_bbs = nms(boxes = boxes_tensor, scores = scores_tensor, iou_threshold=0.3)
 
             img_bbs = [img_bbs[i] for i in nms_bbs]
             bbs.append(img_bbs)
@@ -213,7 +213,7 @@ class Detector(nn.Module):
                         A.Sharpen(),
                         A.RandomBrightnessContrast(),
                     ], p=0.3),
-            ], p=0.3)
+            ], p=0.5)
 
             image = np.array(image)
             transformed = transform(image=image)

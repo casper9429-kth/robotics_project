@@ -13,7 +13,7 @@ class Object_computations():
         rospy.init_node('object_computations')
 
         # Subscribers 
-        self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBoxArray, self.bb_callback)
+        self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBoxArray, self.publish_tf)
        
         # Tf 
         self.tfBuffer = tf2_ros.Buffer(rospy.Duration(60))
@@ -23,7 +23,7 @@ class Object_computations():
         
 
         
-    def bb_callback(self, msg): 
+    def publish_tf(self, msg): 
         
         #rospy.loginfo('New object detected:\n%s', msg.category_name)
         for bb in msg.bounding_boxes:
@@ -51,7 +51,6 @@ class Object_computations():
 
             t = TransformStamped()
             t.header.frame_id = "map"
-            pose_map.point.z = 0
             t.child_frame_id = "object/detected/"+bb.category_name
 
             t.header.stamp = stamp
