@@ -6,6 +6,8 @@ from dataclasses import dataclass,field
 import cProfile
 import pstats
 
+
+
 @dataclass
 class Cell:
     # value = 0 free 
@@ -16,7 +18,8 @@ class Cell:
     value: float = 0
     threshold: float = 0.6
     label: str = None
-
+    #TODO 
+    # Implement in order to incorperate uncertainty
     def deprication(self):
         pass
 
@@ -43,13 +46,12 @@ class Occupancy_grid():
         self.grid = self.create_grid()
         self.limits = self.return_bounderys()
 
+    # Generates the grid. Goes from -self.x -> self.x and likewise for y
     def create_grid(self):
-        grid = [[Cell(float(i),float(j)) for i in range(-self.x,self.x,self.dx)] for j in range(-self.y,self.y,self.dy)]
-        #print(grid)
-        #for i in range(2):
-        #    grid[4][i].value = 1
+        grid = [[Cell(float(x),float(y)) for x in range(-self.x,self.x,self.dx)] for y in range(-self.y,self.y,self.dy)]
         return grid
     
+    # Prints the positions of each cell in the entire map
     def print_pos(self):
         x_list = [self.grid[i] for i in range(len(self.grid))]
         for i in range(len(x_list)):
@@ -57,6 +59,8 @@ class Occupancy_grid():
             print(newlist)
         #print(newlist)
 
+    #TODO check spelling
+    # returns the bounderies, Used to check if things are in bounds in Pat planning algorithms
     def return_bounderys(self):
         xmin = 0
         xmax = 0
@@ -76,22 +80,23 @@ class Occupancy_grid():
         #print(f'bound is {bound}')
         return [xmin,xmax,ymin,ymax]
 
-
+    # TODO implement
     def get_slope(self,points: tuple):
         x1,y1 = points[0][0],points[0][1]
         x2,y2 = points[1][0],points[1][1]
         k= (y1-y2)/(x1-x2)
         return k
         
-
+    # TODO implement
     def define_workspace(self,points: list):
         # find vectors
         # determine the lines
         # assign values ---> use self.add_obstacles
         
         pass
-        
-    #TODO need to be optimized Is currently the thing thats slows it down the most
+
+
+    # Returns a cell at a given position. Do not question return, it is in the wrong order and I have no idea why
     def check_pos(self,pos: tuple): 
         #print(f'pos first is {pos}')
         if len(pos)>2:
@@ -103,16 +108,26 @@ class Occupancy_grid():
         except:
             print(f'found no matching position for {pos}')
 
-
+    #TODO implement a function that does this for many obstacles
+    # Sets a single cell to a wall.
     def set_obstacle(self,pos:tuple):
-        for row in self.grid:
+        cell = self.check_pos(pos)
+        if not isinstance(cell, str):
+            cell.value = 1
+            cell.label = 'wall'
+            return True
+        else:
+            return False
+
+        """for row in self.grid:
             for cell in row:
                 if cell.position() == pos:
                     cell.value = 1
                     cell.label = 'wall'
                     return True
-        return False
-            
+        return False"""
+
+    # Adds a object with a given label
     def add_object(self,pos: tuple,label: str):
         if label in self.label_list:
             for row in self.grid:
@@ -126,7 +141,7 @@ class Occupancy_grid():
             return False
         
 
-    #prints a little grid
+    #prints a grid in terminal
     def print_grid(self, path = None):
         for row in self.grid:
             for cell in (row):
@@ -156,7 +171,7 @@ class Occupancy_grid():
             print('\n')
         print('')
 
-    # not yet working 
+    # Idea is to plot in a window not yet working 
     def plot(self):
         #plt.plot(x,y,'o')
         for x in range(-self.x,self.x):

@@ -8,8 +8,8 @@ from occupancy_grid import Occupancy_grid
 import cProfile
 import pstats
 
-map = Occupancy_grid(10,10)
-currentlist = []
+map = Occupancy_grid(2000,2000)
+currentlist = [] # List for debugging can be removed
 
 
 @dataclass(order=True)
@@ -23,6 +23,8 @@ class Node:
     parent: object = field(default=None)
     #children: list = field(default_factory=list, init=False)
 
+    # Makes sure that the stuff to be initalized is. 
+    # Needed since dataclasses cant handle initalizing functions
     def __post_init__(self):
         if self.parent == None:
             self.g = 0
@@ -55,12 +57,13 @@ def reconstruct_path(node: Node):
     path.reverse()
     return path
 
-
+# checks if inbounds according to the paramethes of the map
 def isinbounds(node):
     """xmin = -map.x+1
     ymin = -map.y+1
     xmax = map.x -1
     ymax = map.y -1"""
+    # retrives the limits for the map
     limits = map.limits
     xmin = limits[0]
     xmax = limits[1]
@@ -74,15 +77,20 @@ def isinbounds(node):
         return False
     return True
 
+#TODO implement dx,dy 
 def generate_neighbours(node): # will cause issues with smaller dx,dx in occupancy_grid
     neighbourlist = {}
     buffer = 0.5
     walllist = []
+    dx = 1
+    dy = 1
+    #dx = map.dx
+    #dy = map.dy
     for longditude in range(-1,2,1):
         #print(f'i = {i}')
         for latitude in range(-1,2,1):
-            new_x = node.x + longditude
-            new_y = node.y + latitude
+            new_x = node.x + dx*longditude
+            new_y = node.y + dy*latitude
             neighbour = Node(new_x, new_y, parent = node, goal= node.goal)
             if isinbounds(neighbour):
 
@@ -112,8 +120,9 @@ def A_star(start,goal,map):
     #best_path = None
     start_node = Node(x=start[0],y=start[1],goal=goal)
     openset[start_node.position()] = start_node
-    maxiter = 1000
 
+    # Controls the amount of max iterations before cancel
+    maxiter = 10000
     iter = 0
     
     while openset and iter < maxiter:
@@ -155,11 +164,13 @@ def A_star(start,goal,map):
             else: openset[neighbournode.position()] = neighbournode
         iter +=1
         #print(iter)
-    return False
+
+    return False, reconstruct_path(current)
 
 def main():
-    start = (0.0,0.0)
-    goal = (8.0,8.0)
+    start = (-1678,-1678.0)
+    goal = (1678,1678.0)
+
     # Obstacle manegment
     obs_1 = tuple((float(x-2),-2.0) for x in range(5))
     print(f'obstacle {obs_1}')
@@ -170,21 +181,29 @@ def main():
     obstacle_tuple = obs_1+obs_2+obs_3
     for obs in obstacle_tuple:
         status = map.set_obstacle((obs))
+
+
     #object management
     obj = (-4.0,-4.0)
-    stat = map.add_object(obj,'animal')
+    stat = map.add_object(obj,'animal') # returns True of False to make sure it works 
     print('got here')
     #map.print_pos()
+
     def test_A_star():
         path = A_star(start,goal,map)
         print(path)
         #print(currentlist)
-        map.print_grid(path)
-    with cProfile.Profile() as pr:
-        test_A_star()
-    stats = pstats.Stats(pr)
-    stats.sort_stats(pstats.SortKey.TIME)
-    stats.print_stats()
+        #map.print_grid(path)
+
+    # Gives stats for the algorithm
+    def return_stats():
+        with cProfile.Profile() as pr:
+            test_A_star()
+        stats = pstats.Stats(pr)
+        stats.sort_stats(pstats.SortKey.TIME)
+        stats.print_stats()
+    test_A_star()
+    #return_stats()
 
 
 
