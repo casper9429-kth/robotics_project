@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import rospy
 from rospy import ServiceProxy
-from arm.srv import SetPickUpTarget, SetPickUpTargetResponse, ArmTrigger, ArmTriggerResponse
+from arm.srv import SetPickUpTarget, ArmTrigger
 
 
 class ArmActions():
@@ -13,16 +13,24 @@ class ArmActions():
 
         # TODO wait for services to be available
 
-        self.straight = ServiceProxy('arm/poses/straight', ArmTrigger, self.straight_service_callback)
-        self.default = ServiceProxy('arm/poses/default', ArmTrigger, self.default_service_callback)
-        self.observe = ServiceProxy('arm/poses/observe', ArmTrigger, self.observe_service_callback)
-        self.prepare_to_pick_up = ServiceProxy('arm/poses/prepare_to_pick_up', ArmTrigger, self.prepare_to_pick_up_service_callback)
-        self.pick_up = ServiceProxy('arm/poses/pick_up', ArmTrigger, self.pick_up_service_callback)
+        rospy.wait_for_service('arm/poses/straight')
+        self.straight = ServiceProxy('arm/poses/straight', ArmTrigger)
+        rospy.wait_for_service('arm/poses/default')
+        self.default = ServiceProxy('arm/poses/default', ArmTrigger)
+        rospy.wait_for_service('arm/poses/observe')
+        self.observe = ServiceProxy('arm/poses/observe', ArmTrigger)
+        rospy.wait_for_service('arm/poses/prepare_to_pick_up')
+        self.prepare_to_pick_up = ServiceProxy('arm/poses/prepare_to_pick_up', ArmTrigger)
+        rospy.wait_for_service('arm/poses/pick_up')
+        self.pick_up = ServiceProxy('arm/poses/pick_up', ArmTrigger)
 
-        self.open_gripper = ServiceProxy('arm/poses/open_gripper', ArmTrigger, self.open_gripper_service_callback)
-        self.close_gripper = ServiceProxy('arm/poses/close_gripper', ArmTrigger, self.close_gripper_service_callback)
+        rospy.wait_for_service('arm/poses/open_gripper')
+        self.open_gripper = ServiceProxy('arm/poses/open_gripper', ArmTrigger)
+        rospy.wait_for_service('arm/poses/close_gripper')
+        self.close_gripper = ServiceProxy('arm/poses/close_gripper', ArmTrigger)
 
-        self.set_pick_up_target = ServiceProxy('arm/poses/set_target', SetPickUpTarget, self.set_pick_up_target_service_callback)
+        rospy.wait_for_service('arm/poses/set_target')
+        self.set_pick_up_target = ServiceProxy('arm/poses/set_target', SetPickUpTarget)
 
         # Define rate
         self.update_rate = 10 # [Hz]
