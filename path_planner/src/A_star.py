@@ -98,7 +98,7 @@ def generate_neighbours(node): # will cause issues with smaller dx,dx in occupan
                 cell = map.check_pos(neighbour.position())
                 #print(f'cell value {cell.value}, {cell.position()}')
                 if cell.value >=0.8: # will always work due to checking inbounds
-                    walllist.append((neighbour.position()))
+                    #walllist.append((neighbour.position()))
                     neighbour.g = np.inf
                     neighbour.f = neighbour.g + neighbour.h
 
