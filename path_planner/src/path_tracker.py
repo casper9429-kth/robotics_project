@@ -295,7 +295,7 @@ class PathTracker():
         if self.check_if_in_fence(self.goal.pose):
             #print('In fence')
             self.transforms()
-            self.pure_pursuit()
+            self.math()
         else:
             print('Goal Pose not inside workspace')
             self.move.linear.x = 0.0
