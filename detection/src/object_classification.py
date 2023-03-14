@@ -16,7 +16,7 @@ import numpy as np
 from cv_bridge import CvBridge, CvBridgeError
 import cv2
 from detection.msg import BoundingBox, BoundingBoxArray
-# import time
+import time
 
 from open3d import open3d as o3d
 from open3d_ros_helper import open3d_ros_helper as o3drh
@@ -44,13 +44,13 @@ class Object_classifier():
         model= self.load_model(self.detector, model_path, self.device)
         self.detector.eval()
         
-        self.cloud = None
+        #self.cloud = None
 
         self.bridge = CvBridge()
 
         self.mapping = ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie", "Cube", "Sphere"]
-        self.sub_mapping_cube = ["red cube", "green cube", "blue cube", "wooden cube"]
-        self.sub_mapping_sphere = ["red ball", "green ball", "blue ball"]
+        self.sub_mapping_cube = ["Red_cube", "Green_cube", "Blue_cube", "Wooden_cube"]
+        self.sub_mapping_sphere = ["Red_ball", "Green_ball", "Blue_ball"]
         self.depth = None
         
         self.camera_info = [None, None, None, None]
@@ -59,13 +59,13 @@ class Object_classifier():
         self.sub_image = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback) 
         self.sub_depth= rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image, self.depth_image_callback)
         self.sub_camera_info= rospy.Subscriber("/camera/color/camera_info", CameraInfo, self.camera_info_callback)
-        self.sub_cloud = rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.cloud_callback)
+        #self.sub_cloud = rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.cloud_callback)
   
         
         # Publisher
         self.bb_pub = rospy.Publisher("/detection/bounding_boxes", BoundingBoxArray, queue_size=10)
         self.image_bb_pub = rospy.Publisher("/detection/image_with_bounding_boxes", Image, queue_size=10)
-        self.pub = rospy.Publisher('/camera/depth/color/ds_points', PointCloud2, queue_size=1)
+        #self.pub = rospy.Publisher('/camera/depth/color/ds_points', PointCloud2, queue_size=1)
 
 
 
@@ -73,12 +73,11 @@ class Object_classifier():
     def image_callback(self, msg): 
         """Callback function for the topic"""
         try:
-            # t0 = time.time()
+            #t0 = time.time()
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
-            np_arr = np.asarray(cv_image)
-            im = pil_image.fromarray(np_arr)
+            
             if self.depth is not None:
-                self.compute_bb(im, msg.header.stamp, msg.header.frame_id, self.depth, cv_image) 
+                self.compute_bb(msg.header.stamp, msg.header.frame_id, self.depth, cv_image) 
 
         except CvBridgeError as e:
             print(e)
@@ -115,8 +114,8 @@ class Object_classifier():
 
 
 
-    def cloud_callback(self, msg: PointCloud2):
-        self.cloud = msg
+    # def cloud_callback(self, msg: PointCloud2):
+    #     self.cloud = msg
 
 
 
@@ -137,7 +136,10 @@ class Object_classifier():
 
 
 
-    def compute_bb(self,image, stamp, frame_id, depth_image, cv_image):     
+    def compute_bb(self, stamp, frame_id, depth_image, cv_image):     
+        
+        np_arr = np.asarray(cv_image)
+        image = pil_image.fromarray(np_arr)
         
         test_images = []
         torch_image, _  = self.detector.input_transform(image, [])
@@ -153,8 +155,7 @@ class Object_classifier():
             bb_list_msg = BoundingBoxArray()
             bb_list_msg.header.stamp = stamp
             bb_list_msg.header.frame_id = frame_id
-            #bb_list_msg.header.frame_id = "camera_depth_optical_frame" # seems to be better but map is not at the good spot rn
-            
+           
             for bb in bbs[0]:
                 
                 x = int(bb["x"])
@@ -165,6 +166,16 @@ class Object_classifier():
                 bb_msg.width = bb["width"]
                 bb_msg.height = bb["height"]
                 bb_msg.category_id = bb["category"]
+                
+                if bb["category"] == 6 or bb["category"] == 7:
+                    category_color = self.compute_color(bb, np_arr)
+                    if category_color is not None:
+                        bb_msg.category_name = category_color
+                    else:
+                        bb_msg.category_name = self.mapping[bb["category"]]
+                        
+                else:
+                    bb_msg.category_name = self.mapping[bb["category"]]
                 
                 # visualize image with bb in Rviz
                 start_point = (x, y)
@@ -188,15 +199,6 @@ class Object_classifier():
                 bb_list_msg.bounding_boxes.append(bb_msg)
 
                 
-                if bb["category"] == 6 or bb["category"] == 7:
-                    category_color = self.compute_color(x, y, depth, bb["category"])
-                    if category_color is not None:
-                        bb_msg.category_name = category_color
-                    else:
-                        bb_msg.category_name = self.mapping[bb["category"]]
-                else:
-                    bb_msg.category_name = self.mapping[bb["category"]]
-                
             self.bb_pub.publish(bb_list_msg)
               
             # tinfer = time.time() - t0
@@ -217,15 +219,16 @@ class Object_classifier():
     
 
 
-    def compute_color(self, x,y,z, category_id):
+    def compute_color_pc(self, x,y,z, category_id):
         # Convert ROS -> Open3D
         cloud = o3drh.rospc_to_o3dpc(self.cloud)
 
         #Crop according to BB TODO
-       # cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -100.0, 0.0]), max_bound=np.array([100.0, 100.0, 0.9 ])))
+
+        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([x-0.2, y-0.2, z-0.2]), max_bound=np.array([x+0.2, y+0.2, z+0.2])))
 
         # Downsample the point cloud to 1 cm
-        ds_cloud = cloud.voxel_down_sample(voxel_size=0.01)
+        ds_cloud = cropped.voxel_down_sample(voxel_size=0.01)
         #ds_cloud = cropped.voxel_down_sample(voxel_size=0.01)
 
         # # Convert Open3D -> NumPy
@@ -326,8 +329,45 @@ class Object_classifier():
 
         return category_name
 
-
+    def compute_color(self, bb, image):
         
+        # Crop image
+        cropped_image = image[int(bb["y"]):int(bb["y"]+bb["height"]),int(bb["x"]):int(bb["x"]+bb["width"])]
+        count_red, count_blue, count_green, count_wooden = 0,0,0,0
+        count_red = np.sum(cropped_image[:,:,0]>180)
+        count_green = np.sum(cropped_image[:,:,1]>160)
+        count_blue = np.sum(cropped_image[:,:,2]>160)
+    
+        category_id = bb["category"]
+       
+        max_color = max(count_red, count_green, count_blue, count_wooden)
+        mapping = None
+        if category_id == 6:
+            mapping = self.sub_mapping_cube
+        else:
+            mapping = self.sub_mapping_sphere
+
+        category_name = ""
+        total_sum = count_red + count_green + count_blue
+        if  max_color == count_red and count_red>0.5*(count_green +count_blue) and total_sum>100:
+            # rospy.loginfo("RED Object detected")
+            category_name = mapping[0]
+        elif category_id== 6 and np.std([count_red, count_green, count_blue])<130 and total_sum>100:
+            # rospy.loginfo(np.std([count_red, count_green, count_blue]))
+            # rospy.loginfo("%s, %s, %s",count_red, count_green, count_blue)
+            # rospy.loginfo("WOODEN Object detected")
+            category_name = mapping[3]
+        elif max_color == count_green and total_sum>100:
+            # rospy.loginfo("GREEN Object detected")
+            #rospy.loginfo("%s, %s, %s",count_red, count_green, count_blue)
+            category_name = mapping[1]
+        elif max_color == count_blue and total_sum>100:
+            # rospy.loginfo("BLUE Object detected")
+            category_name = mapping[2]
+        
+        
+        return category_name
+
         
            
 
