@@ -93,7 +93,7 @@ def train(device: str = "cpu") -> None:
     #     annFile="./dd2419_coco/annotations/validation.json",
         root="./Set1/validation",
         annFile="./Set1/annotations/merged_validation.json",
-        transforms=detector.input_transform,
+        transforms=detector.input_transform_validation,
     )
 
     dataloader = torch.utils.data.DataLoader(
@@ -231,9 +231,21 @@ def validate(
         current_iteration: The current training iteration. Used for logging.
         device: The device to run validation on.
     """
+
     detector.eval()
     coco_pred = copy.deepcopy(val_dataloader.dataset.coco)
     coco_pred.dataset["annotations"] = []
+    coco_val = copy.deepcopy(val_dataloader.dataset.coco)
+        
+    old_dims = [1280, 720, 1280, 720]
+    new_dims = [640, 480, 640, 480]
+    for ann in coco_val.dataset["annotations"]:
+        box = ann["bbox"]
+        new_box = [i / j for i, j in zip(box, old_dims)]
+        new_box = [i * j for i, j in zip(new_box, new_dims)]
+        ann["bbox"] = new_box
+
+   
     with torch.no_grad():
         count = total_pos_mse = total_reg_mse = total_neg_mse = total_loss_test = loss = 0
         image_id = ann_id = 0
@@ -252,7 +264,6 @@ def validate(
                 for img_bb in img_bbs:
                     coco_pred.dataset["annotations"].append(
                         {   
-                            #"id": val_dataloader.dataset.coco.dataset["annotations"][ann_id]["id"],
                             "id": ann_id,
                             "bbox": [
                                 img_bb["x"],
@@ -273,11 +284,7 @@ def validate(
             count += len(val_img_batch) / BATCH_SIZE
         coco_pred.createIndex()
         coco_eval = COCOeval(val_dataloader.dataset.coco, coco_pred, iouType="bbox")
-        #print("coco gt: ", val_dataloader.dataset.coco.dataset["annotations"])
-        #print("coco dt: ", coco_pred.dataset["annotations"])
-        # print("ids = ",val_dataloader.dataset.coco.dataset["annotations"][0]["id"])
-        # print("ids = ",val_dataloader.dataset.coco.dataset["annotations"][1]["id"])
-        # print("ids = ",val_dataloader.dataset.coco.dataset["annotations"][2]["id"])
+        coco_eval = COCOeval(coco_val, coco_pred, iouType="bbox")
         coco_eval.params.useCats = 1 
         coco_eval.evaluate()
         coco_eval.accumulate()
