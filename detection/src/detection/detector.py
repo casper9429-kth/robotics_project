@@ -10,8 +10,11 @@ import torch
 import torch.nn as nn
 from PIL import Image, ImageDraw
 from torchvision import models, transforms
+from torchvision.ops import nms
+import albumentations as A
+import random
 
-
+import rospy
 
 class BoundingBox(TypedDict):
     """Bounding box dictionary.
@@ -118,11 +121,15 @@ class Detector(nn.Module):
                     np.unravel_index(flattened_indices.numpy(), o[4, :, :].shape)
                 ).T
 
+            boxes = []
+            scores = []
+
             # loop over all cells with bounding box center
             for bb_index in bb_indices:
+                
                 bb_coeffs = o[0:4, bb_index[0], bb_index[1]]
                 bb_category = torch.argmax(o[5:13, bb_index[0], bb_index[1]]).item()
-
+                
                 # decode bounding box size and position
                 width = self.img_width * abs(bb_coeffs[2].item())
                 height = self.img_height * abs(bb_coeffs[3].item())
@@ -145,10 +152,17 @@ class Detector(nn.Module):
                         "category": bb_category,
                     }
                 )
+                boxes.append([x,y,x+width, y+height])
+                scores.append(o[4, bb_index[0], bb_index[1]])
+
+            if len(boxes)>0:
+                scores_tensor = torch.tensor(scores)
+                boxes_tensor = torch.tensor(boxes)
+                nms_bbs = nms(boxes = boxes_tensor, scores = scores_tensor, iou_threshold=0.15)
+                img_bbs = [img_bbs[i] for i in nms_bbs]
             bbs.append(img_bbs)
-
+         
         return bbs
-
 
 
 
@@ -173,15 +187,41 @@ class Detector(nn.Module):
                     Shape (5, self.out_cells_y, self.out_cells_x).
         """
     
-        # Resize image and bounding box 
+        
 
         target = torch.zeros(13, self.out_cells_y, self.out_cells_x)
         if len(anns)>0:
             boxes = []
+            class_labels = []
             for ann in anns:
                 boxes.append([[ann["bbox"][0],ann["bbox"][1],ann["bbox"][2],ann["bbox"][3]]])
+                class_labels.append([ann["category_id"]])
+
+           
+            #image augmentation 
+            transform = A.Compose([
+                    A.GaussNoise(p=0.3),
+                    A.OneOf([
+                        A.MotionBlur(p=0.2),
+                        A.MedianBlur(blur_limit=3, p=0.1),
+                        A.Blur(blur_limit=3, p=0.1),
+                    ], p=0.3),
+                    A. OneOf([
+                        A.CLAHE(clip_limit=2),
+                        A.Sharpen(),
+                        A.RandomBrightnessContrast(),
+                    ], p=0.3),
+                    A.Affine(shear = {'x': random.randint(-15, 15), 'y': random.randint(-15, 15)}, p=0.3)
+            ], p=0.3, bbox_params=A.BboxParams(format='coco', label_fields=['class_labels']))
+
+            image = np.array(image)
+            transformed = transform(image=image, bboxes=boxes[0], class_labels=class_labels)
+            boxes = [transformed['bboxes']]
+            image = Image.fromarray(transformed['image'], 'RGB')
 
             boxes = torch.Tensor(list(boxes))
+
+            # Resize image and bounding box 
             image, boxes = self.resize(image, boxes, (self.img_height, self.img_width),False)
 
             
@@ -190,7 +230,7 @@ class Detector(nn.Module):
                 y = boxes[i][0][1]
                 width = boxes[i][0][2]
                 height = boxes[i][0][3]
-                # shape = [(x, y), (x +width, y+height)]
+                shape = [(x, y), (x +width, y+height)]
                 # image1 = ImageDraw.Draw(image) 
                 # image1.rectangle(shape, outline ="red")
                 # image.show()
@@ -228,41 +268,85 @@ class Detector(nn.Module):
             mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
         )(image)
 
-        # Convert bounding boxes to target format
-
-        # First two channels contain relativ x and y offset of bounding box center
-        # Channel 3 & 4 contain relative width and height, respectively
-        # Last channel is 1 for cell with bounding box center and 0 without
-
-        # If there is no bb, the first 4 channels will not influence the loss
-        # -> can be any number (will be kept at 0)
-        #target = torch.zeros(5, self.out_cells_y, self.out_cells_x)
-        # for i in range(anns):
-        #     x = boxes[i][0]
-        #     y = boxes[i][1]
-        #     width = boxes[i][2]
-        #     height = boxes[i][3]
-
-        #     x_center = x + width / 2.0
-        #     y_center = y + height / 2.0
-        #     x_center_rel = x_center / self.img_width * self.out_cells_x
-        #     y_center_rel = y_center / self.img_height * self.out_cells_y
-        #     x_ind = int(x_center_rel)
-        #     y_ind = int(y_center_rel)
-        #     x_cell_pos = x_center_rel - x_ind
-        #     y_cell_pos = y_center_rel - y_ind
-        #     rel_width = width / self.img_width
-        #     rel_height = height / self.img_height
-
-        #     # channels, rows (y cells), cols (x cells)
-        #     target[4, y_ind, x_ind] = 1
-
-        #     # bb size
-        #     target[0, y_ind, x_ind] = x_cell_pos
-        #     target[1, y_ind, x_ind] = y_cell_pos
-        #     target[2, y_ind, x_ind] = rel_width
-        #     target[3, y_ind, x_ind] = rel_height
         return image, target
+
+
+    def input_transform_validation(self, image: Image, anns: List) -> Tuple[torch.Tensor]:
+        """Prepare image and targets on loading.
+
+        This function is called before an image is added to a batch.
+        Must be passed as transforms function to dataset.
+
+        Args:
+            image:
+                The image loaded from the dataset.
+            anns:
+                List of annotations in COCO format.
+
+        Returns:
+            Tuple:
+                image: The image. Shape (3, H, W).
+                target:
+                    The network target encoding the bounding box.
+                    Shape (5, self.out_cells_y, self.out_cells_x).
+        """
+    
+        
+
+        target = torch.zeros(13, self.out_cells_y, self.out_cells_x)
+        if len(anns)>0:
+            boxes = []
+            for ann in anns:
+                boxes.append([[ann["bbox"][0],ann["bbox"][1],ann["bbox"][2],ann["bbox"][3]]])
+
+            boxes = torch.Tensor(list(boxes)
+                                 )
+            # Resize image and bounding box 
+            image, boxes = self.resize(image, boxes, (self.img_height, self.img_width),False)
+
+
+            for i in range(len(anns)):
+                x = boxes[i][0][0]
+                y = boxes[i][0][1]
+                width = boxes[i][0][2]
+                height = boxes[i][0][3]
+                shape = [(x, y), (x +width, y+height)]
+
+                x_center = x + width / 2.0
+                y_center = y + height / 2.0
+                x_center_rel = x_center / self.img_width * self.out_cells_x
+                y_center_rel = y_center / self.img_height * self.out_cells_y
+                x_ind = int(x_center_rel)
+                y_ind = int(y_center_rel)
+                x_cell_pos = x_center_rel - x_ind
+                y_cell_pos = y_center_rel - y_ind
+                rel_width = width / self.img_width
+                rel_height = height / self.img_height
+
+                # channels, rows (y cells), cols (x cells)
+                target[4, y_ind, x_ind] = 1
+
+                # bb size
+                target[0, y_ind, x_ind] = x_cell_pos
+                target[1, y_ind, x_ind] = y_cell_pos
+                target[2, y_ind, x_ind] = rel_width
+                target[3, y_ind, x_ind] = rel_height
+
+                # category 
+                category = ann["category_id"] + 5
+                target[category,y_ind, x_ind] = 1
+        else:
+            image = transforms.functional.resize(image, (self.img_height, self.img_width))
+        
+        # Convert PIL.Image to torch.Tensor
+        image = transforms.ToTensor()(image)
+
+        image = transforms.Normalize(
+            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        )(image)
+
+        return image, target
+
 
     def resize(self, image, boxes, dims=(480, 640), return_percent_coords=True):
         """
@@ -288,5 +372,3 @@ class Detector(nn.Module):
             return new_image, new_boxes
 
         return new_image
-
-    

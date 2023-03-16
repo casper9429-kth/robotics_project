@@ -39,7 +39,7 @@ class Object_classifier():
         self.device = "cuda"
         self.detector = Detector().to(self.device)
         #model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-09_16-47-53-692698.pt" #for robot
-        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-02-18_15-46-29-649082.pt" #for robot
+        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
         #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-09_16-47-53-692698.pt" #for computer
         model= self.load_model(self.detector, model_path, self.device)
         self.detector.eval()
@@ -156,6 +156,7 @@ class Object_classifier():
             bb_list_msg.header.stamp = stamp
             bb_list_msg.header.frame_id = frame_id
            
+            #rospy.loginfo(bbs[0])
             for bb in bbs[0]:
                 
                 x = int(bb["x"])
