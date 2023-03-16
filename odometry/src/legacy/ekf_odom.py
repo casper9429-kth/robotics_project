@@ -6,8 +6,6 @@
 import rospy
 from tf2_geometry_msgs import PoseStamped
 #from tf2_geometry_msgs import TransformStamped
-from tf2_geometry_msgs import PoseStamped
-#from tf2_geometry_msgs import TransformStamped
 from geometry_msgs.msg import TransformStamped
 from robp_msgs.msg import Encoders
 import tf_conversions
@@ -22,12 +20,6 @@ from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray
 from std_msgs.msg import Bool
 from collections import defaultdict
-# from geometry_msgs.msg import PoseStamped
-
-# EKF Aruco Slam, v,omega fusion, odometry in one script
-# This node pefors EKF Aruco Slam with odometry, v,omega fusion 
-# When the aruco marker with id 3 is seen, the odom is set to the center of the map
-
 
 
 class ekf_odom():
@@ -36,6 +28,7 @@ class ekf_odom():
         Peforms EKF odometry
         
         The x,y,theta predict and v,omega predict and update is done in run 
+        
         """
         rospy.init_node('ekf_odom')
 
@@ -46,7 +39,7 @@ class ekf_odom():
                                           
         # Publish the map and the odometry
         self.odom_pub = rospy.Publisher("odom", Odometry, queue_size=50)
-        self.odom_slam_pub = rospy.Publisher("odom_slam", Odometry, queue_size=50) # remove
+        self.odom_slam_pub = rospy.Publisher("odom_slam", Odometry, queue_size=50)
         
 
 
@@ -98,7 +91,6 @@ class ekf_odom():
         # Time var
         self.last_time = rospy.Time.now().to_sec()
         self.current_time_sec = rospy.Time.now().to_sec()
-        self.current_time_sec = rospy.Time.now().to_sec()
 
         
 
@@ -140,7 +132,7 @@ class ekf_odom():
         self.current_time_sec = self.current_time.to_sec()
         self.dt = self.current_time_sec - self.last_time
         ## Time warning
-        if self.dt > self.update_dt*1.2 and self.debug:
+        if self.dt > self.update_dt*1.2:
             rospy.logwarn("refresh rate to high: %f", self.dt)
             rospy.logwarn("refresh rate should be: %f", self.update_dt)
 

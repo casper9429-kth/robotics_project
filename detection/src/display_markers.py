@@ -19,8 +19,6 @@ tfBuffer = tf2_ros.Buffer(rospy.Duration(60))
 listener = tf2_ros.TransformListener(tfBuffer)
 
 def aruco_callback(msg):
-    #rospy.loginfo('New aruco marker detected:\n%s', msg)
-    # necessary to get the correct time stamp
     
     stamp = msg.header.stamp
     frame_id = msg.header.frame_id
@@ -30,17 +28,15 @@ def aruco_callback(msg):
         pose_map = PoseStamped()
         pose_map.header.frame_id = frame_id
         pose_map.header.stamp = stamp
-        pose_map = PoseStamped()
-        pose_map.header.frame_id = frame_id
-        pose_map.header.stamp = stamp
 
         id = marker.id
         pose = marker.pose
-        
-        pose_map = PoseStamped()
-        pose_map.header.frame_id = frame_id
-        pose_map.header.stamp = stamp
 
+        transformed_pose = Marker()
+        transformed_pose.header.stamp = stamp
+        transformed_pose.id = id
+        transformed_pose.header.frame_id = "base_link"
+        transformed_pose.confidence = marker.confidence
 
         # Transform pose from camera_color_optical_frame to map 
         pose_map.pose.orientation = pose.pose.orientation
@@ -48,7 +44,9 @@ def aruco_callback(msg):
         
         
         try:
-            pose_map = tfBuffer.transform(pose_map, "map", rospy.Duration(1.0))
+            transformed_pose.pose.pose = tfBuffer.transform(pose_map, "base_link", rospy.Duration(1.0)).pose
+            pose_map = tfBuffer.transform(pose_map, "map", rospy.Duration(1.0)) 
+            #rospy.loginfo("tf ok")
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             rospy.logwarn(e)
             return   
@@ -67,7 +65,7 @@ def aruco_callback(msg):
         t.header.stamp = stamp
         
         # rospy.loginfo(msg)
-
+    
         t.transform.rotation = pose_map.pose.orientation
         t.transform.translation = pose_map.pose.position
         br.sendTransform(t)

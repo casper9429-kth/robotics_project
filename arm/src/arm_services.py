@@ -73,7 +73,7 @@ class ArmServices():
         self.d_floor_to_base = 131e-3 # [m]
         
         self.pick_up_margin = 6e-3 # [m]
-        self.prepare_to_pick_up_margin = 90e-3 # [m]
+        self.prepare_to_pick_up_margin = 55e-3 # [m]
 
         # Duration of the motion
         self.max_joint_speed = 0.8 # [rad/s]
