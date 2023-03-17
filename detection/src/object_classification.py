@@ -199,8 +199,9 @@ class Object_classifier():
                 bb_msg.bb_center = point
                 bb_list_msg.bounding_boxes.append(bb_msg)
 
-                
-            self.bb_pub.publish(bb_list_msg)
+            
+            if len(bb_list_msg.bounding_boxes)>0:
+                self.bb_pub.publish(bb_list_msg)
               
             # tinfer = time.time() - t0
             # rospy.loginfo(tinfer)
