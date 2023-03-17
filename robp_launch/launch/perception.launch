@@ -17,8 +17,6 @@
     </include>
 
 
-	<!-- https://github.com/IntelRealSense/realsense-ros/issues/714 -->
-
 	<!-- run the motors -->
     <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
 
@@ -28,15 +26,13 @@
 	<!-- run odometry -->
 	<node name="odometry" pkg="odometry" type="ekf_odom.py" output='screen'/>
 
-	<!-- run detection -->
-	<!-- <node name="detection" pkg="detection" type="detection_bc.py" output='screen'/>
-	<node name="display_objects" pkg="detection" type="display_objects.py" output='screen'/> -->
-
 	<!-- run aruco detection -->
 	<node name="display_markers" pkg="detection" type="display_markers.py" output='screen'/>
 
 	<node name="object_classifier" pkg="detection" type="object_classification.py" output='screen'/>
 	<node name="object_computations" pkg="detection" type="object_computations.py" output='screen'/>
+	<node name="obstacle_detection" pkg="detection" type="obstacle_detection.py" output='screen'/>
+
 
 	<!-- run rviz -->
 	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/odometry.rviz" />
