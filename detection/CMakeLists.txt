@@ -171,6 +171,7 @@ catkin_install_python(PROGRAMS
   src/display_markers.py
   src/object_classification.py
   src/object_computations.py
+  src/obstacle_detection.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
