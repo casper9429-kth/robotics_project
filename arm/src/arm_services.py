@@ -186,11 +186,8 @@ class ArmServices():
         yaw = target.yaw
         if not self.in_domain(x, y, z, yaw):
             return TargetResponse(False, self.error_messages['target out of reach'])
-        try:
-            self.joints_hover_target = self.inverse_kinematics(x, y, z + self.hover_target_margin, yaw)
-            self.joints_on_target = self.inverse_kinematics(x, y, z + self.on_target_margin, yaw)
-        except ValueError:
-            return TargetResponse(False, self.error_messages['target out of reach'])
+        self.joints_hover_target = self.inverse_kinematics(x, y, z + self.hover_target_margin, yaw)
+        self.joints_on_target = self.inverse_kinematics(x, y, z + self.on_target_margin, yaw)
         return TargetResponse(True, 'Arm target set')
 
     def target_is_valid_service_callback(self, target):
@@ -205,7 +202,8 @@ class ArmServices():
     def in_domain(self, x, y, z, yaw):
         """ Checks if the target is in the domain of the arm. """
         try:
-            self.inverse_kinematics(x, y, z, yaw)
+            self.inverse_kinematics(x, y, z + self.hover_target_margin, yaw)
+            self.inverse_kinematics(x, y, z + self.on_target_margin, yaw)
         except ValueError:
             return False
         if True: # TODO
