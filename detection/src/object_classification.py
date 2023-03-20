@@ -26,15 +26,15 @@ class Object_classifier():
 
        
         # Define rate
-        self.update_rate = 10 # [Hz] Change this to the rate you want
-        self.update_dt = 1.0/self.update_rate # [s]
-        self.rate = rospy.Rate(self.update_rate) 
+        # self.update_rate = 10 # [Hz] Change this to the rate you want
+        # self.update_dt = 1.0/self.update_rate # [s]
+        # self.rate = rospy.Rate(self.update_rate) 
 
         # Paramethers 
         self.device = "cuda"
         self.detector = Detector().to(self.device)
-        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
-        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-09_16-47-53-692698.pt" #for computer
+        #model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
+        model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
         model= self.load_model(self.detector, model_path, self.device)
         self.detector.eval()
         
@@ -147,45 +147,42 @@ class Object_classifier():
             #rospy.loginfo(bbs[0])
             for bb in bbs[0]:
                 
-                x = int(bb["x"])
-                y = int(bb["y"])
+                x_bb = int(bb["x"])
+                y_bb = int(bb["y"])
                 bb_msg = BoundingBox()
-                bb_msg.x = x
-                bb_msg.y = y
+                bb_msg.x = x_bb
+                bb_msg.y = y_bb
                 bb_msg.width = bb["width"]
                 bb_msg.height = bb["height"]
                 bb_msg.category_id = bb["category"]
                 
+                # Call function to compute point and depth
+                x,y,depth = self.compute_point(depth_image, bb, depth_image)
+
                 if bb["category"] == 6 or bb["category"] == 7:
-                    category_color = self.compute_color(bb, np_arr)
-                    if category_color is not None:
-                        bb_msg.category_name = category_color
-                    else:
-                        bb_msg.category_name = self.mapping[bb["category"]]
-                        
+                    bb_msg.category_name = self.compute_color(bb, np_arr)     
                 else:
                     bb_msg.category_name = self.mapping[bb["category"]]
                 
-                # visualize image with bb in Rviz
-                start_point = (x, y)
-                end_point = (int(x+bb["width"]), int(y+bb["height"]))
-                color = (255, 0, 0)
-                thickness = 2
-                cv_image = cv2.rectangle(cv_image, start_point, end_point, color, thickness)
-                cv_image = cv2.putText(cv_image, bb_msg.category_name, (start_point[0]-10, start_point[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 
-                   1, color, thickness, cv2.LINE_AA)
-                imgMsg = self.bridge.cv2_to_imgmsg(cv_image, "rgb8")
-                self.image_bb_pub.publish(imgMsg)
-                
-                
-                # Call function to compute point and depth
-                x,y,depth = self.compute_point(depth_image, bb, depth_image)
-                point = Point()
-                point.x = x
-                point.y = y
-                point.z = depth
-                bb_msg.bb_center = point
-                bb_list_msg.bounding_boxes.append(bb_msg)
+                if bb_msg.category_name is not None:
+                    # visualize image with bb in Rviz
+                    start_point = (x_bb, y_bb)
+                    end_point = (int(x_bb+bb["width"]), int(y_bb+bb["height"]))
+                    color = (255, 0, 0)
+                    thickness = 2
+                    cv_image = cv2.rectangle(cv_image, start_point, end_point, color, thickness)
+                    cv_image = cv2.putText(cv_image, bb_msg.category_name, (start_point[0]-10, start_point[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 
+                    1, color, thickness, cv2.LINE_AA)
+                    imgMsg = self.bridge.cv2_to_imgmsg(cv_image, "rgb8")
+                    self.image_bb_pub.publish(imgMsg)
+                    
+                    
+                    point = Point()
+                    point.x = x
+                    point.y = y
+                    point.z = depth
+                    bb_msg.bb_center = point
+                    bb_list_msg.bounding_boxes.append(bb_msg)
 
             
             if len(bb_list_msg.bounding_boxes)>0:
@@ -229,23 +226,22 @@ class Object_classifier():
 
         category_name = ""
         total_sum = count_red + count_green + count_blue
-        if  max_color == count_red and count_red>0.5*(count_green +count_blue) and total_sum>100:
-            # rospy.loginfo("RED Object detected")
-            category_name = mapping[0]
-        elif category_id== 6 and np.std([count_red, count_green, count_blue])<130 and total_sum>100:
-            # rospy.loginfo(np.std([count_red, count_green, count_blue]))
+        if category_id== 6 and  0.9 < abs(np.mean([count_red, count_green, count_blue]))/count_green < 1.1 and total_sum>40:
             # rospy.loginfo("%s, %s, %s",count_red, count_green, count_blue)
-            # rospy.loginfo("WOODEN Object detected")
             category_name = mapping[3]
-        elif max_color == count_green and total_sum>100:
+        elif  max_color == count_red and total_sum>40:
+            #rospy.loginfo("RED Object detected")
+            category_name = mapping[0]
+        elif max_color == count_green and total_sum>40:
             # rospy.loginfo("GREEN Object detected")
-            #rospy.loginfo("%s, %s, %s",count_red, count_green, count_blue)
             category_name = mapping[1]
-        elif max_color == count_blue and total_sum>100:
+        elif max_color == count_blue and total_sum>40:
             # rospy.loginfo("BLUE Object detected")
             category_name = mapping[2]
+        else: 
+            category_name = None
         
-        
+        #rospy.loginfo("%s, %s, %s, %s",count_red, count_green, count_blue,np.std([count_red, count_green, count_blue]))
         return category_name
 
         

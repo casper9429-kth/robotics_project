@@ -4,6 +4,7 @@ from detection.msg import BoundingBox, BoundingBoxArray
 import tf2_ros
 from tf2_geometry_msgs import  PointStamped
 from geometry_msgs.msg import TransformStamped, Point, Quaternion
+import message_filters 
 
 
 
@@ -12,17 +13,48 @@ class Object_computations():
         """ Put the node name here, and description of the node"""
         rospy.init_node('object_computations')
 
-        # Subscribers 
-        self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBoxArray, self.publish_tf)
        
         # Tf 
         self.tfBuffer = tf2_ros.Buffer(rospy.Duration(60))
         listener = tf2_ros.TransformListener(self.tfBuffer)
 
         # Parameters
-        
+        self.objects_dict = None
 
-        
+        # Define rate
+        self.update_rate = 10 # [Hz] Change this to the rate you want
+        self.update_dt = 1.0/self.update_rate # [s]
+        self.rate = rospy.Rate(self.update_rate) 
+
+
+        # Subscribers 
+        #self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBoxArray)
+        # self.sub = message_filters.Subscriber("detection/bounding_boxes", BoundingBoxArray)
+        # self.cache = message_filters.Cache(self.sub, 100)
+        #self.cache.registerCallback(myCallback)
+
+    # def myCallback(posemsg):
+    #     print posemsg
+
+
+
+    def filter(self, objects):
+        #filter
+            # cluster position
+            # apply mean position
+            # take max class
+
+        #populate or update dict
+
+        # notify if new object detected
+
+
+        # publish tf
+
+
+        pass
+
+
     def publish_tf(self, msg): 
         
         #rospy.loginfo('New object detected:\n%s', msg.category_name)
@@ -59,12 +91,31 @@ class Object_computations():
             t.transform.translation = pose_map.point
             br.sendTransform(t)
 
-    
-
+    def main(self): # Do main stuff here    
+        """
+        Main loop, instead of changing run function,
+        write your code here to make it more readable.
+        """
         
+        rospy.loginfo("hey")
+        # batch = self.cache.getInterval(rospy.Time.now()-rospy.Duration.from_sec(1), rospy.Time.now())
+        # rospy.loginfo(batch)
+        #rospy.loginfo(self.cache.getOldestTime())
+        
+
+    def run(self):
+        """
+        Run the node. 
+        Don't change anything here, change main instead.
+        """
+        
+        # Run as long as node is not shutdown
+        while not rospy.is_shutdown():
+            self.main()
+            rospy.spin()
 
 
 if __name__ == "__main__":
 
     object_computations = Object_computations()
-    rospy.spin()
+    object_computations.run()
