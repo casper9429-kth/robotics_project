@@ -41,8 +41,6 @@ from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 
 #### Dev 
 # 1. Create a map grid from geofence and resolution
-
-
 # 2. Subscribe to base_link and display it in map
 # 3. Vizualize map in rviz
 
@@ -236,7 +234,171 @@ class GridMap():
             if c > threshold:
                 self.set_value_of_pos(pose[0],pose[1],1)            
             
+    
+    def import_point_cloud(self,pointcloud):
+        """
+        Import point cloud and set values in map grid
+        pointcloud should be numpy Nx2 array
+        will assume frame of latest given robot pose        
+        """
+
+        # if no geofence given, return
+        if not self.given_geofence:
+            rospy.logwarn("No geofence given, but trying to get map grid")
+            return None
         
+        # get robot pose in map frame
+        x = self.robot_pose[0]
+        y = self.robot_pose[1]
+        theta = self.robot_pose[2]
+        
+        # add x and y to pointcloud
+        pointcloud[:,0] = pointcloud[:,0] 
+        pointcloud[:,1] = pointcloud[:,1] 
+        
+        
+        # calc a range and angle for each point in pointcloud
+        ranges = np.sqrt(np.sum(pointcloud**2,axis=1))
+        angle = np.arctan2(pointcloud[:,1],pointcloud[:,0])
+        # shift angle to be relative to robot
+        angle = angle 
+
+        # Get min and max
+        minangle = np.min(angle)
+        maxangle = np.max(angle)
+        minrange = np.min(ranges)
+        maxrange = np.max(ranges)
+
+
+        # create discretized rays
+        resolution_ang = 80
+        angle = ((angle-minangle)/resolution_ang).astype(int)
+        resolution_rang = self.resolution
+        ranges = ((ranges-minrange)/resolution_rang).astype(int)
+        
+
+        # create rays
+        rays = np.zeros(len(ranges))
+        # fill rays with angle and range as each element
+        rays = np.stack((angle,ranges),axis=1)
+        # 
+
+        # get unique ray indices
+        # flatten rays
+        rays, counts = np.unique(rays,axis=0,return_counts=True)
+        min_ang_index = np.min(rays[:,0])
+        max_ang_index = np.max(rays[:,0])
+        min_range_index = np.min(rays[:,1])
+        max_range_index = np.max(rays[:,1])
+        
+        
+        # create rays array
+        d_ang_index = (max_ang_index-min_ang_index+1).astype(int)
+        d_range_index = (max_range_index-min_range_index+1).astype(int)
+        rays_array = np.zeros((d_ang_index,d_range_index))
+        rays_array[(rays[:,0],rays[:,1])] = counts[:]
+
+        
+        rays = []
+        # iter over each col in rays array, make everyth
+        for i in range(d_ang_index):            
+            # find first max index in col
+            theta = i*resolution_ang+minangle
+            index = np.argmax(rays_array[i,:])
+            r = index*resolution_rang+minrange
+            rays.append([r,theta])
+
+        # rays to numpy array
+        rays = np.array(rays)
+        
+        # transform to robots point of view
+        rays = np.stack((rays[:,0]*np.cos(rays[:,1]+theta),rays[:,0]*np.sin(rays[:,1]+theta)),axis=1)
+        
+        # add to map grid
+        for ray in rays:
+            self.set_value_of_pos(ray[0]+x,ray[1]+y,1) 
+        
+        # add ray to map grid, if within
+        
+                
+        
+        return
+        # transform angle and range to index
+        angle = ((angle-minangle)).astype(int)
+        ranges = ((ranges-minrange)).astype(int)
+
+        rays = np.zeros((delta_angle,2))
+        rays[:,0] = ranges
+        rays[:,1] = angle
+
+        # count unique rays
+        rays, counts = np.unique(rays,axis=0,return_counts=True)
+        
+        # create rays array
+        ray
+
+        # fill rays array with range and angle
+        
+        
+        
+        # fill rays array with range and angle
+        ra
+        # tran
+
+        # 
+        rays[:,0] = ranges
+        rays[:,1] = angle
+        
+        
+        
+
+
+
+
+
+        # cluster points into rays with resolution of 1 degree
+        # calc x,y of each point in pointcloud in map frame 
+        x = x + ranges*np.cos(angle+theta)
+        y = y + ranges*np.sin(angle+theta) 
+
+        # discretize x,y to map grid 
+        x_index = np.floor((x-self.bounding_box[0])/self.resolution).astype(int)
+        y_index = np.floor((y-self.bounding_box[2])/self.resolution).astype(int)
+        
+        # set values in map grid
+        self.map_grid[(x_index,y_index)] = 1
+        
+        # get index of robot pose in map grid
+        robot_x_index = int((self.robot_pose[0]-self.bounding_box[0])/self.resolution)
+        robot_y_index = int((self.robot_pose[1]-self.bounding_box[2])/self.resolution)
+        
+        # set robot position in map grid to 0
+        self.map_grid[(robot_x_index,robot_y_index)] = 0
+        
+        # return map grid
+        return self.map_grid
+        
+
+        # calc x,y of each point in pointcloud in map frame 
+        x = x + ranges*np.cos(angle+theta)
+        y = y + ranges*np.sin(angle+theta) 
+
+        # 
+
+
+        # discretize x,y to map grid 
+        x_index = np.floor((x-self.bounding_box[0])/self.resolution).astype(int)
+        y_index = np.floor((y-self.bounding_box[2])/self.resolution).astype(int)
+        
+
+
+
+        # get index of robot pose in map grid
+        robot_x_index = int((self.robot_pose[0]-self.bounding_box[0])/self.resolution)
+        robot_y_index = int((self.robot_pose[1]-self.bounding_box[2])/self.resolution)
+        
+        # S
+    
 
     def get_OccupancyGrid(self):
         """
@@ -300,6 +462,11 @@ class Mapping():
 
         # Resolution
         self.resolution = 0.05 # [m]
+
+        # time of latest cloud callback
+        self.t_latest_cloud = rospy.Time.now()
+        # time treshold for cloud callback
+        self.t_treshold = rospy.Duration(0.5)
         
         # Robot pose in map frame [x,y,theta]
         self.robot_pose = [0,0,0]
@@ -311,27 +478,22 @@ class Mapping():
     def cloud_callback(self, msg: PointCloud2):
         rospy.loginfo("##################")
 
+        if rospy.Time.now() - self.t_latest_cloud < self.t_treshold:
+            rospy.loginfo("cloud callback too fast")
+            return
+        
+
 
         t1 = rospy.Time.now().to_sec()
 
-        # Wait for the transform from the pointcloud's frame to the target frame
-        target_frame = "map"
-        transform = self.tf_buffer.lookup_transform(target_frame, msg.header.frame_id, rospy.Time(0))
 
-        rospy.loginfo("lookup done %s",  rospy.Time.now().to_sec() - t1)
-
-
-        # Transform the pointcloud to the target frame
-        map_pc = do_transform_cloud(msg,transform)
-
-        rospy.loginfo("transform done %s",  rospy.Time.now().to_sec() - t1)
         # Convert ROS -> Open3D
-        cloud = o3drh.rospc_to_o3dpc(map_pc)
+        cloud = o3drh.rospc_to_o3dpc(msg)
         # cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -100.0, 0.0]), max_bound=np.array([100.0, 100.0, 0.9 ])))
         cropped = cloud
         
         # Downsample the point cloud to 1/10 of resolution 
-        ds_cloud = cropped.voxel_down_sample(voxel_size=self.resolution/10)
+        ds_cloud = cropped.voxel_down_sample(voxel_size=self.resolution/5)
 
 
         rospy.loginfo("downsmaple done %s",  rospy.Time.now().to_sec() - t1)
@@ -339,7 +501,7 @@ class Mapping():
 
         # # Convert Open3D -> NumPy
         points = np.asarray(ds_cloud.points)
-        colors = np.asarray(ds_cloud.colors)
+        #colors = np.asarray(ds_cloud.colors)
 
         
         # import points in to grid map 
@@ -348,33 +510,25 @@ class Mapping():
             return
         
         # Get bbox
-        minx = np.min(points[:,0])
-        maxx = np.max(points[:,0])
-        miny = np.min(points[:,1])
-        maxy = np.max(points[:,1])
-        bbox = [minx, maxx, miny, maxy]    
-        
-        # Create grid with self.resolution and bbox
-        grid = np.zeros((int((maxx-minx)/self.resolution), int((maxy-miny)/self.resolution)))
-        
-        # Fill grid with points
-        points[:,0] = ((points[:,0] - minx)/self.resolution)
-        points[:,1] = ((points[:,1] - miny)/self.resolution)
-        # remove last dimension [:,2]
+        #minx = np.min(points[:,0])
+        #maxx = np.max(points[:,0])
+        #miny = np.min(points[:,1])
+        #maxy = np.max(points[:,1])
+        #bbox = [minx, maxx, miny, maxy]    
+                
         points = points[:,:2]
-        points = points.astype(int)
         # Count number of identical points and save as dict
 
-        unique, counts = np.unique(points, axis=0, return_counts=True)
+        # unique, counts = np.unique(points, axis=0, return_counts=True)
 
         # Transform into points 
-        unique_points = np.zeros((len(unique),2))
-        unique_points[:,0] = unique[:,0]*self.resolution + minx
-        unique_points[:,1] = unique[:,1]*self.resolution + miny
+        # unique_points = np.zeros((len(unique),2))
+        # unique_points[:,0] = unique[:,0]*self.resolution + minx
+        # unique_points[:,1] = unique[:,1]*self.resolution + miny
 
-        rospy.loginfo("math done %s",  rospy.Time.now().to_sec() - t1)
+        # rospy.loginfo("math done %s",  rospy.Time.now().to_sec() - t1)
 
-        self.grid_map.set_value_of_pose_array(unique_points, counts,50)
+        self.grid_map.import_point_cloud(points)
         
         rospy.loginfo("Gridmap updated %s", rospy.Time.now().to_sec() - t1)        
         return
