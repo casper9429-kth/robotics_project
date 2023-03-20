@@ -2,7 +2,7 @@
 import rospy
 from rospy import ServiceProxy
 from actionlib import SimpleActionServer
-from arm.srv import SetPickUpTarget, ArmTrigger
+from arm.srv import Target, ArmTrigger
 from arm.msg import ArmAction, ArmGoal, ArmResult, ArmFeedback
 
 
@@ -13,28 +13,31 @@ class ArmActions():
 
         # Service Proxies
 
-        rospy.wait_for_service('arm/poses/straight')
-        self.straight = ServiceProxy('arm/poses/straight', ArmTrigger)
-        rospy.wait_for_service('arm/poses/default')
-        self.default = ServiceProxy('arm/poses/default', ArmTrigger)
-        rospy.wait_for_service('arm/poses/observe')
-        self.observe = ServiceProxy('arm/poses/observe', ArmTrigger)
-        rospy.wait_for_service('arm/poses/prepare_to_pick_up')
-        self.prepare_to_pick_up = ServiceProxy('arm/poses/prepare_to_pick_up', ArmTrigger)
-        rospy.wait_for_service('arm/poses/pick_up')
-        self.pick_up = ServiceProxy('arm/poses/pick_up', ArmTrigger)
+        rospy.wait_for_service('arm/steps/straight')
+        self.straight = ServiceProxy('arm/steps/straight', ArmTrigger)
+        rospy.wait_for_service('arm/steps/default')
+        self.default = ServiceProxy('arm/steps/default', ArmTrigger)
+        rospy.wait_for_service('arm/steps/observe')
+        self.observe = ServiceProxy('arm/steps/observe', ArmTrigger)
+        rospy.wait_for_service('arm/steps/hover_target')
+        self.hover_target = ServiceProxy('arm/steps/hover_target', ArmTrigger)
+        rospy.wait_for_service('arm/steps/on_target')
+        self.on_target = ServiceProxy('arm/steps/on_target', ArmTrigger)
 
-        rospy.wait_for_service('arm/poses/open_gripper')
-        self.open_gripper = ServiceProxy('arm/poses/open_gripper', ArmTrigger)
-        rospy.wait_for_service('arm/poses/close_gripper')
-        self.close_gripper = ServiceProxy('arm/poses/close_gripper', ArmTrigger)
+        rospy.wait_for_service('arm/steps/open_gripper')
+        self.open_gripper = ServiceProxy('arm/steps/open_gripper', ArmTrigger)
+        rospy.wait_for_service('arm/steps/close_gripper')
+        self.close_gripper = ServiceProxy('arm/steps/close_gripper', ArmTrigger)
 
-        rospy.wait_for_service('arm/poses/set_target')
-        self.set_pick_up_target = ServiceProxy('arm/poses/set_target', SetPickUpTarget)
+        rospy.wait_for_service('arm/steps/set_target')
+        self.set_pick_up_target = ServiceProxy('arm/steps/set_target', Target)
+        rospy.wait_for_service('arm/steps/target_is_valid')
+        self.target_is_valid_service = ServiceProxy('arm/steps/target_is_valid', Target, self.target_is_valid_service_callback)
 
         # Action Server
         action_server = SimpleActionServer('arm_actions', ArmAction, self.execute_callback, auto_start=False)
         # TODO if a new goal is received, cancel the current goal
+        # TODO on cancel, return to straight position
         self.running = False
         action_server.start()
 
