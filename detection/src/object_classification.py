@@ -172,7 +172,7 @@ class Object_classifier():
                 color = (255, 0, 0)
                 thickness = 2
                 cv_image = cv2.rectangle(cv_image, start_point, end_point, color, thickness)
-                cv_image = cv2.putText(cv_image, self.mapping[bb["category"]], (start_point[0]-10, start_point[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 
+                cv_image = cv2.putText(cv_image, bb_msg.category_name, (start_point[0]-10, start_point[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 
                    1, color, thickness, cv2.LINE_AA)
                 imgMsg = self.bridge.cv2_to_imgmsg(cv_image, "rgb8")
                 self.image_bb_pub.publish(imgMsg)

@@ -39,8 +39,8 @@ class Obstacle_detection():
         # # Convert Open3D -> NumPy
         # points = np.asarray(ds_cloud.points)
     
-        labels = np.array(ds_cloud.cluster_dbscan(eps=0.02, min_points=10, print_progress=False))
-        max_label = labels.max()
+        #labels = np.array(ds_cloud.cluster_dbscan(eps=0.02, min_points=10, print_progress=False))
+        #max_label = labels.max()
         # colors = matplotlib.cm.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
         # colors[labels < 0] = 0
         # ds_cloud.colors = o3d.utility.Vector3dVector(colors[:, :3])
