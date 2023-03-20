@@ -39,10 +39,6 @@ class ekf_odom():
         """
         rospy.init_node('ekf_odom')
 
-        # Subscribers
-        self.sub_goal = rospy.Subscriber('/motor/encoders', Encoders, self.encoder_callback)
-        self.sub_imu = rospy.Subscriber('/imu/data', Imu, self.imu_callback)
-        self.duty_cycle_pub = rospy.Subscriber('/motor/duty_cycles', DutyCycles, self.duty_cycle_callback)
                                           
         # Publish the map and the odometry
         self.odom_pub = rospy.Publisher("odom", Odometry, queue_size=50)
@@ -99,6 +95,12 @@ class ekf_odom():
         self.last_time = rospy.Time.now().to_sec()
         self.current_time_sec = rospy.Time.now().to_sec()
         self.current_time_sec = rospy.Time.now().to_sec()
+
+        # Subscribers
+        self.sub_goal = rospy.Subscriber('/motor/encoders', Encoders, self.encoder_callback)
+        self.sub_imu = rospy.Subscriber('/imu/data', Imu, self.imu_callback)
+        self.duty_cycle_pub = rospy.Subscriber('/motor/duty_cycles', DutyCycles, self.duty_cycle_callback)
+
 
         
 
