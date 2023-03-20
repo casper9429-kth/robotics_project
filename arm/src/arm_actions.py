@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import rospy
 from rospy import ServiceProxy
+from actionlib import SimpleActionServer
 from arm.srv import SetPickUpTarget, ArmTrigger
+from arm.msg import ArmAction, ArmGoal, ArmResult, ArmFeedback
 
 
 class ArmActions():
@@ -10,8 +12,6 @@ class ArmActions():
         rospy.init_node('arm_actions')
 
         # Service Proxies
-
-        # TODO wait for services to be available
 
         rospy.wait_for_service('arm/poses/straight')
         self.straight = ServiceProxy('arm/poses/straight', ArmTrigger)
@@ -32,6 +32,12 @@ class ArmActions():
         rospy.wait_for_service('arm/poses/set_target')
         self.set_pick_up_target = ServiceProxy('arm/poses/set_target', SetPickUpTarget)
 
+        # Action Server
+        action_server = SimpleActionServer('arm_actions', ArmAction, self.execute_callback, auto_start=False)
+        # TODO if a new goal is received, cancel the current goal
+        self.running = False
+        action_server.start()
+
         # Define rate
         self.update_rate = 10 # [Hz]
         self.update_dt = 1.0/self.update_rate # [s]
@@ -41,20 +47,21 @@ class ArmActions():
 
     ###### All your callbacks here ######
 
-    def some_callback(self, req):
+    def execute_callback(self, goal: ArmGoal):
         """
         Some callback.
         """
-        pass
-        
-    ###### All your other methods here #######
-    
-    def main(self): # Do main stuff here
-        """
-        Main loop, instead of changing run function,
-        write your code here to make it more readable.
-        """
-        pass
+        # TODO check if goal is valid
+        # TODO check if goal is already running
+        # TODO check if goal is already finished
+
+        # Set running to true
+        self.running = True
+
+        # TODO execute goal
+
+        # Set running to false
+        self.running = False
 
     def run(self):
         """
