@@ -164,7 +164,7 @@ class Object_classifier():
                 else:
                     bb_msg.category_name = self.mapping[bb["category"]]
                 
-                if bb_msg.category_name is not None:
+                if bb_msg.category_name is not None and depth < 2:
                     # visualize image with bb in Rviz
                     start_point = (x_bb, y_bb)
                     end_point = (int(x_bb+bb["width"]), int(y_bb+bb["height"]))
@@ -226,7 +226,7 @@ class Object_classifier():
 
         category_name = ""
         total_sum = count_red + count_green + count_blue
-        if category_id== 6 and  0.9 < abs(np.mean([count_red, count_green, count_blue]))/count_green < 1.1 and total_sum>40:
+        if category_id == 6 and  count_green > 0 and 0.9 < abs(np.mean([count_red, count_green, count_blue]))/count_green < 1.1 and total_sum>40:
             # rospy.loginfo("%s, %s, %s",count_red, count_green, count_blue)
             category_name = mapping[3]
         elif  max_color == count_red and total_sum>40:
