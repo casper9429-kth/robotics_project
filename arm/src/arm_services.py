@@ -6,6 +6,9 @@ from hiwonder_servo_msgs.msg import CommandDuration
 from std_srvs.srv import Trigger, TriggerResponse
 from rospy import Service
 from sensor_msgs.msg import JointState
+from tf2_ros import StaticTransformBroadcaster
+from geometry_msgs.msg import TransformStamped
+from tf.transformations import quaternion_from_euler
 
 from arm.srv import Target, TargetResponse, ArmTrigger, ArmTriggerResponse
 
@@ -107,6 +110,13 @@ class ArmServices():
             'target out of reach': 'Target out of reach',
         }
 
+        self.base_link_to_arm_base_x = -0.088
+        self.base_link_to_arm_base_y = -0.047
+        self.base_link_to_arm_base_z = 0.042
+        self.base_link_to_arm_base_yaw = pi
+        self.base_link_to_arm_base_pitch = 0
+        self.base_link_to_arm_base_roll = 0
+        self.broadcast_arm_base_tf()
 
     ###### All your callbacks here ######
 
@@ -261,6 +271,27 @@ class ArmServices():
         """ Publishes the current gripper state. """
         duration *= 1000 # [s] -> [ms]
         self.gripper_pub.publish(CommandDuration(data=gripper, duration=duration))
+
+    def broadcast_arm_base_tf(self):
+        # Broadcast base_link to arm_base transform
+        self.tf2_broadcaster = StaticTransformBroadcaster()
+        self.tf2_transform = TransformStamped()
+        self.tf2_transform.header.frame_id = 'base_link'
+        self.tf2_transform.child_frame_id = 'arm_base'
+        self.tf2_transform.transform.translation.x = self.base_link_to_arm_base_x
+        self.tf2_transform.transform.translation.y = self.base_link_to_arm_base_y
+        self.tf2_transform.transform.translation.z = self.base_link_to_arm_base_z
+        # euler angles
+        yaw = self.base_link_to_arm_base_yaw
+        pitch = self.base_link_to_arm_base_pitch
+        roll = self.base_link_to_arm_base_roll
+        # quaternion
+        q = quaternion_from_euler(roll, pitch, yaw)
+        self.tf2_transform.transform.rotation.x = q[0]
+        self.tf2_transform.transform.rotation.y = q[1]
+        self.tf2_transform.transform.rotation.z = q[2]
+        self.tf2_transform.transform.rotation.w = q[3]
+        self.tf2_broadcaster.sendTransform(self.tf2_transform)
 
     def main(self): # Do main stuff here
         """
