@@ -16,22 +16,44 @@ class path_planner():
         self.path_client = actionlib.SimpleActionClient('path_tracker', MoveBaseAction)
         self.path_client.wait_for_server()
 
+
+        self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
+
+        # self.goal = MoveBaseGoal()
+        # self.goal.target_pose.header.frame_id = "map"
+        # self.goal.target_pose.header.stamp = rospy.Time.now()
+        # self.goal.target_pose.pose.position.x = 1.0
+        # self.goal.target_pose.pose.position.y = 0.0
+        # self.goal.target_pose.pose.position.z = 0.0
+        # self.goal.target_pose.pose.orientation.x = 0.0
+        # self.goal.target_pose.pose.orientation.y = 0.0
+        # self.goal.target_pose.pose.orientation.z = 0.0
+        # self.goal.target_pose.pose.orientation.w = 1.0
+        # self.path_client.send_goal(self.goal)
+        # self.path_client.wait_for_result()
+        # print("Path tracker finished")
+
+
+    def goal_callback(self, msg):
+        
         self.goal = MoveBaseGoal()
         self.goal.target_pose.header.frame_id = "map"
         self.goal.target_pose.header.stamp = rospy.Time.now()
-        self.goal.target_pose.pose.position.x = 1.0
-        self.goal.target_pose.pose.position.y = 0.0
-        self.goal.target_pose.pose.position.z = 0.0
-        self.goal.target_pose.pose.orientation.x = 0.0
-        self.goal.target_pose.pose.orientation.y = 0.0
-        self.goal.target_pose.pose.orientation.z = 0.0
-        self.goal.target_pose.pose.orientation.w = 1.0
+        self.goal.target_pose.pose.position.x = msg.pose.position.x
+        self.goal.target_pose.pose.position.y = msg.pose.position.y
+        self.goal.target_pose.pose.position.z = msg.pose.position.z
+        self.goal.target_pose.pose.orientation.x = msg.pose.orientation.x
+        self.goal.target_pose.pose.orientation.y = msg.pose.orientation.y
+        self.goal.target_pose.pose.orientation.z = msg.pose.orientation.z
+        self.goal.target_pose.pose.orientation.w = msg.pose.orientation.w
         self.path_client.send_goal(self.goal)
         self.path_client.wait_for_result()
-        print("Path tracker finished")
+        print("Goal received")
+
 
 if __name__ == '__main__':
     try:
         pp = path_planner()
+        rospy.spin()
     except rospy.ROSInterruptException:
         pass

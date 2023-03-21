@@ -112,7 +112,7 @@ class PathTracker():
         # To control the robots movement
         self.move = Twist()
         self.acceleration = 0.05
-        self.max_speed = 0.5
+        self.max_speed = 0.6
         self.max_angle = 0.1
         self.angle_speed = 0.7
         self.deceleration_distance = 0.0
@@ -155,18 +155,12 @@ class PathTracker():
         rospy.spin()
 
     def execute_cb(self, goal):
-        self.goal = goal.target_pose
-        print('Goal recieved')
-        self.path_tracker_server.set_succeeded()
+        self.goal = goal.target_pose            # target_pose is a PosedStamped
         
+        self.path_tracker_server.set_succeeded()
+        self.main()
+        print('Goal recieved')
 
-        # self.goal_theta_in_odom = self.get_theta(self.goal)
-        # self.deceleration_distance = self.get_deceleration_distance(self.max_speed, self.acceleration)
-        # print('Goal recieved')
-        # while not rospy.is_shutdown():
-        #     self.transforms()
-        #     self.move_robot()
-        #     self.rate.sleep()
    
     # To get the position of the goal
     def goal_callback(self, msg:PoseStamped):
@@ -311,7 +305,7 @@ class PathTracker():
     def spin(self):
         #print(self.goal.pose)
         #print(self.check_if_in_fence(self.goal.pose))
-        if self.check_if_in_fence(self.goal.pose):
+        if self.check_if_in_fence(self.goal.pose): #
             #print('In fence')
             self.transforms()
             self.math()
@@ -325,7 +319,7 @@ class PathTracker():
     def main(self):
         try:
             while not rospy.is_shutdown():
-                # self.spin()
+                self.spin()
                 self.rate.sleep()
         except rospy.ROSInterruptException:
             pass
@@ -333,4 +327,4 @@ class PathTracker():
 
 if __name__ == '__main__':
     node = PathTracker()
-    node.main()
+    # node.main()
