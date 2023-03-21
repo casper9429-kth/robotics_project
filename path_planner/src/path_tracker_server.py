@@ -251,19 +251,19 @@ class PathTracker():
             if angle_to_goal >= self.max_angle:
                 self.move.linear.x = 0.0
                 self.move.angular.z = self.angle_speed 
-                #print('turning left')
+                # print('turning left')
 
             elif angle_to_goal <= -self.max_angle:
                 self.move.linear.x = 0.0
                 self.move.angular.z = -self.angle_speed 
-                #print('turning right')
+                # print('turning right')
 
             else:
                 self.move.linear.x = self.velocity_controller(distance)
                 self.move.angular.z = 0.0
                 
         else:
-            #print('Goal reached')
+            # print('Goal reached')
             if abs(dtheta) >= self.orientaion_tolerance:
                 self.move.linear.x = 0.0
                 if dtheta >= 0:
@@ -275,7 +275,7 @@ class PathTracker():
             else:
                 self.move.linear.x = 0.0
                 self.move.angular.z = 0.0
-                print('Goal orientation reached')
+                # print('Goal orientation reached')
 
 
         
