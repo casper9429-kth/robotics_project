@@ -30,16 +30,13 @@ class ArmActions():
         self.close_gripper = ServiceProxy('arm/steps/close_gripper', ArmTrigger)
 
         rospy.wait_for_service('arm/steps/set_target')
-        self.set_pick_up_target = ServiceProxy('arm/steps/set_target', Target)
+        self.set_target = ServiceProxy('arm/steps/set_target', Target)
         rospy.wait_for_service('arm/steps/target_is_valid')
-        self.target_is_valid_service = ServiceProxy('arm/steps/target_is_valid', Target, self.target_is_valid_service_callback)
+        self.target_is_valid = ServiceProxy('arm/steps/target_is_valid', Target)
 
         # Action Server
-        action_server = SimpleActionServer('arm_actions', ArmAction, self.execute_callback, auto_start=False)
-        # TODO if a new goal is received, cancel the current goal
-        # TODO on cancel, return to straight position
-        self.running = False
-        action_server.start()
+        self.action_server = SimpleActionServer('arm_actions', ArmAction, self.execute_callback, auto_start=False)
+        self.action_server.start()
 
         # Define rate
         self.update_rate = 10 # [Hz]
@@ -47,35 +44,67 @@ class ArmActions():
         self.rate = rospy.Rate(self.update_rate)
 
         # Parameters
+        self.steps = {
+            'pick_up': [
+                self.open_gripper,
+                self.straight,
+                self.hover_target,
+                self.on_target,
+                self.close_gripper,
+                self.hover_target,
+                self.straight
+            ],
+            'drop_off': [
+                self.straight,
+                self.hover_target,
+                self.on_target,
+                self.open_gripper,
+                self.hover_target,
+                self.straight
+            ]
+        }
 
     ###### All your callbacks here ######
 
     def execute_callback(self, goal: ArmGoal):
         """
-        Some callback.
+        This function is called when the action server receives a new goal.
         """
-        # TODO check if goal is valid
-        # TODO check if goal is already running
-        # TODO check if goal is already finished
+        if goal.action not in self.steps.keys():
+            self.action_server.set_aborted(text=f"Invalid action: '{goal.action}', valid actions are: {list(self.steps.keys())}")
+            return
+        
+        validation = self.target_is_valid(goal.type, goal.x, goal.y, goal.z, goal.yaw)
+        if not validation.valid:
+            self.action_server.set_aborted(text=f"Invalid target: {validation.message}")
+            return
+        
+        response = self.set_target(goal.type, goal.x, goal.y, goal.z, goal.yaw)
+        feedback = ArmFeedback(response.valid, response.message, 0)
+        self.action_server.publish_feedback(feedback)
+        if not response.valid:
+            self.action_server.set_aborted()
+            return
+        
+        for step in self.steps[goal.action]:
+            response = step()
+            feedback = ArmFeedback(response.success, response.message, response.duration)
+            self.action_server.publish_feedback(feedback)
+            if not response.success:
+                self.action_server.set_aborted()
+                return
+            rospy.sleep(response.duration)
 
-        # Set running to true
-        self.running = True
-
-        # TODO execute goal
-
-        # Set running to false
-        self.running = False
-
+        result = ArmResult(message="Action completed successfully", success=True)
+        self.action_server.set_succeeded(result)
+    
     def run(self):
         """
         Run the node. 
         Don't change anything here, change main instead.
         """
         
-        # Run as long as node is not shutdown
-        while not rospy.is_shutdown():
-            self.main()
-            self.rate.sleep()
+        rospy.spin()
 
 
 if __name__ == "__main__":
