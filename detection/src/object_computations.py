@@ -29,7 +29,7 @@ class Object_computations():
         self.frame_id = "camera_color_optical_frame"
 
         # Define rate
-        self.update_rate = 2 # [Hz] Change this to the rate you want
+        self.update_rate = 1 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
 
@@ -43,55 +43,54 @@ class Object_computations():
     def filter(self, batch, time):
 
         nb_msgs = len(batch)
-        #rospy.loginfo("objects len: %s", nb_msgs)
-        
-        # cluster on position
-        X = []
-        bb_list = []
-        for i in range(nb_msgs):
-            curr_msg = batch[i]
-            nb_bb = len(curr_msg.bounding_boxes)
-            for bb in curr_msg.bounding_boxes:
-                bb_list.append(bb)
-                X.append([bb.bb_center.x, bb.bb_center.y, bb.bb_center.z])
-
-        Y = pdist(X, 'euclidean')
-
-        Z = linkage(Y, method='single', metric='euclidean')
-     
-        clusters = fcluster(Z, t=0.1, criterion='distance')
-
-
-        # keep clusters with more than 10 bb detected
-        bbs_by_cluster = []
-        for i in np.unique(clusters):
-            bb_cluster = []
-            a = (j for j in range(len(clusters)) if clusters[j] == i )
-            for index in a:
-                bb_cluster.append(bb_list[index])
-            if len(bb_cluster)>10:
-                bbs_by_cluster.append(bb_cluster)
+        rospy.loginfo("objects len: %s", nb_msgs)
+        if nb_msgs > 0:
+            # cluster on position
+            X = []
+            bb_list = []
+            for i in range(nb_msgs):
+                curr_msg = batch[i]
+                nb_bb = len(curr_msg.bounding_boxes)
+                for bb in curr_msg.bounding_boxes:
+                    bb_list.append(bb)
+                    X.append([bb.bb_center.x, bb.bb_center.y, bb.bb_center.z])
             
-        # take mean position and maximum category_name
-        for cluster in bbs_by_cluster:
-            category_names = [o.category_name for o in cluster]
-            x = [o.bb_center.x for o in cluster]
-            y = [o.bb_center.y for o in cluster]
-            z = [o.bb_center.z for o in cluster]
-            occurence_count = Counter(category_names)
-            category_name = occurence_count.most_common(1)[0][0]
-            x = np.mean(x)
-            y = np.mean(y)
-            z = np.mean(z)
-            self.save_instances((category_name, x, y, z), time)
-            #rospy.loginfo("category_name:%s, x=%s, y=%s, z=%s",category_name,x,y,z)
+            Y = pdist(X, 'euclidean')
+         
+            Z = linkage(Y, method='single', metric='euclidean')
+        
+            clusters = fcluster(Z, t=0.1, criterion='distance')
+
+
+            # keep clusters with more than 10 bb detected
+            bbs_by_cluster = []
+            for i in np.unique(clusters):
+                bb_cluster = []
+                a = (j for j in range(len(clusters)) if clusters[j] == i )
+                for index in a:
+                    bb_cluster.append(bb_list[index])
+                if len(bb_cluster)>12:
+                    bbs_by_cluster.append(bb_cluster)
+                
+            # take mean position and maximum category_name
+            for cluster in bbs_by_cluster:
+                category_names = [o.category_name for o in cluster]
+                x = [o.bb_center.x for o in cluster]
+                y = [o.bb_center.y for o in cluster]
+                z = [o.bb_center.z for o in cluster]
+                occurence_count = Counter(category_names)
+                category_name = occurence_count.most_common(1)[0][0]
+                x = np.mean(x)
+                y = np.mean(y)
+                z = np.mean(z)
+                self.save_instances((category_name, x, y, z), time)
+                #rospy.loginfo("category_name:%s, x=%s, y=%s, z=%s",category_name,x,y,z)
 
 
     def save_instances(self, new_instance, time):
         
         # convert coordinates to map frame
         point_map = self.instance_to_point_map(new_instance, time)
-
         # test if there is already an instance of that category in the list
         instances = [item for item in self.objects_dict if new_instance[0] in item]
         
@@ -100,7 +99,7 @@ class Object_computations():
         if nb_instances == 0:
             # add instance to dict 
             instance_key = new_instance[0]+str(1)
-            self.objects_dict[instance_key] = new_instance
+            self.objects_dict[instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z)   
 
             # notify if new object detected
             rospy.loginfo("New object detected: %s. Position in map: %s", instance_key,point_map.point)
@@ -109,19 +108,34 @@ class Object_computations():
             self.publish_tf(instance_key, point_map)
 
         else:
-            
+            found_close = 0
+            rospy.loginfo(instances)
             for old_instance_key in instances:
                 instance = self.objects_dict[old_instance_key]
-                #rospy.loginfo(instance)
-                dist = math.sqrt((point_map.point.x + int(instance[1]))**2 + (point_map.point.y + int(instance[2]))**2 + (point_map.point.z + int(instance[3]))**2 )
-                
-                if dist < 0.1:
+                # rospy.loginfo("current instance: %s", old_instance_key)
+                # rospy.loginfo("old: %s, new: %s",instance,point_map.point)
+                dist = math.sqrt((point_map.point.x - float(instance[1]))**2 + (point_map.point.y - float(instance[2]))**2 + (point_map.point.z - float(instance[3]))**2 )
+                # rospy.loginfo("dist = %s",dist)
+                if dist < 0.15:
                     #TODO: add check category ??
                     # update
-                    self.objects_dict[old_instance_key] = new_instance
+                    self.objects_dict[old_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z)  
 
                     # publish tf
                     self.publish_tf(old_instance_key, point_map)
+                    
+                    found_close = 1
+                    
+            if not found_close:
+                # add instance to dict 
+                instance_key = new_instance[0]+str(nb_instances+1)
+                self.objects_dict[instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z)  
+
+                # notify if new object detected
+                rospy.loginfo("New object detected: %s. Position in map: %s", instance_key,point_map.point)
+
+                # publish tf
+                self.publish_tf(instance_key, point_map)
 
 
     def instance_to_point_map(self, instance, time):
@@ -167,9 +181,9 @@ class Object_computations():
         """
         
         if rospy.Time.now() > rospy.Time():
-            batch = self.cache.getInterval(rospy.Time.now()-rospy.Duration.from_sec(1), rospy.Time.now())
+            batch = self.cache.getInterval(rospy.Time.now()-rospy.Duration.from_sec(2), rospy.Time.now())
             if len(batch)>0:
-                self.filter(batch, rospy.Time.now()-rospy.Duration.from_sec(0.5))
+                self.filter(batch, rospy.Time.now()-rospy.Duration.from_sec(1))
         #rospy.loginfo(self.cache.getOldestTime())
         
 
