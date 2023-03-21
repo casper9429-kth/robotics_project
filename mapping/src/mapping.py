@@ -58,6 +58,8 @@ class GridMap():
         # Geofence coord 
         self.given_geofence = False
         self.geofence_list = []
+        self.geo_fence_index_dict = defaultdict(lambda: 0)
+
         
         # Bounding box
         self.bounding_box = [0,0,0,0]
@@ -103,12 +105,12 @@ class GridMap():
             if y > self.bounding_box[3]:
                 self.bounding_box[3] = y
         
-
         # Change all cordiantes to grid coordinates if they are on our outside of the geofence polygon
         for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
             for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
                 if not self.is_point_in_polygon(x,y,self.geofence_list):
-                    self.map_grid[(i,j)] = 1
+                    self.map_grid[(i,j)] = 2
+
 
         # Set given geofence to true
         self.given_geofence = True
@@ -220,7 +222,11 @@ class GridMap():
             rospy.logwarn("No geofence given, but trying to get map grid")
             return None
         
-        self.map_grid[(i,j)] = value
+        # check for tuple in geo_fence_index_list numpy array
+        if self.map_grid[(i,j)] != 2:
+            self.map_grid[(i,j)] = value
+
+        
     
     def set_value_of_pos(self,x,y,value):
         """Set value of position in map grid, if not given geofence, return None"""
@@ -264,12 +270,7 @@ class GridMap():
         ranges = np.sqrt(np.sum(pointcloud**2,axis=1))
         angle = np.arctan2(pointcloud[:,1],pointcloud[:,0])
 
-        # Get min and max
-        minangle = np.min(angle)
-        maxangle = np.max(angle)
-        minrange = np.min(ranges)
-        maxrange = np.max(ranges)
-
+        # round to resolution
         resolution_ang = np.pi/100
         angle = np.floor(angle/resolution_ang)*resolution_ang
         resolution_rang = self.resolution/10
@@ -278,17 +279,6 @@ class GridMap():
         # map angle from -pi to pi
         angle = np.mod(angle+np.pi,2*np.pi)-np.pi        
 
-
-
-
-
-
-        
-        # Get min and max
-        minangle = np.min(angle)
-        maxangle = np.max(angle)
-        minrange = np.min(ranges)
-        maxrange = np.max(ranges)
 
         # Create rays
         rays = np.stack((angle,ranges),axis=1)
@@ -312,16 +302,6 @@ class GridMap():
             # find max valu
             ray_list = np.array(ray_list)
 
-            # find index of first local maxima in ray list from index 0
-            
-            ## smooth ray list
-            #ray_list[:,2] = gaussian_filter1d(ray_list[:,2],sigma=2)
-            
-            ## find index of first local maxima of ray list
-            #index = argrelextrema(ray_list[:,2], np.greater)[0]        
-            
-            # find first elem with count > count_threshold
-
             # find shortest ray with count > count_threshold
             ray_list = ray_list[ray_list[:,2] > count_threshold]
             ray_list = ray_list[ray_list[:,1].argsort()]
@@ -334,24 +314,12 @@ class GridMap():
             if ray[2] > count_threshold:
                 rays.append(ray[0:2])
 
+        # make rays np array
         rays = np.array(rays)
-        # we have the rays.
         
-        # we have rays from the robots point of view, 
-                
 
         # offset rays by robot theta
         rays[:,0] = rays[:,0] + theta
-        
-        
-
-        # Make all points in map until ray end 0, make end of ray 1
-        #for ray in rays:
-        #    # make end point of ray 1 
-        #    ray_end = ray
-        #    new_x = x + ray_end[1]*np.cos(ray_end[0])
-        #    new_y = y + ray_end[1]*np.sin(ray_end[0])
-        #    self.set_value_of_pos(new_x,new_y,1)
         
         # Make all points inbetween robot and ray 0, make end of ray 1
         for ray in rays:
@@ -477,10 +445,10 @@ class Mapping():
 
 
     def cloud_callback(self, msg: PointCloud2):
-        rospy.loginfo("##################")
+        #rospy.loginfo("##################")
 
         if rospy.Time.now() - self.t_latest_cloud < self.t_treshold:
-            rospy.loginfo("cloud callback too fast")
+            #rospy.loginfo("cloud callback too fast")
             return
         
 
@@ -496,45 +464,23 @@ class Mapping():
         ds_cloud = cropped.voxel_down_sample(voxel_size=self.resolution/10)
 
 
-        rospy.loginfo("downsmaple done %s",  rospy.Time.now().to_sec() - t1)
-
-
         # # Convert Open3D -> NumPy
         points = np.asarray(ds_cloud.points)
         #colors = np.asarray(ds_cloud.colors)
 
         
-        # import points in to grid map 
-                
+        # import points in to grid map         
         if len(points) == 0:
             return
-        
-        # Get bbox
-        #minx = np.min(points[:,0])
-        #maxx = np.max(points[:,0])
-        #miny = np.min(points[:,1])
-        #maxy = np.max(points[:,1])
-        #bbox = [minx, maxx, miny, maxy]    
-                
-        #points = points[:,:2]
+                        
         new_points = np.zeros((len(points),2))
         new_points[:,0] = points[:,2]
         new_points[:,1] = -points[:,0]
         points = new_points
         # Count number of identical points and save as dict
 
-        # unique, counts = np.unique(points, axis=0, return_counts=True)
-
-        # Transform into points 
-        # unique_points = np.zeros((len(unique),2))
-        # unique_points[:,0] = unique[:,0]*self.resolution + minx
-        # unique_points[:,1] = unique[:,1]*self.resolution + miny
-
-        # rospy.loginfo("math done %s",  rospy.Time.now().to_sec() - t1)
-
         self.grid_map.import_point_cloud(points)
         
-        rospy.loginfo("Gridmap updated %s", rospy.Time.now().to_sec() - t1)        
         return
 
 
