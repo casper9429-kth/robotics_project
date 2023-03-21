@@ -55,6 +55,12 @@ class GridMap():
         # map grid (tuples)
         self.map_grid = defaultdict(lambda: -1)
         
+        # values
+        self.occupied = 1
+        self.unkown = -1
+        self.free = 0
+        self.wall = 2
+        
         # Geofence coord 
         self.given_geofence = False
         self.geofence_list = []
@@ -85,7 +91,7 @@ class GridMap():
             for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
                 for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
                     if not self.is_point_in_polygon(x,y,self.geofence_list):
-                        self.map_grid[(i,j)] = -1
+                        self.map_grid[(i,j)] = self.unkown
 
         # save new geofence
         self.geofence_list = self.geofence_list_new 
@@ -109,7 +115,7 @@ class GridMap():
         for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
             for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
                 if not self.is_point_in_polygon(x,y,self.geofence_list):
-                    self.map_grid[(i,j)] = 2
+                    self.map_grid[(i,j)] = self.wall
 
 
         # Set given geofence to true
@@ -182,6 +188,8 @@ class GridMap():
         y_index = int((y-self.bounding_box[2])/self.resolution)
         
         return x_index, y_index
+    
+        
         
     def get_pos_of_index(self,i,j):
         """Return position of index in map grid, if not given geofence, return None"""
@@ -321,6 +329,10 @@ class GridMap():
         # offset rays by robot theta
         rays[:,0] = rays[:,0] + theta
         
+        # default dict to store points 
+        points_to_add = defaultdict()
+
+
         # Make all points inbetween robot and ray 0, make end of ray 1
         for ray in rays:
             # make end point of ray 1 
@@ -340,6 +352,7 @@ class GridMap():
             # get points
             xs = np.linspace(x,new_x,n)[0:-1]
             ys = np.linspace(y,new_y,n)[0:-1]
+        
             
             # set values of points inbetween
             for i in range(len(xs)-1):
@@ -347,11 +360,16 @@ class GridMap():
                 x2 = xs[i+1]
                 y1 = ys[i]
                 y2 = ys[i+1]               
+
+                p1 = self.get_index_of_pos(x1,y1)
+                p2 = self.get_index_of_pos(x2,y2)
+                p3 = self.get_index_of_pos(x1,y2)
+                p4 = self.get_index_of_pos(x2,y1)
+                points_to_add[p1] = self.free
+                points_to_add[p2] = self.free
+                points_to_add[p3] = self.free
+                points_to_add[p4] = self.free
                 
-                self.set_value_of_pos(x1,y1,-1)
-                self.set_value_of_pos(x1,y2,-1)
-                self.set_value_of_pos(x2,y1,-1)
-                self.set_value_of_pos(x2,y2,-1)
                 
                 
         for ray in rays:
@@ -359,10 +377,14 @@ class GridMap():
             ray_end = ray
             new_x = x + ray_end[1]*np.cos(ray_end[0])
             new_y = y + ray_end[1]*np.sin(ray_end[0])
-            self.set_value_of_pos(new_x,new_y,1)
+            p1 = self.get_index_of_pos(new_x,new_y)
+            points_to_add[p1] = self.occupied
+            #self.set_value_of_pos(new_x,new_y,1)
             
 
-        
+        for p in points_to_add.keys():
+            self.set_value_of_index(p[0],p[1],points_to_add[p])
+            #self.set_value_of_pos(p[0],p[1],points_to_add[p])        
 
         return        
 
@@ -457,7 +479,7 @@ class Mapping():
 
         # Convert ROS -> Open3D
         cloud = o3drh.rospc_to_o3dpc(msg)
-        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 0.075, 100.0 ])))
+        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 0.075, 0.8 ])))
         cropped = cropped
         
         # Downsample the point cloud to 1/10 of resolution 
