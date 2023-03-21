@@ -110,12 +110,12 @@ class ArmServices():
             'target out of reach': 'Target out of reach',
         }
 
-        self.base_link_to_arm_base_x = -0.088
-        self.base_link_to_arm_base_y = -0.047
-        self.base_link_to_arm_base_z = 0.042
-        self.base_link_to_arm_base_yaw = pi
-        self.base_link_to_arm_base_pitch = 0
-        self.base_link_to_arm_base_roll = 0
+        self.base_link_to_arm_base_x = -0.088 # [m]
+        self.base_link_to_arm_base_y = -0.047 # [m]
+        self.base_link_to_arm_base_z = 0.042 # [m]
+        self.base_link_to_arm_base_yaw = pi # [rad]
+        self.base_link_to_arm_base_pitch = 0 # [rad]
+        self.base_link_to_arm_base_roll = 0 # [rad]
         self.broadcast_arm_base_tf()
 
     ###### All your callbacks here ######
