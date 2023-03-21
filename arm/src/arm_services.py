@@ -78,7 +78,7 @@ class ArmServices():
 
         # Duration of the motion
         self.max_joint_speed = 0.8 # [rad/s]
-        self.gripper_duration = 1 # [s]
+        self.gripper_duration = 1 # [s] TODO: make this dynamic
 
         # gripper
         self.gripper_open = -1.8
@@ -206,8 +206,13 @@ class ArmServices():
             self.inverse_kinematics(x, y, z + self.on_target_margin, yaw)
         except ValueError:
             return False
-        if True: # TODO
-            return True
+        # only work in front of the robot
+        x_max = -0.145
+        # don't go beneath the ground
+        z_min = -0.14
+        if x > x_max or z < z_min:
+            return False
+        return True
 
     def inverse_kinematics(self, x, y, z, yaw):
         """ Calculates the inverse kinematics for the arm. """
