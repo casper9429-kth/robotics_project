@@ -137,7 +137,7 @@ class Object_classifier():
         
         with torch.no_grad():
             out = self.detector(test_image).cpu()
-            bbs = self.detector.decode_output(out, 0.5)
+            bbs = self.detector.decode_output(out, 0.85)
 
             
             bb_list_msg = BoundingBoxArray()

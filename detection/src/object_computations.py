@@ -90,6 +90,7 @@ class Object_computations():
     def save_instances(self, new_instance, time):
         
         # convert coordinates to map frame
+        #TODO: try catch around here
         point_map = self.instance_to_point_map(new_instance, time)
         # test if there is already an instance of that category in the list
         instances = [item for item in self.objects_dict if new_instance[0] in item]
