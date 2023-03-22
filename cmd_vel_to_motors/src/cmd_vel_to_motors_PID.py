@@ -50,6 +50,14 @@ class cmd_vel_to_motors:
         # Define the publiser to the /motor/duty_cycles topic
         self.duty_cycle_pub = rospy.Publisher('/motor/duty_cycles', DutyCycles, queue_size=1)
         
+        # Define some variables that the twist callback will use
+        self.linear_velocity = 0.0
+        self.angular_velocity = 0.0
+        
+        # Define left v and right v
+        self.v_left_enco = 0.0
+        self.v_right_enco = 0.0
+
         # Define the subscriber to the /cmd_vel topic
         self.cmd_vel_sub = rospy.Subscriber('/cmd_vel', Twist, self.cmd_vel_callback)
         self.encoder_sub = rospy.Subscriber('/motor/encoders',Encoders,self.encoder_callback)
@@ -57,13 +65,6 @@ class cmd_vel_to_motors:
         # Deine the rate at which the node will run        
         self.rate = rospy.Rate(20)
     
-        # Define some variables that the twist callback will use
-        self.linear_velocity = 0.0
-        self.angular_velocity = 0.0
-        
-        # Define left v and right v
-        self.v_left_enco = 0
-        self.v_right_enco = 0
 
         # Define a DutyCycles message 
         self.duty_cycle_msg = DutyCycles()
@@ -82,11 +83,11 @@ class cmd_vel_to_motors:
 
         self.run()
     
-    def encoder_callback(self,msg):
+    def encoder_callback(self,msg:Encoders):
         time = rospy.get_time()
         f = 20
         # tics per second
-        tic_spd_left = msg.delta_encoder_left / msg.delta_time_left     #(time - self.time_enco)
+        tic_spd_left = msg.delta_encoder_left / msg.delta_time_left               #(time - self.time_enco)
         tic_spd_right = msg.delta_encoder_right / msg.delta_time_right            #/ (time - self.time_enco)
         self.time_enco = time
         # m/tics 
@@ -107,20 +108,22 @@ class cmd_vel_to_motors:
         self.right_dt = msg.delta_time_right
         # append integral
         #self.integral_right = self.integral_right + (self.v_right_des - self.v_right_enco)
-        #self.integral_left = self.integral_left + (self.v_left_des - self.v_lef v_left = 2*pi*f*msg.delta_time_left / self.ticks_per_rev
+        #self.integral_left = self.integral_left + (self.v_left_des - self.v_lef                            # not complete
+        v_left = 2*pi*f*msg.delta_time_left / self.ticks_per_rev                                            # this was commented out
         v_right = 2*pi*f*msg.delta_time_right / self.ticks_per_rev
-        
+        v_left = 2*pi*f*msg.delta_time_left / self.ticks_per_rev
 
         
 
 
-    def cmd_vel_callback(self, msg):
+    def cmd_vel_callback(self, msg:Twist):
         """
         This node subscribes to the /cmd_vel topic and converts the linear and angular velocity
         It then updates the internal variables that are used to publish the duty cycle message
         """
         self.linear_velocity = msg.linear.x
         self.angular_velocity = msg.angular.z
+        
 
     
     def run(self):
@@ -137,6 +140,13 @@ class cmd_vel_to_motors:
             if np.abs(v_left) > 1 or np.abs(v_right) > 1:
                 v_left = v_left / np.abs(v_left)
                 v_right = v_right / np.abs(v_right)
+
+
+
+            if self.linear_velocity == 0 and self.angular_velocity == 0:
+                v_left = 0
+                v_right = 0
+
 
             # Update the duty cycle message
             self.duty_cycle_msg.duty_cycle_left = v_left
@@ -178,7 +188,7 @@ class cmd_vel_to_motors:
         K_D_l = 0.0
         """
         # K_P
-        K_P_r = 0.6
+        K_P_r = 0.7
         K_P_l = 0.6  
 
         #K_I
