@@ -1,0 +1,16 @@
+# goal definition
+string action # 'pick_up', 'drop_off'
+string type # 'cube', 'sphere', 'animal'
+float64 x
+float64 y
+float64 z
+float64 yaw
+---
+# result definition
+bool success
+string message
+---
+# feedback definition
+bool success
+string message
+float64 duration # the expected duration of the current part of the action

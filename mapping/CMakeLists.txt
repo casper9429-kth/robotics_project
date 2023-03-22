@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(arm)
+project(mapping)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -8,11 +8,11 @@ project(arm)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  geometry_msgs
+  robp_msgs
   roscpp
   rospy
   std_msgs
-  message_generation
-  actionlib_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -51,28 +51,29 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 # add_message_files(
 #   FILES
-#   PickUpTarget.msg
+#   Message1.msg
+#   Message2.msg
 # )
 
 ## Generate services in the 'srv' folder
-add_service_files(
-  FILES
-  Target.srv
-  ArmTrigger.srv
-)
+# add_service_files(
+#   FILES
+#   Service1.srv
+#   Service2.srv
+# )
 
 ## Generate actions in the 'action' folder
-add_action_files(
-  FILES
-  Arm.action
-)
+# add_action_files(
+#   FILES
+#   Action1.action
+#   Action2.action
+# )
 
 ## Generate added messages and services with any dependencies listed here
-generate_messages(
-  DEPENDENCIES
-  std_msgs
-  actionlib_msgs
-)
+# generate_messages(
+#   DEPENDENCIES
+#   geometry_msgs#   robp_msgs#   std_msgs
+# )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -105,8 +106,8 @@ generate_messages(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES arm
-  CATKIN_DEPENDS message_runtime actionlib_msgs
+#  LIBRARIES mapping
+#  CATKIN_DEPENDS geometry_msgs robp_msgs roscpp rospy std_msgs
 #  DEPENDS system_lib
 )
 
@@ -118,12 +119,12 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
 # include
-# ${catkin_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/arm.cpp
+#   src/${PROJECT_NAME}/mapping.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -134,7 +135,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/arm_node.cpp)
+# add_executable(${PROJECT_NAME}_node src/mapping_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -161,10 +162,8 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
-  src/yeet.py
-  src/arm_services.py
-  src/kinematics.py
-  src/arm_actions.py
+  src/mapping.py
+  src/workspace_manager.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
@@ -201,7 +200,7 @@ catkin_install_python(PROGRAMS
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_arm.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_mapping.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
