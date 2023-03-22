@@ -33,8 +33,8 @@ class Object_classifier():
         # Paramethers 
         self.device = "cuda"
         self.detector = Detector().to(self.device)
-        #model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
-        model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
+        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
+        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
         model= self.load_model(self.detector, model_path, self.device)
         self.detector.eval()
         
@@ -65,11 +65,11 @@ class Object_classifier():
     def image_callback(self, msg): 
         """Callback function for the topic"""
         try:
-            #t0 = time.time()
+            t0 = time.time()
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
             
             if self.depth is not None:
-                self.compute_bb(msg.header.stamp, msg.header.frame_id, self.depth, cv_image) 
+                self.compute_bb(msg.header.stamp, msg.header.frame_id, self.depth, cv_image, t0) 
 
         except CvBridgeError as e:
             print(e)
@@ -124,7 +124,7 @@ class Object_classifier():
 
 
 
-    def compute_bb(self, stamp, frame_id, depth_image, cv_image):     
+    def compute_bb(self, stamp, frame_id, depth_image, cv_image, t0):     
         
         np_arr = np.asarray(cv_image)
         
@@ -148,6 +148,7 @@ class Object_classifier():
                 
                 x_bb = int(bb["x"])
                 y_bb = int(bb["y"])
+                
                 bb_msg = BoundingBox()
                 bb_msg.x = x_bb
                 bb_msg.y = y_bb
@@ -187,7 +188,7 @@ class Object_classifier():
             if len(bb_list_msg.bounding_boxes)>0:
                 self.bb_pub.publish(bb_list_msg)
               
-            # tinfer = time.time() - t0
+            tinfer = time.time() - t0
             # rospy.loginfo(tinfer)
 
 
@@ -225,7 +226,7 @@ class Object_classifier():
 
         category_name = ""
         total_sum = count_red + count_green + count_blue
-        if category_id == 6 and  count_green > 0 and 0.9 < abs(np.mean([count_red, count_green, count_blue]))/count_green < 1.1 and total_sum>40:
+        if category_id == 6 and  count_green > 0 and  np.std([count_red, count_green, count_blue])/np.mean([count_red, count_green, count_blue]) < 0.3 and total_sum>40:
             # rospy.loginfo("%s, %s, %s",count_red, count_green, count_blue)
             category_name = mapping[3]
         elif  max_color == count_red and total_sum>40:
@@ -240,7 +241,7 @@ class Object_classifier():
         else: 
             category_name = None
         
-        #rospy.loginfo("%s, %s, %s, %s",count_red, count_green, count_blue,np.std([count_red, count_green, count_blue]))
+        #rospy.loginfo("%s, %s, %s, %s",count_red, count_green, count_blue, abs(np.std([count_red, count_green, count_blue]))/np.mean([count_red, count_green, count_blue]))
         return category_name
 
         

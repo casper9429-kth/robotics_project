@@ -41,11 +41,15 @@ class Object_computations():
         
         # Publisher
         self.instances_pub = rospy.Publisher("/detection/object_instances", ObjectInstanceArray, queue_size=10)
+        
+        rospy.Rate(3).sleep()
+        
+        
 
     def filter(self, batch, time):
 
         nb_msgs = len(batch)
-        rospy.loginfo("objects len: %s", nb_msgs)
+        #rospy.loginfo("objects len: %s", nb_msgs)
         if nb_msgs > 0:
             # cluster on position
             X = []
@@ -56,37 +60,43 @@ class Object_computations():
                 for bb in curr_msg.bounding_boxes:
                     bb_list.append(bb)
                     X.append([bb.bb_center.x, bb.bb_center.y, bb.bb_center.z])
-            
+            #rospy.loginfo(X)
             Y = pdist(X, 'euclidean')
-         
-            Z = linkage(Y, method='single', metric='euclidean')
-        
-            clusters = fcluster(Z, t=0.1, criterion='distance')
+            #rospy.loginfo(Y)
+            if len(Y) > 0:
+                Z = linkage(Y, method='single', metric='euclidean')
+            
+                clusters = fcluster(Z, t=0.05, criterion='distance')
 
 
-            # keep clusters with more than 10 bb detected
-            bbs_by_cluster = []
-            for i in np.unique(clusters):
-                bb_cluster = []
-                a = (j for j in range(len(clusters)) if clusters[j] == i )
-                for index in a:
-                    bb_cluster.append(bb_list[index])
-                if len(bb_cluster)>12:
-                    bbs_by_cluster.append(bb_cluster)
-                
-            # take mean position and maximum category_name
-            for cluster in bbs_by_cluster:
-                category_names = [o.category_name for o in cluster]
-                x = [o.bb_center.x for o in cluster]
-                y = [o.bb_center.y for o in cluster]
-                z = [o.bb_center.z for o in cluster]
-                occurence_count = Counter(category_names)
-                category_name = occurence_count.most_common(1)[0][0]
-                x = np.mean(x)
-                y = np.mean(y)
-                z = np.mean(z)
-                self.save_instances((category_name, x, y, z), time)
-                #rospy.loginfo("category_name:%s, x=%s, y=%s, z=%s",category_name,x,y,z)
+                # keep clusters with more than 12 bb detected
+                bbs_by_cluster = []
+                for i in np.unique(clusters):
+                    bb_cluster = []
+                    a = [j for j in range(len(clusters)) if clusters[j] == i ]
+                    for index in a:
+                        bb_cluster.append(bb_list[index])
+                    #rospy.loginfo("Cluster: %s, nb points in cluster: %s",bb_list[a[0]].category_name,len(bb_cluster))
+                    if len(bb_cluster)>12:
+                        bbs_by_cluster.append(bb_cluster)
+    
+                    
+                # take mean position and maximum category_name
+                for cluster in bbs_by_cluster:
+                    category_names = [o.category_name for o in cluster]
+                    x = [o.bb_center.x for o in cluster]
+                    y = [o.bb_center.y for o in cluster]
+                    z = [o.bb_center.z for o in cluster]
+                    
+                    time = time + rospy.Duration.from_sec(0.05)
+                    occurence_count = Counter(category_names)
+                    category_name = occurence_count.most_common(1)[0][0]
+                    x = np.mean(x)
+                    y = np.mean(y)
+                    z = np.mean(z)
+                    
+                    self.save_instances((category_name, x, y, z), time)
+                    #rospy.loginfo("category_name:%s, x=%s, y=%s, z=%s",category_name,x,y,z)
 
 
     def save_instances(self, new_instance, time):
@@ -121,16 +131,16 @@ class Object_computations():
 
         else:
             found_close = 0
-            rospy.loginfo(instances)
+            
             for old_instance_key in instances:
                 instance = self.objects_dict[old_instance_key]
                 # rospy.loginfo("current instance: %s", old_instance_key)
                 # rospy.loginfo("old: %s, new: %s",instance,point_map.point)
                 dist = math.sqrt((point_map.point.x - float(instance[1]))**2 + (point_map.point.y - float(instance[2]))**2 + (point_map.point.z - float(instance[3]))**2 )
                 # rospy.loginfo("dist = %s",dist)
-                if dist < 0.15: #TODO: choose good threshold
+                if dist < 0.05: #TODO: choose good threshold
                     #TODO: add check category ?
-
+                    
                     # update
                     self.objects_dict[old_instance_key] = (new_instance[0], (point_map.point.x +float(instance[1]))/2, (point_map.point.y +float(instance[2]))/2, (point_map.point.z +float(instance[3]))/2)  
                     
@@ -141,7 +151,7 @@ class Object_computations():
                     self.publish_instances()
                     
                     found_close = 1
-                    
+               
             if not found_close:
                 # add instance to dict 
                 instance_key = new_instance[0]+str(nb_instances+1)
@@ -163,13 +173,15 @@ class Object_computations():
         instances_list_msg = ObjectInstanceArray()
         instances_list_msg.header.stamp = rospy.Time.now()
         instances_list_msg.header.frame_id = "map"
-        for instance in self.objects_dict:
+        for instance_key in self.objects_dict:
+            instance = self.objects_dict[instance_key]
             instance_msg = ObjectInstance()
             instance_msg.category_name = instance[0]
+            instance_msg.instance_name = instance_key
             point = Point()
-            point.x = instance[1]
-            point.y = instance[2]
-            point.z = instance[3]
+            point.x = float(instance[1])
+            point.y = float(instance[2])
+            point.z = float(instance[3])
             instance_msg.object_position = point
             instances_list_msg.instances.append(instance_msg)
 
