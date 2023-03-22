@@ -35,13 +35,7 @@ class ArmActions():
         self.target_is_valid = ServiceProxy('arm/steps/target_is_valid', Target)
 
         # Action Server
-        self.action_server = SimpleActionServer('arm_actions', ArmAction, self.execute_callback, auto_start=False)
-        self.action_server.start()
-
-        # Define rate
-        self.update_rate = 10 # [Hz]
-        self.update_dt = 1.0/self.update_rate # [s]
-        self.rate = rospy.Rate(self.update_rate)
+        self.action_server = SimpleActionServer('arm_actions', ArmAction, self.goal_received_callback, auto_start=False)
 
         # Parameters
         self.steps = {
@@ -57,16 +51,17 @@ class ArmActions():
             'drop_off': [
                 self.straight,
                 self.hover_target,
-                self.on_target,
+                self.on_target, # try without this
                 self.open_gripper,
-                self.hover_target,
+                self.hover_target, # and this
                 self.straight
             ]
         }
 
+
     ###### All your callbacks here ######
 
-    def execute_callback(self, goal: ArmGoal):
+    def goal_received_callback(self, goal: ArmGoal):
         """
         This function is called when the action server receives a new goal.
         """
@@ -104,6 +99,7 @@ class ArmActions():
         Don't change anything here, change main instead.
         """
         
+        self.action_server.start()
         rospy.spin()
 
 

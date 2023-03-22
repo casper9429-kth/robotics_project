@@ -1,5 +1,5 @@
 # goal definition
-string action # 'pick_up', put_down
+string action # 'pick_up', 'drop_off'
 string type # 'cube', 'sphere', 'animal'
 float64 x
 float64 y
