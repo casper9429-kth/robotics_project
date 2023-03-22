@@ -13,6 +13,7 @@ from torchvision import models, transforms
 from torchvision.ops import nms
 import albumentations as A
 import random
+import cv2
 
 import rospy
 
@@ -158,13 +159,32 @@ class Detector(nn.Module):
             if len(boxes)>0:
                 scores_tensor = torch.tensor(scores)
                 boxes_tensor = torch.tensor(boxes)
-                nms_bbs = nms(boxes = boxes_tensor, scores = scores_tensor, iou_threshold=0.15)
+                nms_bbs = nms(boxes = boxes_tensor, scores = scores_tensor, iou_threshold=0.15) # CHANGE: threshold
                 img_bbs = [img_bbs[i] for i in nms_bbs]
             bbs.append(img_bbs)
          
         return bbs
 
 
+    def input_transform_inference(self, image)-> torch.Tensor:
+        
+        # resize image
+        height = image.shape[0]
+        width = image.shape[1]
+        if height != self.img_height and width != self.img_width:
+            image = cv2.resize(image, (self.img_width,self.img_height), interpolation = cv2.INTER_AREA)
+        np_arr = np.asarray(image)
+        image = Image.fromarray(np_arr)
+
+        # Convert PIL.Image to torch.Tensor
+        image = transforms.ToTensor()(image)
+
+        image = transforms.Normalize(
+            mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        )(image)
+
+        return image
+    
 
 
     def input_transform(self, image: Image, anns: List) -> Tuple[torch.Tensor]:

@@ -7,9 +7,7 @@
 	
 	<!-- run odometry -->
 	<node name="odometry" pkg="odometry" type="ekf_odom.py" output='screen'/>
-
-	<!-- run detection -->
-	<!-- <node name="detection" pkg="detection" type="detection.py" output='screen'/> -->
+	
 	<!-- run aruco detection -->
 	<node name="display_markers" pkg="detection" type="display_markers.py" output='screen'/>
 

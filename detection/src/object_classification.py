@@ -33,8 +33,8 @@ class Object_classifier():
         # Paramethers 
         self.device = "cuda"
         self.detector = Detector().to(self.device)
-        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
-        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
+        #model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
+        model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
         model= self.load_model(self.detector, model_path, self.device)
         self.detector.eval()
         
@@ -127,10 +127,9 @@ class Object_classifier():
     def compute_bb(self, stamp, frame_id, depth_image, cv_image):     
         
         np_arr = np.asarray(cv_image)
-        image = pil_image.fromarray(np_arr)
         
         test_images = []
-        torch_image, _  = self.detector.input_transform(image, [])
+        torch_image  = self.detector.input_transform_inference(cv_image)
         test_images.append(torch_image)
         test_images = torch.stack(test_images)
         test_image = test_images.to(self.device)
@@ -157,7 +156,7 @@ class Object_classifier():
                 bb_msg.category_id = bb["category"]
                 
                 # Call function to compute point and depth
-                x,y,depth = self.compute_point(depth_image, bb, depth_image)
+                x,y,depth = self.compute_point(bb, depth_image)
 
                 if bb["category"] == 6 or bb["category"] == 7:
                     bb_msg.category_name = self.compute_color(bb, np_arr)     
@@ -193,7 +192,7 @@ class Object_classifier():
 
 
 
-    def compute_point(self, depth, bb, depth_image):
+    def compute_point(self, bb, depth_image):
         depth = depth_image[int(bb["y"]+bb["height"]/2),int(bb["x"]+bb["width"]/2)]/1000
 
         x=0

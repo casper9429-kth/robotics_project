@@ -58,6 +58,8 @@ add_message_files(
   FILES
   BoundingBox.msg
   BoundingBoxArray.msg
+  ObjectInstance.msg
+  ObjectInstanceArray.msg
 )
 
 ## Generate services in the 'srv' folder

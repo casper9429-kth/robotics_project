@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 import rospy
-from detection.msg import BoundingBox, BoundingBoxArray
+from detection.msg import  BoundingBoxArray, ObjectInstanceArray, ObjectInstance
 import tf2_ros
 from tf2_geometry_msgs import  PointStamped
 from geometry_msgs.msg import TransformStamped, Point, Quaternion
 import message_filters 
-from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import pdist
 from matplotlib import pyplot as plt
 import numpy as np
@@ -39,6 +39,8 @@ class Object_computations():
         self.sub = message_filters.Subscriber("detection/bounding_boxes", BoundingBoxArray)
         self.cache = message_filters.Cache(self.sub, 100)
         
+        # Publisher
+        self.instances_pub = rospy.Publisher("/detection/object_instances", ObjectInstanceArray, queue_size=10)
 
     def filter(self, batch, time):
 
@@ -90,8 +92,14 @@ class Object_computations():
     def save_instances(self, new_instance, time):
         
         # convert coordinates to map frame
-        #TODO: try catch around here
-        point_map = self.instance_to_point_map(new_instance, time)
+        point_map = PointStamped()
+        
+        try:
+            point_map = self.instance_to_point_map(new_instance, time)
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.logwarn(e)
+            return   
+        #rospy.loginfo("recherche none: %s, %s",point_map, new_instance)
         # test if there is already an instance of that category in the list
         instances = [item for item in self.objects_dict if new_instance[0] in item]
         
@@ -108,6 +116,9 @@ class Object_computations():
             # publish tf
             self.publish_tf(instance_key, point_map)
 
+            # publish instances msg 
+            self.publish_instances()
+
         else:
             found_close = 0
             rospy.loginfo(instances)
@@ -117,13 +128,17 @@ class Object_computations():
                 # rospy.loginfo("old: %s, new: %s",instance,point_map.point)
                 dist = math.sqrt((point_map.point.x - float(instance[1]))**2 + (point_map.point.y - float(instance[2]))**2 + (point_map.point.z - float(instance[3]))**2 )
                 # rospy.loginfo("dist = %s",dist)
-                if dist < 0.15:
-                    #TODO: add check category ??
-                    # update
-                    self.objects_dict[old_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z)  
+                if dist < 0.15: #TODO: choose good threshold
+                    #TODO: add check category ?
 
+                    # update
+                    self.objects_dict[old_instance_key] = (new_instance[0], (point_map.point.x +float(instance[1]))/2, (point_map.point.y +float(instance[2]))/2, (point_map.point.z +float(instance[3]))/2)  
+                    
                     # publish tf
                     self.publish_tf(old_instance_key, point_map)
+
+                    # publish instances msg 
+                    self.publish_instances()
                     
                     found_close = 1
                     
@@ -137,6 +152,29 @@ class Object_computations():
 
                 # publish tf
                 self.publish_tf(instance_key, point_map)
+
+                # publish instances msg 
+                self.publish_instances()
+
+    
+    #TODO: remove instances
+
+    def publish_instances(self):
+        instances_list_msg = ObjectInstanceArray()
+        instances_list_msg.header.stamp = rospy.Time.now()
+        instances_list_msg.header.frame_id = "map"
+        for instance in self.objects_dict:
+            instance_msg = ObjectInstance()
+            instance_msg.category_name = instance[0]
+            point = Point()
+            point.x = instance[1]
+            point.y = instance[2]
+            point.z = instance[3]
+            instance_msg.object_position = point
+            instances_list_msg.instances.append(instance_msg)
+
+        self.instances_pub.publish(instances_list_msg)
+
 
 
     def instance_to_point_map(self, instance, time):
