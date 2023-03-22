@@ -224,83 +224,89 @@ class A_star():
         y = np.interp(x,x_path,y_path)
         return np.array([x,y]).T
 
+class server_manger():
+    def __init__(self) -> None:
+        rospy.init_node('server_manger')
+        self.client = actionlib.SimpleActionClient('path_tracker', mb.msg.MoveBaseAction)
+        self.client.wait_for_server()
 
-def get_map():
-    resolution = 0.05
-    map = Gridmap(resolution=resolution)
-    return map
 
-def tranform_path_to_posestamped(path, end_pose):
-    path_list = []
-    path_tosend = Path
-    path_tosend.header.frame_id = "map"
-    path_tosend.header.stamp = rospy.Time.now()
+    def get_map():
+        resolution = 0.05
+        map = Gridmap(resolution=resolution)
+        return map
 
-    for point in path:
-        pose = PoseStamped()
-        pose.pose.position.x = point[0]
-        pose.pose.position.y = point[1]
-        pose.pose.position.z = 0
-        pose.pose.orientation.x = 0
-        pose.pose.orientation.y = 0
-        pose.pose.orientation.z = 0
-        pose.pose.orientation.w = 1
-        pose.header.frame_id = "map"
-        pose.header.stamp = rospy.Time.now()
-        path_list.append(pose)
-    end = path_list[-1]
-    end.pose.orientation = end_pose.pose.orientation
-    path_list[-1] = end
-    path_tosend.poses = path_list
-    return path_list
+    def tranform_path_to_posestamped(self,path, end_pose):
+        path_list = []
+        path_tosend = Path
+        path_tosend.header.frame_id = "map"
+        path_tosend.header.stamp = rospy.Time.now()
 
-"""
-rosmsg show move_base_msgs/MoveBaseActionGoal
+        for point in path:
+            pose = PoseStamped()
+            pose.pose.position.x = point[0]
+            pose.pose.position.y = point[1]
+            pose.pose.position.z = 0
+            pose.pose.orientation.x = 0
+            pose.pose.orientation.y = 0
+            pose.pose.orientation.z = 0
+            pose.pose.orientation.w = 1
+            pose.header.frame_id = "map"
+            pose.header.stamp = rospy.Time.now()
+            path_list.append(pose)
+        end = path_list[-1]
+        end.pose.orientation = end_pose.pose.orientation
+        path_list[-1] = end
+        path_tosend.poses = path_list
+        return path_list
 
-std_msgs/Header header
-  uint32 seq
-  time stamp
-  string frame_id
-actionlib_msgs/GoalID goal_id
-  time stamp
-  string id
-move_base_msgs/MoveBaseGoal goal
-  geometry_msgs/PoseStamped target_pose
+    """
+    rosmsg show move_base_msgs/MoveBaseActionGoal
+
     std_msgs/Header header
-      uint32 seq
-      time stamp
-      string frame_id
-    geometry_msgs/Pose pose
-      geometry_msgs/Point position
-        float64 x
-        float64 y
-        float64 z
-      geometry_msgs/Quaternion orientation
-        float64 x
-        float64 y
-        float64 z
-        float64 w
+    uint32 seq
+    time stamp
+    string frame_id
+    actionlib_msgs/GoalID goal_id
+    time stamp
+    string id
+    move_base_msgs/MoveBaseGoal goal
+    geometry_msgs/PoseStamped target_pose
+        std_msgs/Header header
+        uint32 seq
+        time stamp
+        string frame_id
+        geometry_msgs/Pose pose
+        geometry_msgs/Point position
+            float64 x
+            float64 y
+            float64 z
+        geometry_msgs/Quaternion orientation
+            float64 x
+            float64 y
+            float64 z
+            float64 w
 
-"""
-def send_path(client,path,endpostion):
-    path_list = tranform_path_to_posestamped(path,endpostion)
-    for pose_stamped in path_list:
-        goal = mb.msg.MoveBaseGoal()
-        goal.goal.target_pose = pose_stamped
-        client.send_goal(goal)
-        client.wait_for_result()
-        print(client.get_result())
+    """
+    def send_path(self,client,path,endpostion):
+        path_list = self.tranform_path_to_posestamped(path,endpostion)
+        for pose_stamped in path_list:
+            goal = mb.msg.MoveBaseGoal()
+            goal.goal.target_pose = pose_stamped
+            client.send_goal(goal)
+            client.wait_for_result() # result callback 
+            print(client.get_result())
+
+    def main(self):
+        goal = (10,10)
+        path_planner = A_star()
+        path_planner.map = self.get_map()
+        path = path_planner.path(goal)
+        self.send_path(self.client,path,goal)
 
 
 if __name__ == "__main__":
-    sys.path.append('/home/robotics/catkin_ws/src/path_planner/src')
-    client = actionlib.SimpleActionClient('path_tracker', mb.msg.MoveBaseAction)
-    client.wait_for_server()
-    goal = (10,10)
-    path_planner = A_star()
-    path_planner.map = get_map()
-    path = path_planner.path(goal)
-    send_path(client,path,goal)
+    
 
 
 
