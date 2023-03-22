@@ -65,11 +65,11 @@ class Object_classifier():
     def image_callback(self, msg): 
         """Callback function for the topic"""
         try:
-            t0 = time.time()
+            #t0 = time.time()
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
             
             if self.depth is not None:
-                self.compute_bb(msg.header.stamp, msg.header.frame_id, self.depth, cv_image, t0) 
+                self.compute_bb(msg.header.stamp, msg.header.frame_id, self.depth, cv_image) 
 
         except CvBridgeError as e:
             print(e)
@@ -124,7 +124,7 @@ class Object_classifier():
 
 
 
-    def compute_bb(self, stamp, frame_id, depth_image, cv_image, t0):     
+    def compute_bb(self, stamp, frame_id, depth_image, cv_image):     
         
         np_arr = np.asarray(cv_image)
         
@@ -143,7 +143,7 @@ class Object_classifier():
             bb_list_msg.header.stamp = stamp
             bb_list_msg.header.frame_id = frame_id
            
-            #rospy.loginfo(bbs[0])
+            
             for bb in bbs[0]:
                 
                 x_bb = int(bb["x"])
@@ -159,6 +159,7 @@ class Object_classifier():
                 # Call function to compute point and depth
                 x,y,depth = self.compute_point(bb, depth_image)
 
+                # Confusion on colors of cubes when they are too far
                 if not(bb["category"] == 6 and depth > 0.5):
                     if bb["category"] == 6 or bb["category"] == 7:
                         bb_msg.category_name = self.compute_color(bb, np_arr)     
@@ -190,7 +191,7 @@ class Object_classifier():
             if len(bb_list_msg.bounding_boxes)>0:
                 self.bb_pub.publish(bb_list_msg)
               
-            tinfer = time.time() - t0
+            #tinfer = time.time() - t0
             # rospy.loginfo(tinfer)
 
 

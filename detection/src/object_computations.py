@@ -60,23 +60,23 @@ class Object_computations():
                 for bb in curr_msg.bounding_boxes:
                     bb_list.append(bb)
                     X.append([bb.bb_center.x, bb.bb_center.y, bb.bb_center.z])
-            #rospy.loginfo(X)
+            
             Y = pdist(X, 'euclidean')
-            #rospy.loginfo(Y)
+            
             if len(Y) > 0:
                 Z = linkage(Y, method='single', metric='euclidean')
             
                 clusters = fcluster(Z, t=0.05, criterion='distance')
 
 
-                # keep clusters with more than 10 bb detected
+                # keep clusters with more than 12 bb detected
                 bbs_by_cluster = []
                 for i in np.unique(clusters):
                     bb_cluster = []
                     a = [j for j in range(len(clusters)) if clusters[j] == i ]
                     for index in a:
                         bb_cluster.append(bb_list[index])
-                    #rospy.loginfo("Cluster: %s, nb points in cluster: %s",bb_list[a[0]].category_name,len(bb_cluster))
+                    
                     if len(bb_cluster)>12:
                         bbs_by_cluster.append(bb_cluster)
     
@@ -88,6 +88,7 @@ class Object_computations():
                     y = [o.bb_center.y for o in cluster]
                     z = [o.bb_center.z for o in cluster]
                     
+                    # avoid TF repeated timestamp warning
                     time = time + rospy.Duration.from_sec(0.05)
                     occurence_count = Counter(category_names)
                     category_name = occurence_count.most_common(1)[0][0]
@@ -109,7 +110,7 @@ class Object_computations():
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             rospy.logwarn(e)
             return   
-        #rospy.loginfo("recherche none: %s, %s",point_map, new_instance)
+        
         # test if there is already an instance of that category in the list
         instances = [item for item in self.objects_dict if new_instance[0] in item]
         
@@ -130,15 +131,14 @@ class Object_computations():
             self.publish_instances()
 
         else:
+
             found_close = 0
-            
             for old_instance_key in instances:
                 instance = self.objects_dict[old_instance_key]
-                # rospy.loginfo("current instance: %s", old_instance_key)
-                # rospy.loginfo("old: %s, new: %s",instance,point_map.point)
+               
                 dist = math.sqrt((point_map.point.x - float(instance[1]))**2 + (point_map.point.y - float(instance[2]))**2 + (point_map.point.z - float(instance[3]))**2 )
                 # rospy.loginfo("dist = %s",dist)
-                if dist < 0.05: #TODO: choose good threshold
+                if dist < 0.05: 
                     #TODO: add check category ?
                     
                     # update
@@ -170,6 +170,8 @@ class Object_computations():
     #TODO: remove instances
 
     def publish_instances(self):
+
+        # Publish list of current instances on topic /detection/object_instances
         instances_list_msg = ObjectInstanceArray()
         instances_list_msg.header.stamp = rospy.Time.now()
         instances_list_msg.header.frame_id = "map"
@@ -235,7 +237,7 @@ class Object_computations():
             batch = self.cache.getInterval(rospy.Time.now()-rospy.Duration.from_sec(2), rospy.Time.now())
             if len(batch)>0:
                 self.filter(batch, rospy.Time.now()-rospy.Duration.from_sec(1))
-        #rospy.loginfo(self.cache.getOldestTime())
+      
         
 
     def run(self):
