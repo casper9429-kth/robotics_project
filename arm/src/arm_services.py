@@ -6,8 +6,11 @@ from hiwonder_servo_msgs.msg import CommandDuration
 from std_srvs.srv import Trigger, TriggerResponse
 from rospy import Service
 from sensor_msgs.msg import JointState
+from tf2_ros import StaticTransformBroadcaster
+from geometry_msgs.msg import TransformStamped
+from tf.transformations import quaternion_from_euler
 
-from arm.srv import SetPickUpTarget, SetPickUpTargetResponse, ArmTrigger, ArmTriggerResponse
+from arm.srv import Target, TargetResponse, ArmTrigger, ArmTriggerResponse
 
 class Joints:
     def __init__(self, joint1=0, joint2=0, joint3=0, joint4=0, joint5=0):
@@ -47,16 +50,17 @@ class ArmServices():
         self.gripper_pub = rospy.Publisher("/r_joint_controller/command_duration", CommandDuration, queue_size=10)
 
         # Services
-        self.straight_service = Service('arm/poses/straight', ArmTrigger, self.straight_service_callback)
-        self.default_service = Service('arm/poses/default', ArmTrigger, self.default_service_callback)
-        self.observe_service = Service('arm/poses/observe', ArmTrigger, self.observe_service_callback)
-        self.prepare_to_pick_up_service = Service('arm/poses/prepare_to_pick_up', ArmTrigger, self.prepare_to_pick_up_service_callback)
-        self.pick_up_service = Service('arm/poses/pick_up', ArmTrigger, self.pick_up_service_callback)
+        self.straight_service = Service('arm/steps/straight', ArmTrigger, self.straight_service_callback)
+        self.default_service = Service('arm/steps/default', ArmTrigger, self.default_service_callback)
+        self.observe_service = Service('arm/steps/observe', ArmTrigger, self.observe_service_callback)
+        self.hover_target_service = Service('arm/steps/hover_target', ArmTrigger, self.hover_target_service_callback)
+        self.on_target_service = Service('arm/steps/on_target', ArmTrigger, self.on_target_service_callback)
 
-        self.open_gripper_service = Service('arm/poses/open_gripper', ArmTrigger, self.open_gripper_service_callback)
-        self.close_gripper_service = Service('arm/poses/close_gripper', ArmTrigger, self.close_gripper_service_callback)
+        self.open_gripper_service = Service('arm/steps/open_gripper', ArmTrigger, self.open_gripper_service_callback)
+        self.close_gripper_service = Service('arm/steps/close_gripper', ArmTrigger, self.close_gripper_service_callback)
 
-        self.set_pick_up_target_service = Service('arm/poses/set_target', SetPickUpTarget, self.set_pick_up_target_service_callback)
+        self.set_target_service = Service('arm/steps/set_target', Target, self.set_target_service_callback)
+        self.target_is_valid_service = Service('arm/steps/target_is_valid', Target, self.target_is_valid_service_callback)
 
         # Define rate
         self.update_rate = 10 # [Hz]
@@ -72,12 +76,12 @@ class ArmServices():
         self.d_5e = 180e-3 # [m] this is to the end of the end effector with a closed cube grip (approximately)
         self.d_floor_to_base = 131e-3 # [m]
         
-        self.pick_up_margin = 6e-3 # [m]
-        self.prepare_to_pick_up_margin = 55e-3 # [m]
+        self.on_target_margin = 6e-3 # [m]
+        self.hover_target_margin = 55e-3 # [m]
 
         # Duration of the motion
         self.max_joint_speed = 0.8 # [rad/s]
-        self.gripper_duration = 1 # [s]
+        self.gripper_duration = 1 # [s] TODO: make this dynamic
 
         # gripper
         self.gripper_open = -1.8
@@ -87,8 +91,8 @@ class ArmServices():
         self.joints_straight = Joints()
         self.joints_default = Joints(0, 0.52, -1.36, -1.76, 0)
         self.joints_observe = Joints(0, 0, -pi/2, -pi/2, 0)
-        self.joints_prepare_to_pick_up = None
-        self.joints_pick_up = None
+        self.joints_hover_target = None
+        self.joints_on_target = None
 
         # Current state
         self.joints = None
@@ -101,11 +105,18 @@ class ArmServices():
         # Error messages
         self.error_messages = {
             'missing joints': 'No joint states received. Is anyone publishing to /joint_states?',
-            'missing target': 'No pick up target received.',
+            'missing target': 'No target received.',
             'bad target type': '''Bad target type. Legal values are 'cube', 'sphere' and 'animal'.''',
-            'target out of reach': 'Pick up target out of reach',
+            'target out of reach': 'Target out of reach',
         }
 
+        self.base_link_to_arm_base_x = -0.088 # [m]
+        self.base_link_to_arm_base_y = -0.047 # [m]
+        self.base_link_to_arm_base_z = 0.042 # [m]
+        self.base_link_to_arm_base_yaw = pi # [rad]
+        self.base_link_to_arm_base_pitch = 0 # [rad]
+        self.base_link_to_arm_base_roll = 0 # [rad]
+        self.broadcast_arm_base_tf()
 
     ###### All your callbacks here ######
 
@@ -140,27 +151,27 @@ class ArmServices():
         self.publish_joints(self.joints_observe, duration)
         return ArmTriggerResponse(True, 'Arm observing', duration)
 
-    def prepare_to_pick_up_service_callback(self, _):
-        if self.joints_prepare_to_pick_up is None:
+    def hover_target_service_callback(self, _):
+        if self.joints_hover_target is None:
             return ArmTriggerResponse(False, self.error_messages['missing target'], 0)
         duration = None
         try:
-            duration = self.calculate_duration(self.joints, self.joints_prepare_to_pick_up)
+            duration = self.calculate_duration(self.joints, self.joints_hover_target)
         except MissingJointsError:
             return ArmTriggerResponse(False, self.error_messages['missing joints'], 0)
-        self.publish_joints(self.joints_prepare_to_pick_up, duration)
-        return ArmTriggerResponse(True, 'Arm preparing to pick up', duration)
+        self.publish_joints(self.joints_hover_target, duration)
+        return ArmTriggerResponse(True, 'Arm hovering target', duration)
 
-    def pick_up_service_callback(self, _):
-        if self.joints_pick_up is None:
+    def on_target_service_callback(self, _):
+        if self.joints_on_target is None:
             return ArmTriggerResponse(False, self.error_messages['missing target'], 0)
         duration = None
         try:
-            duration = self.calculate_duration(self.joints, self.joints_pick_up)
+            duration = self.calculate_duration(self.joints, self.joints_on_target)
         except MissingJointsError:
             return ArmTriggerResponse(False, self.error_messages['missing joints'], 0)
-        self.publish_joints(self.joints_pick_up, duration)
-        return ArmTriggerResponse(True, 'Arm picking up', duration)
+        self.publish_joints(self.joints_on_target, duration)
+        return ArmTriggerResponse(True, 'Arm on target', duration)
         
     def open_gripper_service_callback(self, _):
         self.publish_gripper(self.gripper_open, self.gripper_duration)
@@ -175,22 +186,43 @@ class ArmServices():
         except KeyError:
             return ArmTriggerResponse(False, self.error_messages['bad target type'], 0)
     
-    def set_pick_up_target_service_callback(self, pick_up_target):
-        if pick_up_target.type not in self.allowed_target_types:
-            return SetPickUpTargetResponse(False, self.error_messages['bad target type'])
-        self.target_type = pick_up_target.type
-        x = pick_up_target.x
-        y = pick_up_target.y
-        z = pick_up_target.z
-        yaw = pick_up_target.yaw
-        try:
-            self.joints_prepare_to_pick_up = self.inverse_kinematics(x, y, z + self.prepare_to_pick_up_margin, yaw)
-            self.joints_pick_up = self.inverse_kinematics(x, y, z + self.pick_up_margin, yaw)
-        except ValueError:
-            return SetPickUpTargetResponse(False, self.error_messages['target out of reach'])
-        return SetPickUpTargetResponse(True, 'Pick up target set')
+    def set_target_service_callback(self, target):
+        if target.type not in self.allowed_target_types:
+            return TargetResponse(False, self.error_messages['bad target type'])
+        self.target_type = target.type
+        x = target.x
+        y = target.y
+        z = target.z
+        yaw = target.yaw
+        if not self.in_domain(x, y, z, yaw):
+            return TargetResponse(False, self.error_messages['target out of reach'])
+        self.joints_hover_target = self.inverse_kinematics(x, y, z + self.hover_target_margin, yaw)
+        self.joints_on_target = self.inverse_kinematics(x, y, z + self.on_target_margin, yaw)
+        return TargetResponse(True, 'Arm target set')
+
+    def target_is_valid_service_callback(self, target):
+        if target.type not in self.allowed_target_types:
+            return TargetResponse(False, self.error_messages['bad target type'])
+        if not self.in_domain(target.x, target.y, target.z, target.yaw):
+            return TargetResponse(False, self.error_messages['target out of reach'])
+        return TargetResponse(True, 'Target is valid')
         
     ###### All your other methods here #######
+
+    def in_domain(self, x, y, z, yaw):
+        """ Checks if the target is in the domain of the arm. """
+        try:
+            self.inverse_kinematics(x, y, z + self.hover_target_margin, yaw)
+            self.inverse_kinematics(x, y, z + self.on_target_margin, yaw)
+        except ValueError:
+            return False
+        # only work in front of the robot
+        x_max = -0.145
+        # don't go beneath the ground
+        z_min = -0.14
+        if x > x_max or z < z_min:
+            return False
+        return True
 
     def inverse_kinematics(self, x, y, z, yaw):
         """ Calculates the inverse kinematics for the arm. """
@@ -239,6 +271,27 @@ class ArmServices():
         """ Publishes the current gripper state. """
         duration *= 1000 # [s] -> [ms]
         self.gripper_pub.publish(CommandDuration(data=gripper, duration=duration))
+
+    def broadcast_arm_base_tf(self):
+        # Broadcast base_link to arm_base transform
+        self.tf2_broadcaster = StaticTransformBroadcaster()
+        self.tf2_transform = TransformStamped()
+        self.tf2_transform.header.frame_id = 'base_link'
+        self.tf2_transform.child_frame_id = 'arm_base'
+        self.tf2_transform.transform.translation.x = self.base_link_to_arm_base_x
+        self.tf2_transform.transform.translation.y = self.base_link_to_arm_base_y
+        self.tf2_transform.transform.translation.z = self.base_link_to_arm_base_z
+        # euler angles
+        yaw = self.base_link_to_arm_base_yaw
+        pitch = self.base_link_to_arm_base_pitch
+        roll = self.base_link_to_arm_base_roll
+        # quaternion
+        q = quaternion_from_euler(roll, pitch, yaw)
+        self.tf2_transform.transform.rotation.x = q[0]
+        self.tf2_transform.transform.rotation.y = q[1]
+        self.tf2_transform.transform.rotation.z = q[2]
+        self.tf2_transform.transform.rotation.w = q[3]
+        self.tf2_broadcaster.sendTransform(self.tf2_transform)
 
     def main(self): # Do main stuff here
         """

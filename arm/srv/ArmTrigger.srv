@@ -1,4 +1,4 @@
 ---
-bool status
+bool success # true if the arm can execute the trajectory
 string message
 float64 duration # the time required to reach the target pose (specified with another service) in seconds
