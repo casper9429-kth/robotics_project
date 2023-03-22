@@ -69,7 +69,7 @@ class Object_computations():
                 clusters = fcluster(Z, t=0.05, criterion='distance')
 
 
-                # keep clusters with more than 12 bb detected
+                # keep clusters with more than 10 bb detected
                 bbs_by_cluster = []
                 for i in np.unique(clusters):
                     bb_cluster = []
