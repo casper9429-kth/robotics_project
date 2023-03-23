@@ -1,2 +1,2 @@
 Header header
-float32[] GridMap
+Array[] data
