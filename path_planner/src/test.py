@@ -3,7 +3,7 @@ import math
 import heapq
 import sys
 
-from A_star import Node
+from path_planner.src.A_star_testing import Node
 
 lst = [0,1,2]
 print(lst[0:2])
