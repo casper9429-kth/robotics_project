@@ -20,7 +20,6 @@ from open3d import open3d as o3d
 from open3d_ros_helper import open3d_ros_helper as o3drh
 import pcl_ros
 from tf import TransformListener
-from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 from math import atan2
 # import gaussian_filter1d  
 from scipy.ndimage.filters import gaussian_filter1d
