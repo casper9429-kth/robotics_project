@@ -142,9 +142,9 @@ class ekf_odom():
         self.current_time_sec = self.current_time.to_sec()
         self.dt = self.current_time_sec - self.last_time
         ## Time warning
-        if self.dt > self.update_dt*1.2 and self.debug:
-            rospy.logwarn("refresh rate to high: %f", self.dt)
-            rospy.logwarn("refresh rate should be: %f", self.update_dt)
+        #if self.dt > self.update_dt*1.2 and self.debug:
+        #    rospy.logwarn("refresh rate to high: %f", self.dt)
+        #    rospy.logwarn("refresh rate should be: %f", self.update_dt)
 
 
 

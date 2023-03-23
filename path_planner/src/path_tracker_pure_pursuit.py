@@ -176,7 +176,9 @@ class PathTracker():
             self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)   
         except:
             print('No transform found')
-                        
+            return
+
+
 
     def pure_pursuit(self):
         k = 1

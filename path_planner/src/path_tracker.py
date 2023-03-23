@@ -8,6 +8,8 @@ from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose
 import tf
+import move_base_msgs.msg
+
 
 class LineSegment():
     def __init__(self,x1,y1,x2,y2) -> None:
@@ -121,6 +123,9 @@ class PathTracker():
         # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
         self.aruco = Marker()
 
+        #server
+        self.server = actionlib.SimpleActionServer('path_tracker',move_base_msgs.msg.MoveBaseAction , self.execute_callback, False)
+        self.server.wait_for_server()
         # tf stuff
         self.br = tf2_ros.TransformBroadcaster()
         self.tfBuffer = tf2_ros.Buffer()
@@ -167,7 +172,7 @@ class PathTracker():
             #raise Exception('No fence set')
             return None
 
-
+   
     
     def transforms(self):   
         
@@ -288,6 +293,13 @@ class PathTracker():
             #print('Moving forward')
         return self.move.linear.x
 
+    #Execute the action server
+    def execute_callback(self, goal):
+        print('Executing action server')
+
+        self.spin()
+        self.server.set_succeeded()
+    
 
     def spin(self):
         #print(self.goal.pose)

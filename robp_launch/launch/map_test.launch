@@ -19,8 +19,17 @@
 	<!-- Include teleop_twist_joy -->
     <include file="$(find teleop_twist_joy)/launch/teleop.launch" />
 
+	<!-- Include realsense2_camera
+	<include file="$(find robp_launch)/launch/rs_camera.launch" /> -->
 	<!-- Include realsense2_camera -->
-	<include file="$(find robp_launch)/launch/rs_camera.launch" />
+	<include file="$(find robp_launch)/launch/rs_camera.launch">
+      <arg name="align_depth" value="true"/>
+    </include>
+
+	<node name="object_classifier" pkg="detection" type="object_classification.py" output='screen'/>
+	<node name="object_computations" pkg="detection" type="object_computations.py" output='screen'/>
+
+
 
 	<!-- run the motors -->
     <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>

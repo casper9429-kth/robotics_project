@@ -68,6 +68,7 @@ find_package(catkin REQUIRED COMPONENTS
 #   Action1.action
 #   Action2.action
 # )
+catkin_python_setup()
 
 ## Generate added messages and services with any dependencies listed here
 # generate_messages(
@@ -166,6 +167,8 @@ catkin_install_python(PROGRAMS
   src/workspace_manager.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+
 
 ## Mark executables for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html

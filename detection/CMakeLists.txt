@@ -10,11 +10,13 @@ project(detection)
 find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
+  std_msgs
   aruco_ros
   robp_msgs
   tf2
   tf2_ros
   tf_conversions
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -51,11 +53,11 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  BoundingBox.msg
+  BoundingBoxArray.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -70,12 +72,13 @@ find_package(catkin REQUIRED COMPONENTS
 #   Action1.action
 #   Action2.action
 # )
-
+catkin_python_setup()
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   sensor_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  sensor_msgs
+  std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -100,6 +103,7 @@ find_package(catkin REQUIRED COMPONENTS
 ###################################
 ## catkin specific configuration ##
 ###################################
+
 ## The catkin_package macro generates cmake config files for your package
 ## Declare things to be passed to dependent projects
 ## INCLUDE_DIRS: uncomment this if your package contains header files
@@ -109,7 +113,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES detection
-#  CATKIN_DEPENDS rospy sensor_msgs aruco_ros robp_msgs tf2 tf2_ros tf_conversions
+   CATKIN_DEPENDS rospy sensor_msgs std_msgs aruco_ros robp_msgs tf2 tf2_ros tf_conversions opencv2 cv_bridge message_runtime
 #  DEPENDS system_lib
 )
 
@@ -164,10 +168,13 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
-  src/detection.py
   src/display_markers.py
+  src/object_classification.py
+  src/object_computations.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+
 
 ## Mark executables for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html
