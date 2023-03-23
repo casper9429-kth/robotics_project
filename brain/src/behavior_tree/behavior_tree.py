@@ -15,6 +15,7 @@ class BehaviorTree:
         self.context = context
 
     def run(self):
+        rospy.loginfo('Running behavior tree')
         return self.root.run(self.context)
     
     def run_forever(self):

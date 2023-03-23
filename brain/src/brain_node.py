@@ -3,7 +3,12 @@
 import rospy
 from rospy import Subscriber
 from std_msgs.msg import String
+from geometry_msgs.msg import PoseStamped
+import tf2_ros
+from tf2_ros import TransformListener, Buffer
+
 from behavior_tree.behavior_tree import BehaviorTree, Selector, Sequence, Inverter, Leaf, SUCCESS, FAILURE, RUNNING
+
 No = Not = Inverter
 
 
@@ -11,27 +16,7 @@ class BrainNode:
     def __init__(self):
         rospy.init_node('brain_node')
         self.behavior_tree = self._create_behavior_tree()
-        self.context_subscriber = Subscriber('brain/context', String, self._context_callback, queue_size=1)
     
-    def _context_callback(self, message):
-        context_str = message.data
-        key_value_pairs = context_str.split(',')
-        context_updates = {}
-        for key_value_pair in key_value_pairs:
-            key, value = key_value_pair.split(':')
-            key = key.strip()
-            value = value.strip()
-            context_updates[key] = value
-        rospy.loginfo('----------------------------------------')
-        rospy.loginfo(f'Updating Context Values: {context_updates}')
-        rospy.loginfo('----------------------------------------')
-        self.behavior_tree.context = {**self.behavior_tree.context, **context_updates}
-        result = self.behavior_tree.run()
-        rospy.loginfo('----------------------------------------')
-        rospy.loginfo(f'Behavior Tree Result: {result}')
-        rospy.loginfo('----------------------------------------')
-        return True
-
     def _create_behavior_tree(self):
         localize = Selector([IsLocalized(), Localize()])
         explore = Selector([IsExplored(), Explore()])
@@ -50,19 +35,7 @@ class BrainNode:
         return behavior_tree
     
     def _create_context(self):
-        context = {'IsLocalized': SUCCESS,
-                   'Localize': RUNNING,
-                   'IsExplored': SUCCESS,
-                   'Explore': RUNNING,
-                   'ObjectsRemaining': SUCCESS,
-                   'IsHoldingObject': FAILURE,
-                   'CanPickUp': FAILURE,
-                   'GoToPickUp': RUNNING,
-                   'PickUp': RUNNING,
-                   'CanDropOff': FAILURE,
-                   'GoToDropOff': RUNNING,
-                   'DropOff': RUNNING,
-                   'ReturnToAnchor': RUNNING}
+        context = {'anchor_id': 500,}
         return context 
 
     def run(self):
@@ -71,94 +44,102 @@ class BrainNode:
 
 
 class IsLocalized(Leaf):
-    def run(self, **context):
-        result = context['IsLocalized']
-        rospy.loginfo(f'IsLocalized: {result}')
-        return result
+    def __init__(self):
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, queue_size=1)
+
+    def run(self, context):
+        rospy.loginfo('IsLocalized')
+        try:
+            self.tf_buffer.lookup_transform('map', f'aruco_detected_{context["anchor_id"]}', rospy.Time(0))
+            return SUCCESS
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            return FAILURE
     
 
 class Localize(Leaf):
-    def run(self, **context):
-        result = context['Localize']
-        rospy.loginfo(f'Localize: {result}')
-        return result
+    def run(self, context):
+        rospy.loginfo('Localize')
+        return RUNNING
     
 
 class IsExplored(Leaf):
-    def run(self, **context):
-        result = context['IsExplored']
-        rospy.loginfo(f'IsExplored: {result}')
-        return result
+    def run(self, context):
+        rospy.loginfo('IsExplored')
+        return SUCCESS
     
 
 class Explore(Leaf):
-    def run(self, **context):
-        result = context['Explore']
-        rospy.loginfo(f'Explore: {result}')
-        return result
+    def run(self, context):
+        rospy.loginfo('Explore')
+        return RUNNING
 
 
 class ObjectsRemaining(Leaf):
-    def run(self, **context):
-        result = context['ObjectsRemaining']
-        rospy.loginfo(f'ObjectsRemaining: {result}')
-        return result
+    def run(self, context):
+        rospy.loginfo('ObjectsRemaining')
+        return SUCCESS
     
 
 class IsHoldingObject(Leaf):
-    def run(self, **context):
-        result = context['IsHoldingObject']
-        rospy.loginfo(f'IsHoldingObject: {result}')
-        return result
+    def run(self, context):
+        rospy.loginfo('IsHoldingObject')
+        return FAILURE
     
 
 class CanPickUp(Leaf):
-    def run(self, **context):
-        result = context['CanPickUp']
-        rospy.loginfo(f'CanPickUp: {result}')
-        return result
+    def run(self, context):
+        rospy.loginfo('CanPickUp')
+        return FAILURE
     
 
 class GoToPickUp(Leaf):
-    def run(self, **context):
-        result = context['GoToPickUp']
-        rospy.loginfo(f'GoToPickUp: {result}')
-        return result
+    def __init__(self):
+        self.move_base_simple_publisher = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
+
+    def run(self, context):
+        rospy.loginfo('GoToPickUp')
+        pick_up_pose = PoseStamped()
+        pick_up_pose.header.frame_id = 'map'
+        pick_up_pose.pose.position.x = 0.0
+        pick_up_pose.pose.position.y = 0.0
+        pick_up_pose.pose.position.z = 0.0
+        pick_up_pose.pose.orientation.x = 0.0
+        pick_up_pose.pose.orientation.y = 0.0
+        pick_up_pose.pose.orientation.z = 0.0
+        pick_up_pose.pose.orientation.w = 1.0
+        self.move_base_simple_publisher.publish(pick_up_pose)
+        return RUNNING
     
 
 class PickUp(Leaf):
-    def run(self, **context):
-        result = context['PickUp']
-        rospy.loginfo(f'PickUp: {result}')
-        return result
+    def run(self, context):
+        rospy.loginfo('PickUp')
+        return RUNNING
     
 
 class CanDropOff(Leaf):
-    def run(self, **context):
-        result = context['CanDropOff']
-        rospy.loginfo(f'CanDropOff: {result}')
-        return result
+    def run(self, context):
+        rospy.loginfo('CanDropOff')
+        return SUCCESS
     
 
 class GoToDropOff(Leaf):
-    def run(self, **context):
-        result = context['GoToDropOff']
-        rospy.loginfo(f'GoToDropOff: {result}')
-        return result
+    def run(self, context):
+        rospy.loginfo('GoToDropOff')
+        return RUNNING
     
 
 class DropOff(Leaf):
-    def run(self, **context):
-        result = context['DropOff']
-        rospy.loginfo(f'DropOff: {result}')
-        return result
+    def run(self, context):
+        rospy.loginfo('DropOff')
+        return RUNNING
     
 
 class ReturnToAnchor(Leaf):
-    def run(self, **context):
-        result = context['ReturnToAnchor']
-        rospy.loginfo(f'ReturnToAnchor: {result}')
-        return result
+    def run(self, context):
+        rospy.loginfo('ReturnToAnchor')
+        return RUNNING
         
 
 if __name__ == '__main__':
