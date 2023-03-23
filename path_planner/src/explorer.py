@@ -48,8 +48,8 @@ class explorer():
 
     def map_callback(self, msg: PoseStamped):
         # extract the map coords from the message
-        self.map_coords = np.array([msg.pose.position.x, msg.pose.position.y]) # change the msg to what the map is published as and extract x and y coords
-        # self.map_coords = np.array([(3,4), (1,2), (5,6), (7,8)])
+        # self.map_coords = np.array([msg.pose.position.x, msg.pose.position.y]) # change the msg to what the map is published as and extract x and y coords
+        self.map_coords = np.array([(3,4), (1,2), (5,6), (7,8)])
         print('Map received')
         self.transforms()
         self.find_goal()
@@ -79,7 +79,9 @@ class explorer():
                 self.nearest_goal = data
             elif np.linalg.norm(distances) < np.linalg.norm(self.nearest_goal-self.point):
                 self.nearest_goal = data
-        print(self.nearest_goal)
+            print(data)
+        # print(self.nearest_goal)
+        self.publish_goal()
 
 
     def publish_goal(self):
