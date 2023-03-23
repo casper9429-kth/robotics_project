@@ -4,8 +4,9 @@ import rospy
 from rospy import Subscriber
 from std_msgs.msg import Bool
 from geometry_msgs.msg import PoseStamped
-import tf2_ros
+from actionlib import SimpleActionClient
 
+from arm.msg import ArmAction, ArmGoal, ArmResult, ArmFeedback
 from behavior_tree.behavior_tree import BehaviorTree, Selector, Sequence, Inverter, Leaf, SUCCESS, FAILURE, RUNNING
 
 No = Not = Inverter
@@ -35,7 +36,10 @@ class BrainNode:
         return behavior_tree
     
     def _create_context(self):
-        context = {'anchor_id': 500,}
+        context = {'anchor_id': 500,
+                   'target_type': 'animal',
+                   'is_holding_object': False,
+                   'objects_remaining': 1,}
         return context 
 
     def run(self):
@@ -78,13 +82,13 @@ class Explore(Leaf):
 class ObjectsRemaining(Leaf):
     def run(self, context):
         rospy.loginfo('ObjectsRemaining')
-        return SUCCESS
+        return SUCCESS if context['objects_remaining'] > 0 else FAILURE
     
 
 class IsHoldingObject(Leaf):
     def run(self, context):
         rospy.loginfo('IsHoldingObject')
-        return FAILURE
+        return SUCCESS if context['is_holding_object'] else FAILURE
     
 
 class CanPickUp(Leaf):
@@ -113,8 +117,28 @@ class GoToPickUp(Leaf):
     
 
 class PickUp(Leaf):
+    def __init__(self):
+        self.action_client = SimpleActionClient('arm_actions', ArmAction) # TODO move this check to before the behavior tree
+        self.action_client.wait_for_server()
+        self.running = False
+
     def run(self, context):
         rospy.loginfo('PickUp')
+        if not self.running:
+            self.running = True
+            goal = ArmGoal()
+            goal.action = 'pick_up'
+            goal.type = context['target_type']
+            goal.x = -0.15
+            goal.y = 0.0
+            goal.z = -0.13
+            goal.yaw = 0.0
+
+            def done_cb(state, result, context):
+                self.running = False
+                context['is_holding_object'] = True
+
+            self.action_client.send_goal(goal, done_cb=done_cb)
         return RUNNING
     
 
@@ -133,12 +157,27 @@ class GoToDropOff(Leaf):
 class DropOff(Leaf):
     def run(self, context):
         rospy.loginfo('DropOff')
+        # TODO
+        context['objects_remaining'] -= 1
         return RUNNING
     
 
 class ReturnToAnchor(Leaf):
+    def __init__(self):
+        self.move_base_simple_publisher = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
+
     def run(self, context):
         rospy.loginfo('ReturnToAnchor')
+        pick_up_pose = PoseStamped()
+        pick_up_pose.header.frame_id = 'map'
+        pick_up_pose.pose.position.x = 0.0
+        pick_up_pose.pose.position.y = 0.0
+        pick_up_pose.pose.position.z = 0.0
+        pick_up_pose.pose.orientation.x = 0.0
+        pick_up_pose.pose.orientation.y = 0.0
+        pick_up_pose.pose.orientation.z = 0.0
+        pick_up_pose.pose.orientation.w = 1.0
+        self.move_base_simple_publisher.publish(pick_up_pose)
         return RUNNING
         
 
