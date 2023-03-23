@@ -26,6 +26,7 @@ from math import atan2
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy.signal import argrelextrema
 import json
+from mapping.msg import GridMap as GridMapMSG
 # Mapping node
 
 ## Gridmap
@@ -77,51 +78,17 @@ class GridMap():
         
         # 
 
-    def export_as_json(self):
-        """
-        Export file as JSON
-        """
-        json_dict = defaultdict()
-        json_dict["resolution"] = self.resolution
-        new_map_grid = defaultdict()
-        for key in self.map_grid:
-            new_map_grid[str(key)] = self.map_grid[key]
-        json_dict["map_grid"] = new_map_grid
-        json_dict["occupied"] = self.occupied
-        json_dict["unkown"] = self.unkown
-        json_dict["free"] = self.free
-        json_dict["wall"] = self.wall
-        json_dict["given_geofence"] = self.given_geofence
-        json_dict["geofence_list"] = self.geofence_list
-        json_dict["geo_fence_index_dict"] = self.geo_fence_index_dict
-        json_dict["bounding_box"] = self.bounding_box
-        json_dict["robot_pose"] = self.robot_pose
 
-        # convert defaultdict to json string
-        JSON = json.dumps(json_dict)
-
-        return JSON
-        
-
-    def import_from_json(self,JSON):
+    def get_GridMapMsg(self):
         """
-        import from json
+        Get GridMapMsg
+        Containing:
+        * header
+        * 2d array of gridmap
         """
-        json_dict = json.loads(JSON)
-        self.resolution = json_dict["resolution"]
-        self.map_grid = json_dict["map_grid"]
-        self.occupied = json_dict["occupied"]
-        self.unkown = json_dict["unkown"]
-        self.free = json_dict["free"]
-        self.wall = json_dict["wall"]
-        self.given_geofence = json_dict["given_geofence"]
-        self.geofence_list = json_dict["geofence_list"]
-        self.geo_fence_index_dict = json_dict["geo_fence_index_dict"]
-        self.bounding_box = json_dict["bounding_box"]
-        self.robot_pose_time = rospy.Time(json_dict["robot_pose_time"])
-        self.robot_pose = json_dict["robot_pose"]
-        
-        
+        # 
+
+
 
     def update_geofence_and_boundingbox(self,msg):
         """Update geofence coordinates and bounding box, takes pose array message as input, aslo sets given_geofence to true, if geofence is given will remove old geofence from map"""

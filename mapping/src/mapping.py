@@ -26,6 +26,7 @@ from math import atan2
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy.signal import argrelextrema
 from grid_map.grid_map import GridMap
+from mapping.msg import GridMap as GridMapMsg
 # Mapping node
 
 ## Gridmap
@@ -159,9 +160,9 @@ class Mapping():
             
             
             
-        # export as json
-        JSON = self.grid_map.export_as_json()
-        rospy.loginfo("JSON: {}".format(JSON))
+
+
+
         
 
     def run(self):
