@@ -1,56 +1,69 @@
-#!/usr/bin/env python3
+import heapq
 import rospy
-from geometry_msgs.msg import  PoseArray, Pose, TransformStamped
-from tf2_geometry_msgs import PoseStamped
-from robp_msgs.msg import Encoders
-import tf_conversions
-import tf2_ros
-import math
-from  math import pi
-import tf
-from sensor_msgs.msg import Imu
+from functools import total_ordering
 import numpy as np
-from nav_msgs.msg import Odometry,OccupancyGrid
-from robp_msgs.msg import DutyCycles
-from aruco_msgs.msg import MarkerArray
-from std_msgs.msg import Bool
+import math
+import actionlib
+import move_base_msgs.msg as mb
+import sys
 from collections import defaultdict
-from sensor_msgs.msg import PointCloud2
-from open3d import open3d as o3d
-from open3d_ros_helper import open3d_ros_helper as o3drh
-import pcl_ros
-from tf import TransformListener
-from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
-from math import atan2
-# import gaussian_filter1d  
-from scipy.ndimage.filters import gaussian_filter1d
-from scipy.signal import argrelextrema
-import json
-# Mapping node
+from dataclasses import dataclass,field
+from occupancy_grid import Occupancy_grid
 
-## Gridmap
-### Resolution
-### Contour of geofence rectange offseted outwards
+from numba import jit
+from typing import Dict,Tuple
+from scipy.interpolate import CubicSpline
+from queue import PriorityQueue
+from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import Path
 
-## Camera
-### Everything obstacles
-### Map down to 2d
-### Update map
-### If above threshold, add to map
-### Update map if below threshold
-
-## Robot Pose
-### Look up base_link in map frame (tf)
+#from mapping.grid_map.grid_map import GridMap
 
 
-#### Dev 
-# 1. Create a map grid from geofence and resolution
-# 2. Subscribe to base_link and display it in map
-# 3. Vizualize map in rviz
+@total_ordering
+@dataclass
+class Node:
+    x: float
+    y: float
+    goal: tuple
+    g: float = field(init=False)
+    h: float = field(init=False)
+    f: float = field(init=False)
+    parent: object = field(default=None)
+    #children: list = field(default_factory=list, init=False)
+
+    # Makes sure that the stuff to be initalized is. 
+    # Needed since dataclasses cant handle initalizing functions
+    def __post_init__(self):
+        if self.parent == None:
+            self.g = 0
+        else:
+            par_pos =[pos for pos in self.parent.position()]
+            self.g = self.parent.g + math.dist([self.x,self.y],par_pos)
+        self.h = self.dist_to_goal(self.goal)
+        self.f = self.g + self.h
+
+    def __lt__(self,other):
+        return self.f < other.f
+    """def __eq__(self, other):
+        return self.f == other.f"""
+
+    def dist_to_goal(self, goal):
+        return math.dist((self.x, self.y), goal)
+    
+    def set_g(self):
+        self.g = self.parent.f
+    
+    def position(self):
+        return (self.x,self.y)
+    
+    def as_array(self):
+        return np.array([self.x, self.y, self.goal[0], self.goal[1], self.g, self.h, self.f])
+
 
 
 class GridMap():
-    def __init__(self,resolution=0.05):
+    def __init__(self,resolution):
         self.resolution = resolution
         
         # map grid (tuples)
@@ -76,52 +89,6 @@ class GridMap():
         self.robot_pose = [0,0,0]
         
         # 
-
-    def export_as_json(self):
-        """
-        Export file as JSON
-        """
-        json_dict = defaultdict()
-        json_dict["resolution"] = self.resolution
-        new_map_grid = defaultdict()
-        for key in self.map_grid:
-            new_map_grid[str(key)] = self.map_grid[key]
-        json_dict["map_grid"] = new_map_grid
-        json_dict["occupied"] = self.occupied
-        json_dict["unkown"] = self.unkown
-        json_dict["free"] = self.free
-        json_dict["wall"] = self.wall
-        json_dict["given_geofence"] = self.given_geofence
-        json_dict["geofence_list"] = self.geofence_list
-        json_dict["geo_fence_index_dict"] = self.geo_fence_index_dict
-        json_dict["bounding_box"] = self.bounding_box
-        json_dict["robot_pose"] = self.robot_pose
-
-        # convert defaultdict to json string
-        JSON = json.dumps(json_dict)
-
-        return JSON
-        
-
-    def import_from_json(self,JSON):
-        """
-        import from json
-        """
-        json_dict = json.loads(JSON)
-        self.resolution = json_dict["resolution"]
-        self.map_grid = json_dict["map_grid"]
-        self.occupied = json_dict["occupied"]
-        self.unkown = json_dict["unkown"]
-        self.free = json_dict["free"]
-        self.wall = json_dict["wall"]
-        self.given_geofence = json_dict["given_geofence"]
-        self.geofence_list = json_dict["geofence_list"]
-        self.geo_fence_index_dict = json_dict["geo_fence_index_dict"]
-        self.bounding_box = json_dict["bounding_box"]
-        self.robot_pose_time = rospy.Time(json_dict["robot_pose_time"])
-        self.robot_pose = json_dict["robot_pose"]
-        
-        
 
     def update_geofence_and_boundingbox(self,msg):
         """Update geofence coordinates and bounding box, takes pose array message as input, aslo sets given_geofence to true, if geofence is given will remove old geofence from map"""
@@ -614,4 +581,290 @@ class GridMap():
         
         return occupancy_grid
         
+
+
+class A_star():
+
+    def __init__(self):
+        #self.client = actionlib.SimpleActionClient('path_tracker', move_base_msgs.msg.MoveBaseAction)
+        self.map = None
+        self.iterations = 500
+
+    def distance(self,node1: Node,node2:Node):
+        return math.dist(node1.position(),node2.position())
+
+    def reconstruct_path(self,node: Node):
+        pathlist = []
+        while node.parent is not None:  # found target
+            pathlist.append(node)
+            node = node.parent
+        pathlist.append(node) 
+        path = [(node.x,node.y) for node in pathlist]
+        path.reverse()
+        return path
+    
+    # checks if inbounds according to the paramethes of the map
+    """def isinbounds(self,node):
+        # retrives the limits for the map
+        #TODO improve this for different maps
+        limits = self.map.limits
+        xmin = limits[0]
+        xmax = limits[1]
+        ymin = limits[2]
+        ymax = limits[3]
+        if node.x < xmin or node.x > xmax:
+            #print('out of x bounds')
+            return False
+        if node.y < ymin or node.y > ymax:
+            #print('out of y bounds')
+            return False
+        return True"""
+    
+    def is_in_bounds(self,node,buffer):
+        for longditude in range(-1,2,1):
+            for latitude in range(-1,2,1):
+                new_x = node.x + buffer*longditude
+                new_y = node.y + buffer*latitude
+                if not self.map.is_point_in_polygon(new_x,new_y,self.map.geofence_list):
+                    return False
+        return True
+        #self.map.is_point_in_polygon(new_x,new_y,self.map.geofence_list):
+
+    #TODO implement dx,dy 
+    def generate_neighbours(self,node):
+        neighbourlist = {}
+        buffer = 0.5
+        #walllist = []
+        dx = self.map.resolution # 5 cm
+        dy = self.map.resolution
+        #dx = map.dx
+        #dy = map.dy
+        for longditude in range(-1,2,1):
+            for latitude in range(-1,2,1):
+                new_x = node.x + dx*longditude
+                new_y = node.y + dy*latitude
+                neighbour = Node(new_x, new_y, parent = node, goal= node.goal)
+                #if self.isinbounds(neighbour):
+                if self.is_in_bounds(neighbour,buffer):
+                    #print(f'send in coord {new_x,new_y}')
+                    #index_x,index_y = self.map.get_index_of_pos(new_x,new_y)
+                    #print(f'cell value {cell.value}, {cell.position()}')
+                    #cell = self.map
+                    if self.map.get_value_of_pos(new_x,new_y)>=0.8: # will always work due to checking inbounds
+                        #walllist.append((neighbour.position()))
+                        neighbour.g = np.inf
+                        neighbour.f = neighbour.g + neighbour.h
+                    
+                    neighbourlist[neighbour.position()] = neighbour
+                    
+
+        """for wall in walllist:
+            print(f'wall is {wall}')"""
+                    
+                
+        return neighbourlist
+
+
+    def path(self,goal):
+        # usually min heap
+        goal = (goal.pose.position.x,goal.pose.position.y)
+        start = self.map.robot_pose[0:2] # gets the start position from the map
+        heap = []
+        heapq.heapify(heap)
+        openset = {}
+        closedset = {}
+        #heapify(openset)
+        #best_path = None
+        start_node = Node(x=start[0],y=start[1],goal=goal)
+        openset[start_node.position()] = start_node
+        heapq.heappush(heap,(start_node.f,start_node))
+
+        # Controls the amount of max iterations before cancel
+        #maxiter = 15000
+        iter = 0
+        
+        while heapq and iter < self.iterations:
+            #current = min(openset, key=lambda cordinates: openset[cordinates].f)
+            current = heapq.heappop(heap)
+            current = current[1]
+            #if current.position() == (1.0,1.0):
+            #print(openset)
+            #print(current.position())
+            #print(current.g)
+            #print('\n')
+            #print(current)
+            #currentlist.append(current.position())
+            if (current.x,current.y) == goal:
+                return True,self.reconstruct_path(current)
+            
+            closedset[start_node.position()] = start_node
+            
+            neighbours = self.generate_neighbours(current)
+            
+            for neighbour in neighbours:
+                neighbournode= neighbours[neighbour]
+
+                if neighbournode.position() in closedset:
+                    continue
+                else:
+                    closedset[neighbournode.position()] = neighbournode
+                
+                if neighbournode.position() in openset:
+                    sameCoords = {key: openset[key] for key in openset.keys()
+                                        & {(neighbournode.x, neighbournode.y)}}
+                    nodes = sameCoords.values()
+                    #print(f'nodes = {nodes}')
+                    #print(nodes)
+                    for node in nodes:
+                        if neighbournode.g >= node.g:
+                            pass
+                        else:
+                            heapq.heappush(heap,(neighbournode.f,neighbournode))
+                            openset[neighbournode.position()] = neighbournode
+                else: 
+                    openset[neighbournode.position()] = neighbournode
+                    heapq.heappush(heap,(neighbournode.f,neighbournode))
+            iter +=1
+            #print(iter)
+        #print('no path found')
+        #print(f'iter = {iter}')
+        #print(f'openset length = {len(openset)}')
+        return False, self.reconstruct_path(current)
+
+
+    def path_smoothing_cubline_split(self,path):
+        x_path = [path[i][0] for i in range(len(path))]
+        y_path = [path[i][1] for i in range(len(path))]
+        cubic_spline = CubicSpline(x_path,y_path)
+        x = np.linspace(path[0][0],path[0][-1],1000)
+        y = cubic_spline(x)
+        return np.array([x,y]).T
+
+    # straight line split path smoothing
+    def path_smoothing_straightline_split(self,path):
+        x_path = [path[i][0] for i in range(len(path))]
+        y_path = [path[i][1] for i in range(len(path))]
+        x = np.linspace(path[0][0],path[0][-1],1000)
+        y = np.interp(x,x_path,y_path)
+        return np.array([x,y]).T
+
+class Path_Planner():
+    def __init__(self) -> None:
+        rospy.init_node('path_planner')
+        #server
+        self.client = actionlib.SimpleActionClient('path_tracker', mb.MoveBaseAction)
+        print('waiting for server')
+        self.client.wait_for_server(rospy.Duration(0.5))
+
+        #subscriber
+        self.sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
+        #goal currently a fix
+
+        self.goal = PoseStamped()
+        # might need to change in the future
+        self.rate = rospy.Rate(1)
+
+        self.path_planner = A_star()
+
+    def goal_callback(self,goal):
+        self.goal = goal
+        self.main() # this might be bad programming
+
+    def get_map(self):
+        # might call service to get map
+        resolution = 0.05
+        map = GridMap(resolution=resolution)
+        #map =None
+        return map
+
+    def tranform_path_to_posestamped(self,path):
+        path_list = []
+        """path_tosend = Path
+        path_tosend.header.frame_id = "map"
+        path_tosend.header.stamp = rospy.Time.now()"""
+
+        for point in path:
+            pose = PoseStamped()
+            pose.pose.position.x = point[0]
+            pose.pose.position.y = point[1]
+            pose.pose.position.z = 0
+            pose.pose.orientation.x = 0
+            pose.pose.orientation.y = 0
+            pose.pose.orientation.z = 0
+            pose.pose.orientation.w = 1
+            pose.header.frame_id = "map"
+            pose.header.stamp = rospy.Time.now()
+            path_list.append(pose)
+
+        end = path_list[-1]
+        end.pose.orientation = self.goal.pose.orientation
+        path_list[-1] = end
+        #path_tosend.poses = path_list
+
+        return path_list
+
+    """
+    rosmsg show move_base_msgs/MoveBaseActionGoal
+
+    std_msgs/Header header
+    uint32 seq
+    time stamp
+    string frame_id
+    actionlib_msgs/GoalID goal_id
+    time stamp
+    string id
+    move_base_msgs/MoveBaseGoal goal
+    geometry_msgs/PoseStamped target_pose
+        std_msgs/Header header
+        uint32 seq
+        time stamp
+        string frame_id
+        geometry_msgs/Pose pose
+        geometry_msgs/Point position
+            float64 x
+            float64 y
+            float64 z
+        geometry_msgs/Quaternion orientation
+            float64 x
+            float64 y
+            float64 z
+            float64 w
+
+    """
+    def send_path(self,client,path):
+        path_list = self.tranform_path_to_posestamped(path)
+        for pose_stamped in path_list:
+            goal = mb.MoveBaseGoal()
+            goal.target_pose = pose_stamped
+            client.send_goal(goal,done_cb=self.done_cb,feedback_cb=self.feedback_cb)
+            client.wait_for_result() # result callback 
+            print(client.get_result())
+
+    def done_cb(self,status,result):
+        print('done')
+        print(status)
+        print(result)
+        
+    def feedback_cb(self,feedback):
+        print('feedback')
+        print(feedback)
+
+    def main(self):
+        #goal = (10,10)
+        self.path_planner.map = self.get_map()
+        status,path = self.path_planner.path(self.goal)
+        self.send_path(self.client,path)
+
+    def spin(self):
+        while not rospy.is_shutdown():
+            self.main()
+            self.rate.sleep()
+
+
+if __name__ == "__main__":
+    path_planner = Path_Planner()
+    path_planner.spin()
+
+
+
 
