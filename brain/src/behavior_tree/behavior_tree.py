@@ -7,9 +7,8 @@ RUNNING = 'running'
 
 
 class BehaviorTree:
-    def __init__(self, root, rate, context=None):
+    def __init__(self, root, context=None):
         self.root = root
-        self.rate = rate  # [Hz]
         if context is None:
             context = {}
         self.context = context
@@ -18,10 +17,10 @@ class BehaviorTree:
         rospy.loginfo('Running behavior tree')
         return self.root.run(self.context)
     
-    def run_forever(self):
-        rate = rospy.Rate(self.rate)
+    def run_forever(self, rate):
+        rate = rospy.Rate(rate)
         while not rospy.is_shutdown():
-            self.run(self.context)
+            self.run()
             rate.sleep()
 
 

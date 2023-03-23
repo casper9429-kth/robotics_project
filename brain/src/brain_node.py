@@ -15,6 +15,7 @@ No = Not = Inverter
 class BrainNode:
     def __init__(self):
         rospy.init_node('brain_node')
+        rospy.loginfo('Brain node started')
         self.behavior_tree = self._create_behavior_tree()
     
     def _create_behavior_tree(self):
@@ -31,7 +32,7 @@ class BrainNode:
                                        DropOff()])])
         return_to_anchor = ReturnToAnchor()
         root = Sequence([localize, explore, pick_up, drop_off, return_to_anchor])
-        behavior_tree = BehaviorTree(root, rate=10, context=self._create_context())
+        behavior_tree = BehaviorTree(root, context=self._create_context())
         return behavior_tree
     
     def _create_context(self):
@@ -39,7 +40,7 @@ class BrainNode:
         return context 
 
     def run(self):
-        self.behavior_tree.run()
+        self.behavior_tree.run_forever(rate=10)
         rospy.spin()
 
 
