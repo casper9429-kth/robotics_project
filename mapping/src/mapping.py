@@ -156,6 +156,12 @@ class Mapping():
         Occupancy_Grid = self.grid_map.get_OccupancyGrid()
         if Occupancy_Grid != None:
             self.OccupancyGrid_pub.publish(Occupancy_Grid)
+            
+            
+            
+        # export as json
+        JSON = self.grid_map.export_as_json()
+        rospy.loginfo("JSON: {}".format(JSON))
         
 
     def run(self):
