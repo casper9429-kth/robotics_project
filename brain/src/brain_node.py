@@ -2,10 +2,9 @@
 
 import rospy
 from rospy import Subscriber
-from std_msgs.msg import String
+from std_msgs.msg import Bool
 from geometry_msgs.msg import PoseStamped
 import tf2_ros
-from tf2_ros import TransformListener, Buffer
 
 from behavior_tree.behavior_tree import BehaviorTree, Selector, Sequence, Inverter, Leaf, SUCCESS, FAILURE, RUNNING
 
@@ -46,16 +45,16 @@ class BrainNode:
 
 class IsLocalized(Leaf):
     def __init__(self):
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, queue_size=1)
+        self.slam_ready = False
+        self.slam_ready_subscriber = Subscriber('/slam_ready', Bool, self._slam_ready_callback, queue_size=1)
+    
+    def _slam_ready_callback(self, slam_ready_msg):
+        self.slam_ready = slam_ready_msg.data
 
     def run(self, context):
         rospy.loginfo('IsLocalized')
-        try:
-            self.tf_buffer.lookup_transform('map', f'aruco_detected_{context["anchor_id"]}', rospy.Time(0))
-            return SUCCESS
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
-            return FAILURE
+        return SUCCESS if self.slam_ready else FAILURE
+        
     
 
 class Localize(Leaf):
@@ -102,7 +101,7 @@ class GoToPickUp(Leaf):
         rospy.loginfo('GoToPickUp')
         pick_up_pose = PoseStamped()
         pick_up_pose.header.frame_id = 'map'
-        pick_up_pose.pose.position.x = 0.0
+        pick_up_pose.pose.position.x = 1.0
         pick_up_pose.pose.position.y = 0.0
         pick_up_pose.pose.position.z = 0.0
         pick_up_pose.pose.orientation.x = 0.0

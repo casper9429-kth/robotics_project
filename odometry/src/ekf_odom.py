@@ -78,7 +78,7 @@ class ekf_odom():
         
         # EKF var 
         ## v,omega fusion
-        self.R = np.eye(2) * 100  
+        self.R = np.eye(2) * 1000000000000 # 100  
         self.Q_enco = np.eye(2)
         self.Q_enco[0,0] = 100
         self.Q_enco[1,1] = 10

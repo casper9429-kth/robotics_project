@@ -186,7 +186,7 @@ class PathTracker():
         
         stamp = self.pose.header.stamp  
         try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
-            transform_map_2_base_link = self.tfBuffer.lookup_transform('base_link','odom', stamp,rospy.Duration(0.5))     # give goal in base link frame
+            transform_map_2_base_link = self.tfBuffer.lookup_transform('base_link','map', stamp,rospy.Duration(0.5))     # give goal in base link frame
             self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)   
         except:
             print('No transform found')
