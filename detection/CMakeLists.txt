@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   tf_conversions
   message_generation
+  message_filters 
 )
 
 ## System dependencies are found with CMake's conventions
@@ -57,6 +58,8 @@ add_message_files(
   FILES
   BoundingBox.msg
   BoundingBoxArray.msg
+  ObjectInstance.msg
+  ObjectInstanceArray.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -113,7 +116,7 @@ generate_messages(
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES detection
-   CATKIN_DEPENDS rospy sensor_msgs std_msgs aruco_ros robp_msgs tf2 tf2_ros tf_conversions opencv2 cv_bridge message_runtime
+   CATKIN_DEPENDS rospy sensor_msgs std_msgs aruco_ros robp_msgs tf2 tf2_ros tf_conversions opencv2 cv_bridge message_runtime message_filters
 #  DEPENDS system_lib
 )
 
