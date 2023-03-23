@@ -99,6 +99,7 @@ class explorer():
 
 
 
+
 if __name__ == '__main__':
     explorer = explorer()
     rospy.spin()
