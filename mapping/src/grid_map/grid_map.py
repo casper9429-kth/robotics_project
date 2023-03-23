@@ -20,12 +20,14 @@ from open3d import open3d as o3d
 from open3d_ros_helper import open3d_ros_helper as o3drh
 import pcl_ros
 from tf import TransformListener
-from tf2_sensor_msgs.tf2_sensor_msgs import do_transform_cloud
 from math import atan2
 # import gaussian_filter1d  
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy.signal import argrelextrema
 import json
+from mapping.msg import GridMap as GridMapMSG
+from mapping.msg import Array
+from std_msgs.msg import Float32
 # Mapping node
 
 ## Gridmap
@@ -77,51 +79,60 @@ class GridMap():
         
         # 
 
-    def export_as_json(self):
-        """
-        Export file as JSON
-        """
-        json_dict = defaultdict()
-        json_dict["resolution"] = self.resolution
-        new_map_grid = defaultdict()
-        for key in self.map_grid:
-            new_map_grid[str(key)] = self.map_grid[key]
-        json_dict["map_grid"] = new_map_grid
-        json_dict["occupied"] = self.occupied
-        json_dict["unkown"] = self.unkown
-        json_dict["free"] = self.free
-        json_dict["wall"] = self.wall
-        json_dict["given_geofence"] = self.given_geofence
-        json_dict["geofence_list"] = self.geofence_list
-        json_dict["geo_fence_index_dict"] = self.geo_fence_index_dict
-        json_dict["bounding_box"] = self.bounding_box
-        json_dict["robot_pose"] = self.robot_pose
 
-        # convert defaultdict to json string
-        JSON = json.dumps(json_dict)
-
-        return JSON
-        
-
-    def import_from_json(self,JSON):
+    def get_GridMapMsg(self):
         """
-        import from json
+        Get GridMapMsg
+        Containing:
+        * header
+        * 2d array of gridmap
         """
-        json_dict = json.loads(JSON)
-        self.resolution = json_dict["resolution"]
-        self.map_grid = json_dict["map_grid"]
-        self.occupied = json_dict["occupied"]
-        self.unkown = json_dict["unkown"]
-        self.free = json_dict["free"]
-        self.wall = json_dict["wall"]
-        self.given_geofence = json_dict["given_geofence"]
-        self.geofence_list = json_dict["geofence_list"]
-        self.geo_fence_index_dict = json_dict["geo_fence_index_dict"]
-        self.bounding_box = json_dict["bounding_box"]
-        self.robot_pose_time = rospy.Time(json_dict["robot_pose_time"])
-        self.robot_pose = json_dict["robot_pose"]
+        # Create GridMapMsg
+        grid_map_msg = GridMapMSG()
         
+        # Fill header
+        if self.robot_pose_time == 0:
+            rospy.loginfo("No robot pose recieved yet")
+            return None
         
+        grid_map_msg.header.stamp = self.robot_pose_time
+        grid_map_msg.header.frame_id = "map"
+
+
+        # Get raw numpy array of map
+        map_data = self.get_grid_map_array()
+
+        # Convert to list
+        map_data = map_data.tolist()
+
+        # For each row, convert to Array
+        map_data_array = []
+        for i,row in enumerate(map_data):
+            array = Array()
+            array.data = row.tolist()
+            map_data_array.append(array)
+
+        
+        # Fill grid map
+        grid_map_msg.data = map_data_array
+
+        # Fill bounding box
+        grid_map_msg.resolution = self.resolution
+        grid_map_msg.bbminx = self.bounding_box[0]
+        grid_map_msg.bbmaxx = self.bounding_box[1]
+        grid_map_msg.bbminy = self.bounding_box[2]
+        grid_map_msg.bbmaxy = self.bounding_box[3]
+        # Get index of origo
+        i = int((self.bounding_box[0])/self.resolution)
+        j = int((self.bounding_box[2])/self.resolution)
+        grid_map_msg.origo_index_i = i
+        grid_map_msg.origo_index_j = j 
+
+        # Return grid map msg
+        return grid_map_msg
+
+
+
 
     def update_geofence_and_boundingbox(self,msg):
         """Update geofence coordinates and bounding box, takes pose array message as input, aslo sets given_geofence to true, if geofence is given will remove old geofence from map"""
@@ -218,7 +229,7 @@ class GridMap():
             rospy.logwarn("No geofence given, but trying to get map grid")
             return None
         
-        map_array = np.zeros([int((self.bounding_box[1]-self.bounding_box[0])/self.resolution),int((self.bounding_box[3]-self.bounding_box[2])/self.resolution)])
+        map_array = np.zeros([int((self.bounding_box[1]-self.bounding_box[0])/self.resolution),int((self.bounding_bsox[3]-self.bounding_box[2])/self.resolution)])
         for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
             for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
                 map_array[i,j] = self.map_grid[(i,j)]

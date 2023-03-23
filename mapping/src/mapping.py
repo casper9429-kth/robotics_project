@@ -26,6 +26,7 @@ from math import atan2
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy.signal import argrelextrema
 from grid_map.grid_map import GridMap
+from mapping.msg import GridMap as GridMapMsg
 # Mapping node
 
 ## Gridmap
@@ -63,6 +64,9 @@ class Mapping():
         
         # Publisher
         self.OccupancyGrid_pub = rospy.Publisher("/occupancy_grid/walls", OccupancyGrid, queue_size=10)
+        # Publish GridMapMsg 
+        self.grid_map_pub = rospy.Publisher("/map/GridMap", GridMapMsg, queue_size=1)
+
 
         # Define rate
         self.update_rate = 20 # [Hz] Change this to the rate you want
@@ -137,8 +141,6 @@ class Mapping():
 
 
 
-
-
     def main(self): # Do main stuff here    
         """
         Main loop, instead of changing run function,
@@ -158,10 +160,8 @@ class Mapping():
             self.OccupancyGrid_pub.publish(Occupancy_Grid)
             
             
-            
-        # export as json
-        JSON = self.grid_map.export_as_json()
-        rospy.loginfo("JSON: {}".format(JSON))
+        # Publish grid map
+        self.grid_map_pub.publish(self.grid_map.get_GridMapMsg()) 
         
 
     def run(self):
