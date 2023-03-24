@@ -7,9 +7,8 @@ import tf2_geometry_msgs
 from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedback
 import tf
-import move_base_msgs.msg
-
 
 class LineSegment():
     def __init__(self,x1,y1,x2,y2) -> None:
@@ -113,7 +112,7 @@ class PathTracker():
         # To control the robots movement
         self.move = Twist()
         self.acceleration = 0.05
-        self.max_speed = 0.5
+        self.max_speed = 0.6
         self.max_angle = 0.1
         self.angle_speed = 0.7
         self.deceleration_distance = 0.0
@@ -123,9 +122,6 @@ class PathTracker():
         # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
         self.aruco = Marker()
 
-        #server
-        self.server = actionlib.SimpleActionServer('path_tracker',move_base_msgs.msg.MoveBaseAction , self.execute_callback, False)
-        self.server.wait_for_server()
         # tf stuff
         self.br = tf2_ros.TransformBroadcaster()
         self.tfBuffer = tf2_ros.Buffer()
@@ -153,6 +149,19 @@ class PathTracker():
         # self.aruco.pose.pose.orientation = msg.pose.pose.orientation
 
 
+        self.path_tracker_server = actionlib.SimpleActionServer('path_tracker', MoveBaseAction, execute_cb=self.execute_cb, auto_start=False)
+        self.path_tracker_server.start()
+        print('Action server started')
+        rospy.spin()
+
+    def execute_cb(self, goal):
+        self.goal = goal.target_pose            # target_pose is a PosedStamped
+        
+        self.path_tracker_server.set_succeeded()
+        self.main()
+        print('Goal recieved')
+
+   
     # To get the position of the goal
     def goal_callback(self, msg:PoseStamped):
         self.goal.pose.position = msg.pose.position                 # 2D Nav goal in rviz is in odom frame
@@ -160,7 +169,6 @@ class PathTracker():
         # print(self.goal)
         
 
-    
     def fence_callback(self, msg:PoseArray):
         self.polygon = Polygon(msg.poses)
 
@@ -172,7 +180,7 @@ class PathTracker():
             #raise Exception('No fence set')
             return None
 
-   
+
     
     def transforms(self):   
         
@@ -243,19 +251,19 @@ class PathTracker():
             if angle_to_goal >= self.max_angle:
                 self.move.linear.x = 0.0
                 self.move.angular.z = self.angle_speed 
-                #print('turning left')
+                # print('turning left')
 
             elif angle_to_goal <= -self.max_angle:
                 self.move.linear.x = 0.0
                 self.move.angular.z = -self.angle_speed 
-                #print('turning right')
+                # print('turning right')
 
             else:
                 self.move.linear.x = self.velocity_controller(distance)
                 self.move.angular.z = 0.0
                 
         else:
-            #print('Goal reached')
+            # print('Goal reached')
             if abs(dtheta) >= self.orientaion_tolerance:
                 self.move.linear.x = 0.0
                 if dtheta >= 0:
@@ -267,7 +275,7 @@ class PathTracker():
             else:
                 self.move.linear.x = 0.0
                 self.move.angular.z = 0.0
-                print('Goal orientation reached')
+                # print('Goal orientation reached')
 
 
         
@@ -293,18 +301,11 @@ class PathTracker():
             #print('Moving forward')
         return self.move.linear.x
 
-    #Execute the action server
-    def execute_callback(self, goal):
-        print('Executing action server')
-
-        self.spin()
-        self.server.set_succeeded()
-    
 
     def spin(self):
         #print(self.goal.pose)
         #print(self.check_if_in_fence(self.goal.pose))
-        if self.check_if_in_fence(self.goal.pose):
+        if self.check_if_in_fence(self.goal.pose): #
             #print('In fence')
             self.transforms()
             self.math()
@@ -326,4 +327,4 @@ class PathTracker():
 
 if __name__ == '__main__':
     node = PathTracker()
-    node.main()
+    # node.main()

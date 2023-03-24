@@ -1,6 +1,15 @@
 
 import math
+import heapq
+import sys
 
-print(math.hypot(1,1,2,0))
-print(math.hypot(1,1,0,2))
-print(math.dist((1,1),(2,2)))
+from path_planner.src.A_star_testing import Node
+
+lst = [0,1,2]
+print(lst[0:2])
+sys.path.append('/home/robotics/catkin_ws/src/path_planner/src')
+import mapping
+from mapping import Gridmap
+print(sys.path)
+map = Gridmap()
+print(map)
