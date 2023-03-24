@@ -237,7 +237,8 @@ class A_star():
 
     def __init__(self):
         #self.client = actionlib.SimpleActionClient('path_tracker', move_base_msgs.msg.MoveBaseAction)
-        self.map = Occupancy_grid(20,20)
+
+        self.map = Occupancy_grid(2000,2000)
 
     def distance(self,node1: Node,node2:Node):
         return math.dist(node1.position(),node2.position())
@@ -276,10 +277,10 @@ class A_star():
     #TODO implement dx,dy 
     def generate_neighbours(self,node):
         neighbourlist = {}
-        buffer = 0.5
+        buffer = 1
         #walllist = []
-        dx = 0.05 # 5 cm
-        dy = 0.05 
+        dx = 1 # 5 cm
+        dy = 1 
         #dx = map.dx
         #dy = map.dy
         min_pos = None
@@ -328,15 +329,18 @@ class A_star():
             #current = min(openset, key=lambda cordinates: openset[cordinates].f)
             current = heapq.heappop(heap)
             current = current[1]
+            openset.pop(current.position())
             #if current.position() == (1.0,1.0):
             #print(openset)
             #print(current.position())
             #print(current.g)
             #print('\n')
             #print(current)
-            currentlist.append(current.position())
+            #print(len(openset))
+
+            #currentlist.append(current.position())
             if (current.x,current.y) == goal:
-                return self.reconstruct_path(current)
+                return True,self.reconstruct_path(current)
             
             closedset[start_node.position()] = start_node
             
@@ -390,7 +394,30 @@ class A_star():
         return np.array([x,y]).T
 
 
+    def path_smoothing(self,path):
+        # check 3 points at a time
+        # if the change in dx and dy is the same, remove the middle point
+        # if the change in dx and dy is not the same, keep the middle point
+        path_length = len(path)
+        print(f'path_length = {path_length}')
+        points_to_remove = []
+        for point in range( 1, path_length-1):
+            #print(f'point = {path[point]}')
+            dx1 = (path[point][0] - path[point-1][0])
+            dy1 = (path[point][1] - path[point-1][1])
+            dx2 = (path[point+1][0] - path[point][0])
+            dy2 = (path[point+1][1] - path[point][1])
+            print(f'dx1 = {dx1}, dy1 = {dy1}, dx2 = {dx2}, dy2 = {dy2}')
+            if dx1 == dx2 and dy1 == dy2:
+                points_to_remove.append(point)
+        points_to_remove.reverse()
 
+        print(f'points_to_remove = {points_to_remove}')
+        for point in points_to_remove:
+            path.pop(point)
+        #print(f'smoothened path = {path}')
+        return path
+        
 
 """Bezier Curve Smoothing:
 def path_smoothing_bezier(path):
@@ -403,15 +430,15 @@ def path_smoothing_bezier(path):
 
 
 def main():
-    goalvar = 2
+    goalvar = 1
     if goalvar == 1:
         start = (-1682.0,-1682.0)
         goal = (1682.0,1682.0)
     elif goalvar == 2:
         start = (0.0,0.0)
-        goal = (1.0,2.0)
+        goal = (10.0,10.0)
     #print(f'goal = {goal[0]}')
-    path_planner = A_star_test()
+    path_planner = A_star()
     #path_planner = A_star()
     
     # Obstacle manegment
@@ -433,12 +460,14 @@ def main():
     #map.print_pos()
 
     def test_A_star():
-        path = path_planner.path(start,goal)
+        status,path = path_planner.path(start,goal)
+        
+        smooth_path = path_planner.path_smoothing(path)
         print(path)
         #print(currentlist)
         #smooth_path = path_smoothing(path)
         if goalvar == 2:
-            path_planner.map.print_grid(path)
+            path_planner.map.print_grid(smooth_path)
 
     # Gives stats for the algorithm
     def return_stats():
