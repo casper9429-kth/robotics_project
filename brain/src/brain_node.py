@@ -5,6 +5,7 @@ from rospy import Subscriber
 from std_msgs.msg import Bool
 from geometry_msgs.msg import PoseStamped
 from actionlib import SimpleActionClient
+from tf2_ros import Buffer, TransformListener
 
 from arm.msg import ArmAction, ArmGoal, ArmResult, ArmFeedback
 from behavior_tree.behavior_tree import BehaviorTree, Selector, Sequence, Inverter, Leaf, SUCCESS, FAILURE, RUNNING
@@ -39,7 +40,9 @@ class BrainNode:
         context = {'anchor_id': 500,
                    'target_type': 'animal',
                    'is_holding_object': False,
-                   'objects_remaining': 1,}
+                   'objects_remaining': 1,
+                   'box_found': False,
+                   'animal_found': False,}
         return context 
 
     def run(self):
@@ -67,13 +70,27 @@ class Localize(Leaf):
         return RUNNING
     
 
-class IsExplored(Leaf):
+class IsExplored(Leaf): # TODO
+    def __init__(self):
+        self.buffer = Buffer(cache_time=rospy.Duration(60.0))
+        self.listener = TransformListener(self.buffer)
+
     def run(self, context):
         rospy.loginfo('IsExplored')
-        return SUCCESS
+        try:
+            self.buffer.lookup_transform('map', 'aruco/detected1', rospy.Time(0))
+            context['box_found'] = True
+        except:
+            pass
+        try:
+            self.buffer.lookup_transform('map', 'object/detected/Binky_1', rospy.Time(0))
+            context['animal_found'] = True
+        except:
+            pass
+        return SUCCESS if context['box_found'] and context['animal_found'] else FAILURE
     
 
-class Explore(Leaf):
+class Explore(Leaf): # TODO
     def run(self, context):
         rospy.loginfo('Explore')
         return RUNNING
@@ -91,13 +108,13 @@ class IsHoldingObject(Leaf):
         return SUCCESS if context['is_holding_object'] else FAILURE
     
 
-class CanPickUp(Leaf):
+class CanPickUp(Leaf): # TODO
     def run(self, context):
         rospy.loginfo('CanPickUp')
         return FAILURE
     
 
-class GoToPickUp(Leaf):
+class GoToPickUp(Leaf): # TODO
     def __init__(self):
         self.move_base_simple_publisher = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
 
@@ -116,7 +133,7 @@ class GoToPickUp(Leaf):
         return RUNNING
     
 
-class PickUp(Leaf):
+class PickUp(Leaf): # TODO
     def __init__(self):
         self.action_client = SimpleActionClient('arm_actions', ArmAction) # TODO move this check to before the behavior tree
         self.action_client.wait_for_server()
@@ -142,19 +159,19 @@ class PickUp(Leaf):
         return RUNNING
     
 
-class CanDropOff(Leaf):
+class CanDropOff(Leaf): # TODO
     def run(self, context):
         rospy.loginfo('CanDropOff')
         return SUCCESS
     
 
-class GoToDropOff(Leaf):
+class GoToDropOff(Leaf): # TODO
     def run(self, context):
         rospy.loginfo('GoToDropOff')
         return RUNNING
     
 
-class DropOff(Leaf):
+class DropOff(Leaf): # TODO
     def run(self, context):
         rospy.loginfo('DropOff')
         # TODO
@@ -162,7 +179,7 @@ class DropOff(Leaf):
         return RUNNING
     
 
-class ReturnToAnchor(Leaf):
+class ReturnToAnchor(Leaf): # TODO
     def __init__(self):
         self.move_base_simple_publisher = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
 

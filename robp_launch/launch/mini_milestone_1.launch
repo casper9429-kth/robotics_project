@@ -6,7 +6,9 @@
 	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
 
 	<!-- Include realsense2_camera -->
-	<include file="$(find robp_launch)/launch/rs_camera.launch" />
+	<include file="$(find robp_launch)/launch/rs_camera.launch">
+		<arg name="align_depth" value="true"/>
+	</include>
 
 	<!-- run odometry -->
     <node name="odometry" pkg="odometry" type="ekf_odom.py"/>
@@ -34,11 +36,11 @@
 		<param name="reference_frame"    value="camera_color_optical_frame"/>
 		<param name="camera_frame"       value="camera_color_optical_frame"/>
 		<param name="use_depth"          value="True"/>
-		<!-- <param name="adaptiveThreshWinSizeMin"  value="141"/>  
-		<param name="adaptiveThreshWinSizeMax"  value="251"/>  
-		<param name="adaptiveThreshWinSizeStep" value="20"/> 
-		<param name="adaptiveThreshConstant"    value="4"/>     -->
 	</node>
+
+	<!-- Object Detection -->
+	<node name="object_classifier" pkg="detection" type="object_classification.py" output='screen'/>
+	<node name="object_computations" pkg="detection" type="object_computations.py" output='screen'/>
 
     <!-- Pathing -->
     <node name="path_tracker" pkg="path_planner" type="path_tracker_server.py"/>
