@@ -734,23 +734,30 @@ class A_star():
         #print(f'openset length = {len(openset)}')
         print(' at the end')
         return False, self.reconstruct_path(current)
+    
+    def path_smoothing(self,path):
+        # check 3 points at a time
+        # if the change in dx and dy is the same, remove the middle point
+        # if the change in dx and dy is not the same, keep the middle point
+        path_length = len(path)
+        print(f'path_length = {path_length}')
+        points_to_remove = []
+        for point in range( 1, path_length-1):
+            #print(f'point = {path[point]}')
+            dx1 = (path[point][0] - path[point-1][0])
+            dy1 = (path[point][1] - path[point-1][1])
+            dx2 = (path[point+1][0] - path[point][0])
+            dy2 = (path[point+1][1] - path[point][1])
+            print(f'dx1 = {dx1}, dy1 = {dy1}, dx2 = {dx2}, dy2 = {dy2}')
+            if dx1 == dx2 and dy1 == dy2:
+                points_to_remove.append(point)
+        points_to_remove.reverse()
 
-
-    def path_smoothing_cubline_split(self,path):
-        x_path = [path[i][0] for i in range(len(path))]
-        y_path = [path[i][1] for i in range(len(path))]
-        cubic_spline = CubicSpline(x_path,y_path)
-        x = np.linspace(path[0][0],path[0][-1],1000)
-        y = cubic_spline(x)
-        return np.array([x,y]).T
-
-    # straight line split path smoothing
-    def path_smoothing_straightline_split(self,path):
-        x_path = [path[i][0] for i in range(len(path))]
-        y_path = [path[i][1] for i in range(len(path))]
-        x = np.linspace(path[0][0],path[0][-1],1000)
-        y = np.interp(x,x_path,y_path)
-        return np.array([x,y]).T
+        print(f'points_to_remove = {points_to_remove}')
+        for point in points_to_remove:
+            path.pop(point)
+        #print(f'smoothened path = {path}')
+        return path
 
 class Path_Planner():
     def __init__(self) -> None:
@@ -875,6 +882,7 @@ class Path_Planner():
         self.path_planner.map = self.get_map()
         #print(self.goal)
         status,path = self.path_planner.path(self.goal)
+        path = self.path_planner.path_smoothing(path)
         self.send_path(self.client,path)
         print('path sent')
 
