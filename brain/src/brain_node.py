@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 import rospy
-from rospy import Subscriber
+from rospy import Subscriber, ServiceProxy
 from std_msgs.msg import Bool
 from geometry_msgs.msg import PoseStamped
+from std_srvs.srv import Trigger
 from actionlib import SimpleActionClient
 from tf2_ros import Buffer, TransformListener
 
@@ -70,7 +71,7 @@ class Localize(Leaf):
         return RUNNING
     
 
-class IsExplored(Leaf): # TODO
+class IsExplored(Leaf):
     def __init__(self):
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
@@ -90,9 +91,13 @@ class IsExplored(Leaf): # TODO
         return SUCCESS if context['box_found'] and context['animal_found'] else FAILURE
     
 
-class Explore(Leaf): # TODO
+class Explore(Leaf):
+    def __init__(self):
+        self.explore = ServiceProxy('/explore', Trigger)
+
     def run(self, context):
         rospy.loginfo('Explore')
+        self.explore()
         return RUNNING
 
 
@@ -109,8 +114,12 @@ class IsHoldingObject(Leaf):
     
 
 class CanPickUp(Leaf): # TODO
+    def __init__(self):
+        pass
+
     def run(self, context):
         rospy.loginfo('CanPickUp')
+        # TODO: Check if distance to goal pose is less than some threshold
         return FAILURE
     
 
@@ -135,7 +144,7 @@ class GoToPickUp(Leaf): # TODO
 
 class PickUp(Leaf): # TODO
     def __init__(self):
-        self.action_client = SimpleActionClient('arm_actions', ArmAction) # TODO move this check to before the behavior tree
+        self.action_client = SimpleActionClient('arm_actions', ArmAction) # TODO move this check to before the behavior tree or mod BT to check if initialized
         self.action_client.wait_for_server()
         self.running = False
 
