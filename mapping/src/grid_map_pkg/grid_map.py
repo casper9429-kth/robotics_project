@@ -314,7 +314,7 @@ class GridMap():
                 self.set_value_of_pos(pose[0],pose[1],1)            
             
     
-    def import_point_cloud_rays(self,pointcloud):
+    def import_point_cloud_rays_v3(self,pointcloud):
         """
         Import point cloud and set values in map grid
         pointcloud should be numpy Nx2 array
@@ -336,25 +336,38 @@ class GridMap():
         pointcloud[:,1] = pointcloud[:,1] 
         
         
+        # Create array of possible angles
+        d_ang_rad = 1 # distance min max angle
+        steps_d_ang = 100
+        resolution_ang = d_ang_rad/steps_d_ang
+        resolution_ang_inv = int(1/resolution_ang)
+        resolution_ang = 1/resolution_ang_inv
+        possible_angles = [-0.5 + i*resolution_ang for i in range(resolution_ang_inv)]
+        
+        
+        
+        
         # calc a range and angle for each point in pointcloud
         ranges = np.sqrt(np.sum(pointcloud**2,axis=1))
         angle = np.arctan2(pointcloud[:,1],pointcloud[:,0])
 
-        # round to resolution
-        resolution_ang = np.pi/100
-        angle = np.floor(angle/resolution_ang)*resolution_ang
-        resolution_rang = self.resolution/10
-        ranges = np.floor(ranges/resolution_rang)*resolution_rang
-        
         # map angle from -pi to pi
         angle = np.mod(angle+np.pi,2*np.pi)-np.pi        
 
 
+        # round to resolution
+        angle = np.floor((angle-0.5)/resolution_ang)*resolution_ang + 0.5
+        resolution_rang = self.resolution/10
+        ranges = np.floor(ranges/resolution_rang)*resolution_rang
+        
         # Create rays
         rays = np.stack((angle,ranges),axis=1)
 
         # Filter unique rays
         rays, counts = np.unique(rays,axis=0,return_counts=True)
+
+        # Sort rays by angle
+        
 
 
 
@@ -386,10 +399,6 @@ class GridMap():
 
         # make rays np array
         rays = np.array(rays)
-        
-        # min theta and max theta
-        print("min theta: ",np.min(rays[:,0]))
-        print("max theta: ",np.max(rays[:,0]))
         
 
         # offset rays by robot theta
@@ -453,6 +462,168 @@ class GridMap():
             #self.set_value_of_pos(p[0],p[1],points_to_add[p])        
 
         return            
+    
+    def import_point_cloud_rays_v2(self,pointcloud,max_range=1.5):
+        """
+        Import point cloud and set values in map grid
+        pointcloud should be numpy Nx2 array
+        will assume frame of latest given robot pose        
+        """
+
+        # if no geofence given, return
+        if not self.given_geofence:
+            rospy.logwarn("No geofence given, but trying to get map grid")
+            return None
+        
+        # get robot pose in map frame
+        x = self.robot_pose[0]
+        y = self.robot_pose[1]
+        theta = self.robot_pose[2]
+        
+        # add x and y to pointcloud
+        pointcloud[:,0] = pointcloud[:,0] 
+        pointcloud[:,1] = pointcloud[:,1] 
+        
+        
+        # calc a range and angle for each point in pointcloud
+        ranges = np.sqrt(np.sum(pointcloud**2,axis=1))
+        angle = np.arctan2(pointcloud[:,1],pointcloud[:,0])
+
+        # map angle from -pi to pi
+        angle = np.mod(angle+np.pi,2*np.pi)-np.pi        
+
+
+        # Create array of possible angles
+        d_ang_rad = 1 # distance min max angle
+        
+        steps_d_ang = 30
+        resolution_ang = d_ang_rad/steps_d_ang
+        resolution_ang_inv = int(1/resolution_ang)
+        resolution_ang = 1/resolution_ang_inv
+        possible_angles = [-0.5 + i*resolution_ang for i in range(resolution_ang_inv)]
+        
+        # set each elem in angle to closest value in array possible angle
+        angle = np.floor((angle-0.5)/resolution_ang)*resolution_ang + 0.5
+        angle = np.array([possible_angles[np.argmin(np.abs(possible_angles - a))] for a in angle])
+        
+        
+        # round to resolution
+        resolution_rang = self.resolution/10
+        ranges = np.floor(ranges/resolution_rang)*resolution_rang
+
+        # Create rays
+        rays = np.stack((angle,ranges),axis=1)
+
+        # Filter unique rays
+        rays, counts = np.unique(rays,axis=0,return_counts=True)
+
+        # Iter through possible angles, if angle not in rays, add it
+        for ang in possible_angles:
+            if ang not in rays[:,0]:
+                rays = np.vstack((rays,[ang,-1]))
+                counts = np.append(counts,10)
+
+        angle_range_dict = defaultdict(list)
+        for ray,count in zip(rays,counts):
+            ray = [ray[0],ray[1],count]
+            angle_range_dict[ray[0]].append(ray)
+
+
+        rays = [] 
+        count_threshold = 0
+        for key in angle_range_dict.keys():
+            ray_list = angle_range_dict[key]
+            # find first highest count ray in list
+            # find max valu
+            ray_list = np.array(ray_list)
+
+            # find shortest ray with count > count_threshold
+            ray_list = ray_list[ray_list[:,2] > count_threshold]
+            ray_list = ray_list[ray_list[:,1].argsort()]
+            ray = ray_list[0]            
+            
+            
+
+            #index = np.argmax(ray_list[:,2])
+            #ray = ray_list[index]            
+            if ray[2] > count_threshold:
+                rays.append(ray[0:2])
+
+        # make rays np array
+        rays = np.array(rays)
+        
+   
+        
+
+        # offset rays by robot theta
+        rays[:,0] = rays[:,0] + theta
+        
+        # default dict to store points 
+        points_to_add = defaultdict()
+
+
+        # Make all points inbetween robot and ray 0, make end of ray 1
+        for ray in rays:
+            # make end point of ray 1 
+            if ray[1] == -1:
+                ray_end = ray
+                new_x = x + max_range*np.cos(ray_end[0])
+                new_y = y + max_range*np.sin(ray_end[0])
+            else:
+                ray_end = ray
+                new_x = x + ray_end[1]*np.cos(ray_end[0])
+                new_y = y + ray_end[1]*np.sin(ray_end[0])
+
+            #self.set_value_of_pos(new_x,new_y,1)
+            
+            # make all points inbetween 0
+            # get points inbetween
+            dx = new_x - x
+            dy = new_y - y
+            
+            # get number of points
+            n = int(2*(np.sqrt(dx**2 + dy**2)/self.resolution))
+            
+            # get points
+            xs = np.linspace(x,new_x,n)[0:-1]
+            ys = np.linspace(y,new_y,n)[0:-1]
+        
+            
+            # set values of points inbetween
+            for i in range(len(xs)-1):
+                x1 = xs[i]
+                x2 = xs[i+1]
+                y1 = ys[i]
+                y2 = ys[i+1]               
+
+                p1 = self.get_index_of_pos(x1,y1)
+                p2 = self.get_index_of_pos(x2,y2)
+                p3 = self.get_index_of_pos(x1,y2)
+                p4 = self.get_index_of_pos(x2,y1)
+                points_to_add[p1] = self.free
+                points_to_add[p2] = self.free
+                points_to_add[p3] = self.free
+                points_to_add[p4] = self.free
+                
+                
+                
+        for ray in rays:
+            # make end point of ray 1 
+            if ray[1] == -1:
+                continue
+            ray_end = ray
+            new_x = x + ray_end[1]*np.cos(ray_end[0])
+            new_y = y + ray_end[1]*np.sin(ray_end[0])
+            p1 = self.get_index_of_pos(new_x,new_y)
+            points_to_add[p1] = self.occupied
+            #self.set_value_of_pos(new_x,new_y,1)
+            
+
+        for p in points_to_add.keys():
+            self.set_value_of_index(p[0],p[1],points_to_add[p])
+            #self.set_value_of_pos(p[0],p[1],points_to_add[p])        
+
+        return          
     
 
     def get_OccupancyGrid(self):

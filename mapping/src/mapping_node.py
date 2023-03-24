@@ -128,7 +128,7 @@ class Mapping():
         points = new_points
         # Count number of identical points and save as dict
 
-        self.grid_map.import_point_cloud_rays(points)
+        self.grid_map.import_point_cloud_rays_v2(points)
         
         return
 
@@ -160,7 +160,6 @@ class Mapping():
             
             
         # Publish grid map
-        print("Publishing grid map")
         grid_map = self.grid_map.get_GridMapMsg()
         if grid_map != None:
             self.grid_map_pub.publish(self.grid_map.get_GridMapMsg()) 
@@ -179,6 +178,8 @@ class Mapping():
 
 
 if __name__ == "__main__":
-
+    # Sleep for 3 second to make sure all nodes are up and running
+    rospy.sleep(3)
+    
     node=Mapping()
     node.run()
