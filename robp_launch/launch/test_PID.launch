@@ -16,7 +16,7 @@
 	<!-- <node name="path_planner" pkg="path_planner" type="Astaru.py" output='screen'/> -->
 
 	<!-- run the path tracker -->
-	<node name="path_tracker" pkg="path_planner" type="path_tracker.py" output='screen'/>
+	<!-- <node name="path_tracker" pkg="path_planner" type="path_tracker.py" output='screen'/> -->
 	
 	<!-- run the explorer -->
 	<!-- <node name="explorer" pkg="path_planner" type="explorer.py" output='screen'/> -->

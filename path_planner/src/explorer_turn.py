@@ -42,7 +42,7 @@ class explorer_turn():
         angle_rotated = 0
         self.move.angular.z = self.angle_speed
         
-        while angle_rotated < math.pi*4:
+        while angle_rotated < math.pi*4 and self.switch:
             self.cmd_pub.publish(self.move)
             rospy.sleep(0.1)
             angle_rotated += abs(self.move.angular.z) * 0.1 # need to be tuned to the real robot
