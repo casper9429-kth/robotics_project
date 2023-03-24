@@ -24,7 +24,8 @@ def aruco_callback(msg):
     frame_id = msg.header.frame_id
 
     for marker in msg.markers:
-
+        if int(marker.id) != int(id):
+            continue
         pose_map = PoseStamped()
         pose_map.header.frame_id = frame_id
         pose_map.header.stamp = stamp
@@ -70,8 +71,11 @@ def aruco_callback(msg):
         t.transform.translation = pose_map.pose.position
         br.sendTransform(t)
 
-sub_goal = rospy.Subscriber('/aruco/markers', MarkerArray, aruco_callback)
-pub = rospy.Publisher('/aruco/markers/transformed_pose', Marker, queue_size=1)
 
 if __name__ == '__main__':
+    # from launch file import param for id
+    id = int(rospy.get_param("id"))
+    name_or_path = rospy.get_param("aruco_name")
+    sub_goal = rospy.Subscriber('/'+str(name_or_path)+'/markers', MarkerArray, aruco_callback)
+    pub = rospy.Publisher('/aruco/markers/transformed_pose', Marker, queue_size=1)
     rospy.spin()
