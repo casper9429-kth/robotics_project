@@ -24,8 +24,8 @@ from math import atan2
 # import gaussian_filter1d  
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy.signal import argrelextrema
-from grid_map.grid_map import GridMap
-from mapping.msg import GridMap as GridMapMsg
+from grid_map_pkg.grid_map import GridMap
+from mapping.msg import GridMapMsg
 # Mapping node
 
 ## Gridmap
@@ -160,7 +160,10 @@ class Mapping():
             
             
         # Publish grid map
-        self.grid_map_pub.publish(self.grid_map.get_GridMapMsg()) 
+        print("Publishing grid map")
+        grid_map = self.grid_map.get_GridMapMsg()
+        if grid_map != None:
+            self.grid_map_pub.publish(self.grid_map.get_GridMapMsg()) 
         
 
     def run(self):

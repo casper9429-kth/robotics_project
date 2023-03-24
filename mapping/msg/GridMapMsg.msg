@@ -1,5 +1,5 @@
 Header header
-Array[] data
+Array_float[] data
 float32 resolution
 float32 bbminx
 float32 bbminy
