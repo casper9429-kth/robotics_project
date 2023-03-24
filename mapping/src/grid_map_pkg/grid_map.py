@@ -495,7 +495,6 @@ class GridMap():
 
         # Create array of possible angles
         d_ang_rad = 1 # distance min max angle
-        
         steps_d_ang = 30
         resolution_ang = d_ang_rad/steps_d_ang
         resolution_ang_inv = int(1/resolution_ang)
@@ -598,12 +597,8 @@ class GridMap():
 
                 p1 = self.get_index_of_pos(x1,y1)
                 p2 = self.get_index_of_pos(x2,y2)
-                p3 = self.get_index_of_pos(x1,y2)
-                p4 = self.get_index_of_pos(x2,y1)
                 points_to_add[p1] = self.free
                 points_to_add[p2] = self.free
-                points_to_add[p3] = self.free
-                points_to_add[p4] = self.free
                 
                 
                 
