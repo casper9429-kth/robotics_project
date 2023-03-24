@@ -14,9 +14,6 @@ class ExplorerTurn():
         #Init node
         rospy.init_node('explorer_turn')
         
-        #subscribers
-        self.map_sub = rospy.Subscriber('/map', PoseStamped, self.map_callback) # change to the topic that the map is published on
-        
         #publishers
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         
