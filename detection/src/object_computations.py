@@ -14,6 +14,7 @@ import math
 from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
+import os
 
 class Object_computations():
     def __init__(self):
@@ -29,13 +30,10 @@ class Object_computations():
         self.objects_dict = {}
         self.frame_id = "camera_color_optical_frame"
 
-
-        self.directory = "./saved_instances"
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-        
-        
-            
+        self.directory = "/home/sleepy/dd2419_ws/src/detection/src/saved_instances"
+        if not os.path.exists(self.directory):
+            os.makedirs(self.directory)
+        self.bridge = CvBridge()
 
 
         # Define rate
@@ -103,7 +101,7 @@ class Object_computations():
                     y_min = [o.y for o in cluster]
                     width = [o.width for o in cluster]
                     height = [o.height for o in cluster]
-                    stamp = [o.stamp for o in cluster]
+                    stamp = [o.stamp.nsecs for o in cluster]
                     
                     # avoid TF repeated timestamp warning
                     time = time + rospy.Duration.from_sec(0.05)
@@ -117,7 +115,7 @@ class Object_computations():
                     stamp = np.mean(stamp)
                     x_min = np.mean(x_min)
                     y_min = np.mean(y_min)
-                    image = self.cache_image.getElemAfterTime(stamp)
+                    image = self.cache_image.getElemAfterTime(rospy.Time(0, stamp))
 
                     
                     self.save_instances((category_name, x, y, z), time, (x_min, y_min, width, height, image))
@@ -201,16 +199,19 @@ class Object_computations():
         width = bb_info[2]
         height = bb_info[3]
         
-        start_point = (x_min, y_min)
+        start_point = (int(x_min), int(y_min))
         end_point = (int(x_min+width), int(y_min+height))
-        color = (255, 0, 0)
+        color = (0, 0, 255)
         thickness = 2
+
         
         try:
-            cv_image = self.bridge.imgmsg_to_cv2(image, "rgb8")
+            cv_image = self.bridge.imgmsg_to_cv2(image, "bgr8")
             cv_image = cv2.rectangle(cv_image, start_point, end_point, color, thickness)
             cv_image = cv2.putText(cv_image, instance_key, (start_point[0]-10, start_point[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness, cv2.LINE_AA)
-            cv2.imwrite(self.directory+"_"+instance_key+".jpg", cv_image)
+            path = self.directory+"/"+instance_key+".jpg"
+            rospy.loginfo("Saving image at %s", path)
+            cv2.imwrite(path, cv_image)
         except CvBridgeError as e:
             print(e)
 

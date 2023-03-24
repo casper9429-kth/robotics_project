@@ -33,8 +33,8 @@ class Object_classifier():
         # Paramethers 
         self.device = "cuda"
         self.detector = Detector().to(self.device)
-        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
-        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
+        #model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
+        model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
         model= self.load_model(self.detector, model_path, self.device)
         self.detector.eval()
         
@@ -148,8 +148,9 @@ class Object_classifier():
                 
                 x_bb = int(bb["x"])
                 y_bb = int(bb["y"])
-                bb_msg.stame = stamp
+                
                 bb_msg = BoundingBox()
+                bb_msg.stamp = stamp
                 bb_msg.x = x_bb
                 bb_msg.y = y_bb
                 bb_msg.width = bb["width"]
