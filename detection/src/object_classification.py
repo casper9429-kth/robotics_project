@@ -148,7 +148,7 @@ class Object_classifier():
                 
                 x_bb = int(bb["x"])
                 y_bb = int(bb["y"])
-                
+                bb_msg.stame = stamp
                 bb_msg = BoundingBox()
                 bb_msg.x = x_bb
                 bb_msg.y = y_bb

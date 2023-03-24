@@ -11,8 +11,9 @@ from matplotlib import pyplot as plt
 import numpy as np
 from collections import Counter
 import math
-
-
+from sensor_msgs.msg import Image
+import cv2
+from cv_bridge import CvBridge, CvBridgeError
 
 class Object_computations():
     def __init__(self):
@@ -28,6 +29,15 @@ class Object_computations():
         self.objects_dict = {}
         self.frame_id = "camera_color_optical_frame"
 
+
+        self.directory = "./saved_instances"
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        
+        
+            
+
+
         # Define rate
         self.update_rate = 1 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
@@ -37,7 +47,9 @@ class Object_computations():
         # Subscribers 
         #self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBoxArray)
         self.sub = message_filters.Subscriber("detection/bounding_boxes", BoundingBoxArray)
+        self.sub_image = message_filters.Subscriber("/camera/color/image_raw", Image) 
         self.cache = message_filters.Cache(self.sub, 100)
+        self.cache_image = message_filters.Cache(self.sub_image, 100)
         
         # Publisher
         self.instances_pub = rospy.Publisher("/detection/object_instances", ObjectInstanceArray, queue_size=10)
@@ -87,6 +99,11 @@ class Object_computations():
                     x = [o.bb_center.x for o in cluster]
                     y = [o.bb_center.y for o in cluster]
                     z = [o.bb_center.z for o in cluster]
+                    x_min = [o.x for o in cluster]
+                    y_min = [o.y for o in cluster]
+                    width = [o.width for o in cluster]
+                    height = [o.height for o in cluster]
+                    stamp = [o.stamp for o in cluster]
                     
                     # avoid TF repeated timestamp warning
                     time = time + rospy.Duration.from_sec(0.05)
@@ -95,12 +112,19 @@ class Object_computations():
                     x = np.mean(x)
                     y = np.mean(y)
                     z = np.mean(z)
+                    width = np.mean(width)
+                    height = np.mean(height)
+                    stamp = np.mean(stamp)
+                    x_min = np.mean(x_min)
+                    y_min = np.mean(y_min)
+                    image = self.cache_image.getElemAfterTime(stamp)
+
                     
-                    self.save_instances((category_name, x, y, z), time)
+                    self.save_instances((category_name, x, y, z), time, (x_min, y_min, width, height, image))
                     #rospy.loginfo("category_name:%s, x=%s, y=%s, z=%s",category_name,x,y,z)
 
 
-    def save_instances(self, new_instance, time):
+    def save_instances(self, new_instance, time, bb_info):
         
         # convert coordinates to map frame
         point_map = PointStamped()
@@ -123,6 +147,7 @@ class Object_computations():
 
             # notify if new object detected
             rospy.loginfo("New object detected: %s. Position in map: %s", instance_key,point_map.point)
+            self.save_instance_image(instance_key, bb_info)
 
             # publish tf
             self.publish_tf(instance_key, point_map)
@@ -159,6 +184,7 @@ class Object_computations():
 
                 # notify if new object detected
                 rospy.loginfo("New object detected: %s. Position in map: %s", instance_key,point_map.point)
+                self.save_instance_image(instance_key, bb_info)
 
                 # publish tf
                 self.publish_tf(instance_key, point_map)
@@ -167,6 +193,29 @@ class Object_computations():
                 self.publish_instances()
 
     
+    def save_instance_image(self, instance_key, bb_info):
+        # save image of the instance
+        image = bb_info[4]
+        x_min = bb_info[0]
+        y_min = bb_info[1]
+        width = bb_info[2]
+        height = bb_info[3]
+        
+        start_point = (x_min, y_min)
+        end_point = (int(x_min+width), int(y_min+height))
+        color = (255, 0, 0)
+        thickness = 2
+        
+        try:
+            cv_image = self.bridge.imgmsg_to_cv2(image, "rgb8")
+            cv_image = cv2.rectangle(cv_image, start_point, end_point, color, thickness)
+            cv_image = cv2.putText(cv_image, instance_key, (start_point[0]-10, start_point[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness, cv2.LINE_AA)
+            cv2.imwrite(self.directory+"_"+instance_key+".jpg", cv_image)
+        except CvBridgeError as e:
+            print(e)
+
+
+       
     #TODO: remove instances
 
     def publish_instances(self):
