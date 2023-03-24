@@ -28,11 +28,23 @@
 	<!-- Aruco Detection -->
 	<node name="display_markers" pkg="detection" type="display_markers.py"/>
 
-    <node name="aruco" pkg="aruco_ros" type="marker_publisher">
+    <node name="aruco_anchor" pkg="aruco_ros" type="marker_publisher">
 		<remap from="/camera_info" to="/camera/color/camera_info"/>
 		<remap from="/image" to="/camera/color/image_raw"/>
 		<param name="image_is_rectified" value="True"/>
 		<param name="marker_size"        value="0.08"/> 
+		<param name="marker_ids"		 value="500"/>
+		<param name="reference_frame"    value="camera_color_optical_frame"/>
+		<param name="camera_frame"       value="camera_color_optical_frame"/>
+		<param name="use_depth"          value="True"/>
+	</node>
+
+    <node name="aruco1" pkg="aruco_ros" type="marker_publisher">
+		<remap from="/camera_info" to="/camera/color/camera_info"/>
+		<remap from="/image" to="/camera/color/image_raw"/>
+		<param name="image_is_rectified" value="True"/>
+		<param name="marker_size"        value="0.051"/> 
+		<param name="marker_ids"		 value="1"/>
 		<param name="reference_frame"    value="camera_color_optical_frame"/>
 		<param name="camera_frame"       value="camera_color_optical_frame"/>
 		<param name="use_depth"          value="True"/>
@@ -46,6 +58,9 @@
     <node name="path_tracker" pkg="path_planner" type="path_tracker_server.py"/>
     <node name="workspace_manager" pkg="localization" type="workspace_manager.py"/>
     <node name="path_tracker_client" pkg="path_planner" type="path_tracker_client.py"/>
+
+	<!-- Exploration -->
+	<node name="explorer_turn" pkg="path_planner" type="explorer_turn.py"/>
 
 	<!-- Brain -->
 	<node name="brain_node" pkg="brain" type="brain_node.py" output="screen"/>
