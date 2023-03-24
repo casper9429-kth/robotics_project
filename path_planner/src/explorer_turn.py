@@ -14,7 +14,7 @@ class explorer_turn():
 
         
         #subscribers
-        self.map_sub = rospy.Subscriber('/map', PoseStamped, self.map_callback) # change to the topic that the map is published on
+        # self.map_sub = rospy.Subscriber('/map', PoseStamped, self.map_callback) # change to the topic that the map is published on
 
         
         #publishers
@@ -23,22 +23,24 @@ class explorer_turn():
         # To control the robots movement
         self.move = Twist()
         self.max_angle = 0.1
-        self.angle_speed = 0.8
+        self.angle_speed = math.pi/4 # need to be tuned to the real robot
         self.in_goal_tolerance = 0.02
-        
+        self.rate = rospy.Rate(10)
+        for i in range(50):
+            self.rate.sleep()
         self.turn360()
-
-
+        
+     
     def turn360(self):
 
         angle_rotated = 0
         self.move.angular.z = self.angle_speed
         
-        while angle_rotated < math.pi*2:
+        while angle_rotated < math.pi*4:
             self.cmd_pub.publish(self.move)
             rospy.sleep(0.1)
             angle_rotated += abs(self.move.angular.z) * 0.1 # need to be tuned to the real robot
-            # print(angle_rotated)
+            print(angle_rotated)
             
         self.move.angular.z = 0
         self.cmd_pub.publish(self.move)
