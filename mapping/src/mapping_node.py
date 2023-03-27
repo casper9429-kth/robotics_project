@@ -77,7 +77,8 @@ class Mapping():
         self.br = tf2_ros.TransformBroadcaster()
         self.listner = tf2_ros.TransformListener(self.tf_buffer)
         self.tf_listner = TransformListener()
-
+        self.p_cloud_buffer = []
+        self.p_cloud_cont = 0
         # Resolution
         self.resolution = 0.05 # [m]
 
@@ -126,9 +127,13 @@ class Mapping():
         new_points[:,0] = points[:,2]
         new_points[:,1] = -points[:,0]
         points = new_points
+        self.p_cloud_buffer.append(points)
         # Count number of identical points and save as dict
-
-        self.grid_map.import_point_cloud_rays_v2(points)
+        self.p_cloud_cont += 1
+        if self.p_cloud_cont%3 == 0:
+            points = np.vstack(points)
+            self.p_cloud_buffer = []
+            self.grid_map.import_point_cloud_rays_v3(points)
         
         return
 
@@ -179,7 +184,7 @@ class Mapping():
 
 if __name__ == "__main__":
     # Sleep for 3 second to make sure all nodes are up and running
-    rospy.sleep(3)
+    rospy.sleep(5)
     
     node=Mapping()
     node.run()
