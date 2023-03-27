@@ -57,7 +57,7 @@ class GridMap():
         
         # map grid (tuples)
         self.map_grid = None#defaultdict(lambda: -1)
-        
+        self.contour_mask = None
         # values
         self.occupied = 1
         self.unkown = -1
@@ -160,12 +160,17 @@ class GridMap():
             if y > self.bounding_box[3]:
                 self.bounding_box[3] = y
 
+        # Expand bounding box by resolution on all sides
+        self.bounding_box[0] -= self.resolution*4
+        self.bounding_box[1] += self.resolution*4
+        self.bounding_box[2] -= self.resolution*4
+        self.bounding_box[3] += self.resolution*4
 
 
     
 
         # Create numpy array of bounding box
-        self.map_grid = np.ones([int(((self.bounding_box[1]-self.bounding_box[0])/self.resolution)+1),int(((self.bounding_box[3]-self.bounding_box[2])/self.resolution)+1)])*self.unkown
+        self.map_grid = np.ones([int(((self.bounding_box[1]-self.bounding_box[0])/self.resolution)),int(((self.bounding_box[3]-self.bounding_box[2])/self.resolution))])*self.unkown
         self.map_grid = self.map_grid.astype(int)
         print("#######################")
         print("#######################")
@@ -177,10 +182,15 @@ class GridMap():
         
                 
         # Change all cordiantes to grid coordinates if they are on our outside of the geofence polygon
-        for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
-            for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
+        # arange but exclude last value
+        for i in range(self.map_grid.shape[0]):
+            for j in range(self.map_grid.shape[1]):
+                x = self.resolution*i + self.bounding_box[0]
+                y = self.resolution*j + self.bounding_box[2]
                 if not self.is_point_in_polygon(x,y,self.geofence_list):
-                    self.map_grid[i,j] = self.wall
+                    self.map_grid[i,j] = self.occupied
+
+        self.contour_mask = self.map_grid.copy()
 
 
         # Set given geofence to true
@@ -212,11 +222,7 @@ class GridMap():
         self.robot_pose_time = msg.header.stamp
         self.robot_pose_new = [msg.transform.translation.x, msg.transform.translation.y, tf.transformations.euler_from_quaternion([msg.transform.rotation.x, msg.transform.rotation.y, msg.transform.rotation.z, msg.transform.rotation.w])[2]]
 
-        # add robot pose to map
-        if self.robot_pose != self.robot_pose_new:
-            self.set_value_of_pos(self.robot_pose[0],self.robot_pose[1],-1)
-            self.robot_pose = self.robot_pose_new
-            self.set_value_of_pos(self.robot_pose[0],self.robot_pose[1],1)
+        self.robot_pose = self.robot_pose_new
         
     
     
@@ -396,9 +402,6 @@ class GridMap():
         # offset rays by robot theta
         rays[:,0] = rays[:,0] + theta
         
-        # default dict to store points 
-        points_to_add = defaultdict()
-
 
         # Make all points inbetween robot and ray 0, make end of ray 1
         map_grid = self.map_grid.copy() # maybe need to add a copy here
@@ -442,6 +445,8 @@ class GridMap():
             new_y = int((new_y-self.bounding_box[2])/self.resolution)
             map_grid[new_x,new_y] = self.occupied
 
+        # Apply mask of geofence to make sure no points outside of geofence are 0
+        map_grid[self.contour_mask==self.wall] = self.wall
         self.map_grid = map_grid
             
 
@@ -462,8 +467,8 @@ class GridMap():
         occupancy_grid.header.frame_id = "map"
         occupancy_grid.header.stamp = rospy.Time.now()
         occupancy_grid.info.resolution = self.resolution
-        occupancy_grid.info.width = int(((self.bounding_box[1]-self.bounding_box[0])/self.resolution) +1)
-        occupancy_grid.info.height = int(((self.bounding_box[3]-self.bounding_box[2])/self.resolution) + 1)
+        occupancy_grid.info.width = self.map_grid.shape[0]#int(((self.bounding_box[1]-self.bounding_box[0])/self.resolution) +1)
+        occupancy_grid.info.height = self.map_grid.shape[1]#int(((self.bounding_box[3]-self.bounding_box[2])/self.resolution) +1)
         occupancy_grid.info.origin.position.x = self.bounding_box[0]
         occupancy_grid.info.origin.position.y = self.bounding_box[2]
         occupancy_grid.info.origin.position.z = 0
