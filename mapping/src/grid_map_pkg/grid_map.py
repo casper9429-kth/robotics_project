@@ -401,7 +401,7 @@ class GridMap():
 
 
         # Make all points inbetween robot and ray 0, make end of ray 1
-        map_grid = self.map_grid
+        map_grid = self.map_grid.copy() # maybe need to add a copy here
         for ray in rays:
             # make end point of ray 1 
             ang = ray[0]
@@ -425,20 +425,9 @@ class GridMap():
             xs = np.linspace(x,new_x,n)
             ys = np.linspace(y,new_y,n)
             
-            #x_index = int((x-self.bounding_box[0])/self.resolution)
-            #y_index = int((y-self.bounding_box[2])/self.resolution)
             xs = ((xs-self.bounding_box[0])/self.resolution).astype(int)
             ys = ((ys-self.bounding_box[2])/self.resolution).astype(int)
             map_grid[(xs[:],ys[:])] = self.free
-            #xs = 
-            
-            # set values of points inbetween
-            #for i in range(len(xs)):
-            #    x1 = xs[i]
-            #    y1 = ys[i]
-            #    
-            #    p1 = self.get_index_of_pos(x1,y1)
-            #    points_to_add[p1] = self.free
                 
                 
                 
@@ -457,9 +446,6 @@ class GridMap():
             
 
         
-        #for p in points_to_add.keys():
-        #    self.set_value_of_index(p[0],p[1],points_to_add[p])
-        #    #self.set_value_of_pos(p[0],p[1],points_to_add[p])        
 
         return            
     
