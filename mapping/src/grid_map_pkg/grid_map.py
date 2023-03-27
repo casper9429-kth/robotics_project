@@ -65,7 +65,7 @@ class GridMap():
         self.wall = 2
         
         # Geofence coord 
-        self.given_geofence = None#False
+        self.given_geofence = False
         self.geofence_list = []
 
         
@@ -104,7 +104,6 @@ class GridMap():
 
         # Get raw numpy array of map
         map_data = self.get_grid_map_array()
-
         # Convert to list
         map_data = map_data.tolist()
 
@@ -140,31 +139,17 @@ class GridMap():
     def update_geofence_and_boundingbox(self,msg):
         """Update geofence coordinates and bounding box, takes pose array message as input, aslo sets given_geofence to true, if geofence is given will remove old geofence from map"""
         
-        # save new geofence
-        self.geofence_list_new = [[pose.position.x, pose.position.y] for pose in msg.poses] 
-    
-        # if old geofence == new geofence, do nothing
-        if self.geofence_list == self.geofence_list_new:
+        if self.given_geofence == True:
             return
-
-        # Create numpy array of bounding box
-        self.map_grid = np.ones((int((self.bounding_box[1]-self.bounding_box[0])/self.resolution+1),int((self.bounding_box[3]-self.bounding_box[2])/self.resolution+1)))*self.unkown
-        print(self.map_grid.shape)
-        # if old geofence is given, remove it from the map
-        if self.given_geofence:
-            for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
-                for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
-                    if not self.is_point_in_polygon(x,y,self.geofence_list):
-                        self.map_grid[i,j] = self.unkown
-
         # save new geofence
-        self.geofence_list = self.geofence_list_new 
+        self.geofence_list = [[pose.position.x, pose.position.y] for pose in msg.poses] 
+
+
 
         # Find bounding box of geofence 
-        if len(self.geofence_list) > 0:
-            self.bounding_box = [self.geofence_list[0][0], self.geofence_list[0][0], self.geofence_list[0][1], self.geofence_list[0][1]]
+        self.bounding_box = [self.geofence_list[0][0], self.geofence_list[0][0], self.geofence_list[0][1], self.geofence_list[0][1]]
 
-        
+
         for x,y in self.geofence_list:
             if x < self.bounding_box[0]:
                 self.bounding_box[0] = x
@@ -174,7 +159,23 @@ class GridMap():
                 self.bounding_box[2] = y
             if y > self.bounding_box[3]:
                 self.bounding_box[3] = y
+
+
+
+    
+
+        # Create numpy array of bounding box
+        self.map_grid = np.ones([int(((self.bounding_box[1]-self.bounding_box[0])/self.resolution)+1),int(((self.bounding_box[3]-self.bounding_box[2])/self.resolution)+1)])*self.unkown
+        self.map_grid = self.map_grid.astype(int)
+        print("#######################")
+        print("#######################")
+        print("#######################")
+        print(self.map_grid.shape)
+        print("#######################")
+        print("#######################")
+        print("#######################")
         
+                
         # Change all cordiantes to grid coordinates if they are on our outside of the geofence polygon
         for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
             for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
@@ -232,7 +233,7 @@ class GridMap():
     def get_grid_map_array(self):
         """Return map grid as array, if not given geofence, return None"""
         # Retrun map grid as array if not given geofence, return None
-        if not self.given_geofence:
+        if self.given_geofence == False:
             rospy.logwarn("No geofence given, but trying to get map grid")
             return None
         
@@ -400,6 +401,7 @@ class GridMap():
 
 
         # Make all points inbetween robot and ray 0, make end of ray 1
+        map_grid = self.map_grid
         for ray in rays:
             # make end point of ray 1 
             ang = ray[0]
@@ -422,15 +424,21 @@ class GridMap():
             # get points
             xs = np.linspace(x,new_x,n)
             ys = np.linspace(y,new_y,n)
-        
+            
+            #x_index = int((x-self.bounding_box[0])/self.resolution)
+            #y_index = int((y-self.bounding_box[2])/self.resolution)
+            xs = ((xs-self.bounding_box[0])/self.resolution).astype(int)
+            ys = ((ys-self.bounding_box[2])/self.resolution).astype(int)
+            map_grid[(xs[:],ys[:])] = self.free
+            #xs = 
             
             # set values of points inbetween
-            for i in range(len(xs)):
-                x1 = xs[i]
-                y1 = ys[i]
-
-                p1 = self.get_index_of_pos(x1,y1)
-                points_to_add[p1] = self.free
+            #for i in range(len(xs)):
+            #    x1 = xs[i]
+            #    y1 = ys[i]
+            #    
+            #    p1 = self.get_index_of_pos(x1,y1)
+            #    points_to_add[p1] = self.free
                 
                 
                 
@@ -441,14 +449,17 @@ class GridMap():
             ray_end = ray
             new_x = x + ray_end[1]*np.cos(ray_end[0])
             new_y = y + ray_end[1]*np.sin(ray_end[0])
-            p1 = self.get_index_of_pos(new_x,new_y)
-            points_to_add[p1] = self.occupied
-            #self.set_value_of_pos(new_x,new_y,1)
+            new_x = int((new_x-self.bounding_box[0])/self.resolution)
+            new_y = int((new_y-self.bounding_box[2])/self.resolution)
+            map_grid[new_x,new_y] = self.occupied
+
+        self.map_grid = map_grid
             
 
-        for p in points_to_add.keys():
-            self.set_value_of_index(p[0],p[1],points_to_add[p])
-            #self.set_value_of_pos(p[0],p[1],points_to_add[p])        
+        
+        #for p in points_to_add.keys():
+        #    self.set_value_of_index(p[0],p[1],points_to_add[p])
+        #    #self.set_value_of_pos(p[0],p[1],points_to_add[p])        
 
         return            
     
@@ -465,8 +476,8 @@ class GridMap():
         occupancy_grid.header.frame_id = "map"
         occupancy_grid.header.stamp = rospy.Time.now()
         occupancy_grid.info.resolution = self.resolution
-        occupancy_grid.info.width = int((self.bounding_box[1]-self.bounding_box[0])/self.resolution)
-        occupancy_grid.info.height = int((self.bounding_box[3]-self.bounding_box[2])/self.resolution)
+        occupancy_grid.info.width = int(((self.bounding_box[1]-self.bounding_box[0])/self.resolution) +1)
+        occupancy_grid.info.height = int(((self.bounding_box[3]-self.bounding_box[2])/self.resolution) + 1)
         occupancy_grid.info.origin.position.x = self.bounding_box[0]
         occupancy_grid.info.origin.position.y = self.bounding_box[2]
         occupancy_grid.info.origin.position.z = 0
@@ -479,12 +490,11 @@ class GridMap():
 
         
         occupancy_grid.data = []
-        
-        for j in range(occupancy_grid.info.height):
-            for i in range(occupancy_grid.info.width):
-
-                occupancy_grid.data.append(self.get_value_of_index(i,j))
-        
+        #for j in range(occupancy_grid.info.height):
+        #    for i in range(occupancy_grid.info.width):
+        #        occupancy_grid.data.append(self.get_value_of_index(i,j))
+    
+        occupancy_grid.data = self.map_grid.flatten('F').tolist()
         return occupancy_grid
         
 
