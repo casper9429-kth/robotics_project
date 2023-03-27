@@ -33,8 +33,8 @@ class Object_classifier():
         # Paramethers 
         self.device = "cuda"
         self.detector = Detector().to(self.device)
-        #model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
-        model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
+        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
+        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
         model= self.load_model(self.detector, model_path, self.device)
         self.detector.eval()
         

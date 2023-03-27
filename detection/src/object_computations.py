@@ -30,9 +30,7 @@ class Object_computations():
         self.objects_dict = {}
         self.frame_id = "camera_color_optical_frame"
 
-        self.directory = "/home/sleepy/dd2419_ws/src/detection/src/saved_instances"
-        if not os.path.exists(self.directory):
-            os.makedirs(self.directory)
+        self.directory = "/home/robot/dd2419_ws/src/detection/src/saved_instances"
         self.bridge = CvBridge()
 
 
@@ -98,10 +96,10 @@ class Object_computations():
                     x = [o.bb_center.x for o in cluster]
                     y = [o.bb_center.y for o in cluster]
                     z = [o.bb_center.z for o in cluster]
-                    x_min = [o.x for o in cluster]
-                    y_min = [o.y for o in cluster]
-                    width = [o.width for o in cluster]
-                    height = [o.height for o in cluster]
+                    # x_min = [o.x for o in cluster]
+                    # y_min = [o.y for o in cluster]
+                    # width = [o.width for o in cluster]
+                    # height = [o.height for o in cluster]
                     stamp = [o.stamp.nsecs for o in cluster]
                     
                     # avoid TF repeated timestamp warning
@@ -111,15 +109,16 @@ class Object_computations():
                     x = np.mean(x)
                     y = np.mean(y)
                     z = np.mean(z)
-                    width = np.mean(width)
-                    height = np.mean(height)
+                    # width = np.mean(width)
+                    # height = np.mean(height)
                     stamp = np.mean(stamp)
-                    x_min = np.mean(x_min)
-                    y_min = np.mean(y_min)
+                    # x_min = np.mean(x_min)
+                    # y_min = np.mean(y_min)
                     image = self.cache_image.getElemAfterTime(rospy.Time(0, stamp))
+                    bb = cluster[6]
 
                     
-                    self.save_instances((category_name, x, y, z), time, (x_min, y_min, width, height, image))
+                    self.save_instances((category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image))
                     #rospy.loginfo("category_name:%s, x=%s, y=%s, z=%s",category_name,x,y,z)
 
 
@@ -216,9 +215,6 @@ class Object_computations():
         except CvBridgeError as e:
             print(e)
 
-
-       
-    #TODO: remove instances
 
     def publish_instances(self):
 
