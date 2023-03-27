@@ -46,6 +46,7 @@ class Object_computations():
         #self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBoxArray)
         self.sub = message_filters.Subscriber("detection/bounding_boxes", BoundingBoxArray)
         self.sub_image = message_filters.Subscriber("/camera/color/image_raw", Image) 
+        self.sub_remove_instance = rospy.Subscriber("/detection/remove_instance", ObjectInstance, self.remove_instance_callback)
         self.cache = message_filters.Cache(self.sub, 100)
         self.cache_image = message_filters.Cache(self.sub_image, 100)
         
@@ -210,7 +211,7 @@ class Object_computations():
             cv_image = cv2.rectangle(cv_image, start_point, end_point, color, thickness)
             cv_image = cv2.putText(cv_image, instance_key, (start_point[0]-10, start_point[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness, cv2.LINE_AA)
             path = self.directory+"/"+instance_key+".jpg"
-            rospy.loginfo("Saving image at %s", path)
+            #rospy.loginfo("Saving image at %s", path)
             cv2.imwrite(path, cv_image)
         except CvBridgeError as e:
             print(e)
@@ -275,6 +276,13 @@ class Object_computations():
         t.transform.translation = point_map.point
         br.sendTransform(t)
 
+    def remove_instance_callback(self, msg):
+        instance_key = msg.instance_name
+        # delete instance from dict
+        try:
+            del self.objects_dict[instance_key]
+        except KeyError as e:
+            rospy.logwarn(e)
 
 
     def main(self): # Do main stuff here    
