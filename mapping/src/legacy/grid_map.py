@@ -56,7 +56,7 @@ class GridMap():
         self.resolution = resolution
         
         # map grid (tuples)
-        self.map_grid = None#defaultdict(lambda: -1)
+        self.map_grid = defaultdict(lambda: -1)
         
         # values
         self.occupied = 1
@@ -65,8 +65,9 @@ class GridMap():
         self.wall = 2
         
         # Geofence coord 
-        self.given_geofence = None#False
+        self.given_geofence = False
         self.geofence_list = []
+        self.geo_fence_index_dict = defaultdict(lambda: 0)
 
         
         # Bounding box
@@ -147,15 +148,12 @@ class GridMap():
         if self.geofence_list == self.geofence_list_new:
             return
 
-        # Create numpy array of bounding box
-        self.map_grid = np.ones((int((self.bounding_box[1]-self.bounding_box[0])/self.resolution+1),int((self.bounding_box[3]-self.bounding_box[2])/self.resolution+1)))*self.unkown
-        print(self.map_grid.shape)
         # if old geofence is given, remove it from the map
         if self.given_geofence:
             for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
                 for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
                     if not self.is_point_in_polygon(x,y,self.geofence_list):
-                        self.map_grid[i,j] = self.unkown
+                        self.map_grid[(i,j)] = self.unkown
 
         # save new geofence
         self.geofence_list = self.geofence_list_new 
@@ -179,7 +177,7 @@ class GridMap():
         for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
             for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
                 if not self.is_point_in_polygon(x,y,self.geofence_list):
-                    self.map_grid[i,j] = self.wall
+                    self.map_grid[(i,j)] = self.wall
 
 
         # Set given geofence to true
@@ -226,7 +224,6 @@ class GridMap():
             rospy.logwarn("No geofence given, but trying to get map grid")
             return None
 
-        
         return self.map_grid
     
     def get_grid_map_array(self):
@@ -236,12 +233,12 @@ class GridMap():
             rospy.logwarn("No geofence given, but trying to get map grid")
             return None
         
-        #map_array = np.zeros([int((self.bounding_box[1]-self.bounding_box[0])/self.resolution+1),int((self.bounding_box[3]-self.bounding_box[2])/self.resolution+1)])
-        #for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
-        #    for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
-        #        map_array[i,j] = self.map_grid[i,j]
+        map_array = np.zeros([int((self.bounding_box[1]-self.bounding_box[0])/self.resolution+1),int((self.bounding_box[3]-self.bounding_box[2])/self.resolution+1)])
+        for i,x in enumerate(np.arange(self.bounding_box[0], self.bounding_box[1], self.resolution)):
+            for j,y in enumerate(np.arange(self.bounding_box[2], self.bounding_box[3], self.resolution)):
+                map_array[i,j] = self.map_grid[(i,j)]
                 
-        return self.map_grid
+        return map_array
     
     def get_index_of_pos(self,x,y):
         """Return index of position in map grid, if not given geofence, return None"""
@@ -277,7 +274,7 @@ class GridMap():
         if i < 0 or i > int((self.bounding_box[1]-self.bounding_box[0])/self.resolution) or j < 0 or j > int((self.bounding_box[3]-self.bounding_box[2])/self.resolution):
             return 1
         
-        return self.map_grid[i,j]
+        return self.map_grid[(i,j)]
     
     def get_value_of_pos(self,x,y):
         """Return value of position in map grid, if not given geofence, return None"""
@@ -296,8 +293,8 @@ class GridMap():
             return None
         
         # check for tuple in geo_fence_index_list numpy array
-        if self.map_grid[i,j] != 2:
-            self.map_grid[i,j] = value
+        if self.map_grid[(i,j)] != 2:
+            self.map_grid[(i,j)] = value
 
         
     

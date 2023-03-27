@@ -127,13 +127,13 @@ class Mapping():
         new_points[:,0] = points[:,2]
         new_points[:,1] = -points[:,0]
         points = new_points
-        self.p_cloud_buffer.append(points)
-        # Count number of identical points and save as dict
-        self.p_cloud_cont += 1
-        if self.p_cloud_cont%3 == 0:
-            points = np.vstack(points)
-            self.p_cloud_buffer = []
-            self.grid_map.import_point_cloud_rays_v3(points)
+        #self.p_cloud_buffer.append(points)
+        ## Count number of identical points and save as dict
+        #self.p_cloud_cont += 1
+        #if self.p_cloud_cont%3 == 0:
+        #    points = np.vstack(points)
+        #    self.p_cloud_buffer = []
+        self.grid_map.import_point_cloud_rays(points,1.5,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2])
         
         return
 
@@ -154,6 +154,7 @@ class Mapping():
         try:
             map_base_link = self.tf_buffer.lookup_transform('map', 'base_link', rospy.Time()) # TransformStamped
             self.grid_map.update_robot_pose(map_base_link)
+            self.robot_pose = [map_base_link.transform.translation.x, map_base_link.transform.translation.y, tf.transformations.euler_from_quaternion([map_base_link.transform.rotation.x, map_base_link.transform.rotation.y, map_base_link.transform.rotation.z, map_base_link.transform.rotation.w])[2]]
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             rospy.logwarn(e)
                 
