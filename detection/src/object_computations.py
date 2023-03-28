@@ -96,11 +96,6 @@ class Object_computations():
                     x = [o.bb_center.x for o in cluster]
                     y = [o.bb_center.y for o in cluster]
                     z = [o.bb_center.z for o in cluster]
-                    # x_min = [o.x for o in cluster]
-                    # y_min = [o.y for o in cluster]
-                    # width = [o.width for o in cluster]
-                    # height = [o.height for o in cluster]
-                    stamp = [o.stamp.nsecs for o in cluster]
                     
                     # avoid TF repeated timestamp warning
                     time = time + rospy.Duration.from_sec(0.05)
@@ -109,18 +104,13 @@ class Object_computations():
                     x = np.mean(x)
                     y = np.mean(y)
                     z = np.mean(z)
-                    # width = np.mean(width)
-                    # height = np.mean(height)
-                    
-                    # x_min = np.mean(x_min)
-                    # y_min = np.mean(y_min)
                     
                     bb = cluster[6]
                     stamp = bb.stamp
                     image = self.cache_image.getElemAfterTime(stamp)
                     
                     self.save_instances((category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image))
-                    #rospy.loginfo("category_name:%s, x=%s, y=%s, z=%s",category_name,x,y,z)
+    
 
 
 
@@ -137,12 +127,11 @@ class Object_computations():
         
         # test if there is already an instance of that category in the list
         instances = [item for item in self.objects_dict if new_instance[0] in item]
-        
         nb_instances = len(instances)
 
         if nb_instances == 0:
             
-            # Is there an instance closer than 5cm to the new instance ?
+            # Is there an object instance closer than 5cm to the new instance ?
             found_close, old_instance_key = self.found_close(list(self.objects_dict.keys()), point_map, 0.05, self.objects_dict)
             new_instance_key = new_instance[0]+str(1)
 
@@ -157,11 +146,12 @@ class Object_computations():
                 self.publish_tf(new_instance_key, point_map)
 
             else:
-                # Goal: keep only one in the long term memory. Keep the one with the largest numberof detections
+                # Goal: keep only one in the long term memory. Keep the one with the largest number of detections
                 temp_instances = [item for item in self.temp_dict if new_instance[0] in item]
-
-                # update temp memory 
+                
                 if len(temp_instances) > 0:
+                    
+                    # check if there is a close instance in the temp memory
                     found_close, tmp_old_instance_key = self.found_close(temp_instances, point_map, 0.05, self.temp_dict)
 
                     if found_close:
@@ -185,7 +175,7 @@ class Object_computations():
                     # publish tf
                     self.publish_tf(new_instance_key, point_map)
                 
-                    #TODO: delete image ?
+                    #TODO: delete other image ?
 
         else:
             
