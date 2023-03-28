@@ -14,7 +14,6 @@ import math
 from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-import os
 
 class Object_computations():
     def __init__(self):
@@ -29,6 +28,7 @@ class Object_computations():
         # Parameters
         self.objects_dict = {}
         self.frame_id = "camera_color_optical_frame"
+        self.temp_dict = {}
 
         self.directory = "/home/robot/dd2419_ws/src/detection/src/saved_instances"
         self.bridge = CvBridge()
@@ -51,14 +51,14 @@ class Object_computations():
         # Publisher
         self.instances_pub = rospy.Publisher("/detection/object_instances", ObjectInstanceArray, queue_size=10)
         
-        rospy.Rate(3).sleep()
+        rospy.Rate(4).sleep()
         
         
 
     def filter(self, batch, time):
 
         nb_msgs = len(batch)
-        #rospy.loginfo("objects len: %s", nb_msgs)
+        rospy.loginfo("objects len: %s", nb_msgs)
         if nb_msgs > 0:
             # cluster on position
             X = []
@@ -111,15 +111,17 @@ class Object_computations():
                     z = np.mean(z)
                     # width = np.mean(width)
                     # height = np.mean(height)
-                    stamp = np.mean(stamp)
+                    
                     # x_min = np.mean(x_min)
                     # y_min = np.mean(y_min)
-                    image = self.cache_image.getElemAfterTime(rospy.Time(0, stamp))
+                    
                     bb = cluster[6]
-
+                    stamp = bb.stamp
+                    image = self.cache_image.getElemAfterTime(rospy.Time(0, stamp))
                     
                     self.save_instances((category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image))
                     #rospy.loginfo("category_name:%s, x=%s, y=%s, z=%s",category_name,x,y,z)
+
 
 
     def save_instances(self, new_instance, time, bb_info):
@@ -139,46 +141,68 @@ class Object_computations():
         nb_instances = len(instances)
 
         if nb_instances == 0:
-            # add instance to dict 
-            instance_key = new_instance[0]+str(1)
-            self.objects_dict[instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z)   
 
-            # notify if new object detected
-            rospy.loginfo("New object detected: %s. Position in map: %s", instance_key,point_map.point)
-            self.save_instance_image(instance_key, bb_info)
+            # Is there an instance closer than 5cm to the new instance ?
+            found_close, old_instance_key = self.found_close(instances, point_map, 0.05)
+            new_instance_key = new_instance[0]+str(1)
 
-            # publish tf
-            self.publish_tf(instance_key, point_map)
-
-            # publish instances msg 
-            self.publish_instances()
-
-        else:
-
-            found_close = 0
-            for old_instance_key in instances:
-                instance = self.objects_dict[old_instance_key]
-               
-                dist = math.sqrt((point_map.point.x - float(instance[1]))**2 + (point_map.point.y - float(instance[2]))**2 + (point_map.point.z - float(instance[3]))**2 )
-                # rospy.loginfo("dist = %s",dist)
-                if dist < 0.05: 
-                    #TODO: add check category ?
-                    
-                    # update
-                    self.objects_dict[old_instance_key] = (new_instance[0], (point_map.point.x +float(instance[1]))/2, (point_map.point.y +float(instance[2]))/2, (point_map.point.z +float(instance[3]))/2)  
-                    
-                    # publish tf
-                    self.publish_tf(old_instance_key, point_map)
-
-                    # publish instances msg 
-                    self.publish_instances()
-                    
-                    found_close = 1
-               
             if not found_close:
                 # add instance to dict 
+                self.objects_dict[new_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)   
+                # notify if new object detected
+                rospy.loginfo("New object detected: %s. Position in map: %s", new_instance_key,point_map.point)
+                self.save_instance_image(new_instance_key, bb_info)
+
+                # publish tf
+                self.publish_tf(new_instance_key, point_map)
+
+            else:
+                # Goal: keep only one in the log term memory. Keep the one with the largest numberof detections
+                temp_instances = [item for item in self.temp_dict if new_instance[0] in item]
+
+                # update temp memory 
+                if len(temp_instances) > 0:
+                    found_close, tmp_old_instance_key = self.found_close(temp_instances, point_map, 0.05)
+
+                    if found_close:
+                        instance_temp = self.temp_dict[tmp_old_instance_key]
+                        self.temp_dict[tmp_old_instance_key] = (instance_temp[0], (point_map.point.x +float(instance_temp[1]))/2, (point_map.point.y +float(instance_temp[2]))/2, (point_map.point.z +float(instance_temp[3]))/2, int(instance_temp[4])+1 ) 
+                        new_instance_key = tmp_old_instance_key
+
+                else:
+                    self.temp_dict[new_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)
+
+                # compare temp and long term memory 
+                if self.objects_dict[old_instance_key][4] <= self.temp_dict[new_instance_key][4]:
+                    del self.objects_dict[old_instance_key]
+                    self.objects_dict[new_instance_key] = self.temp_dict[new_instance_key]
+                    del self.temp_dict[new_instance_key]
+
+                    # notify if new object detected
+                    rospy.loginfo("New object detected: %s. Position in map: %s", new_instance_key,point_map.point)
+                    self.save_instance_image(new_instance_key, bb_info)
+
+                    # publish tf
+                    self.publish_tf(new_instance_key, point_map)
+                
+
+        else:
+            
+            # Is the old instance closer than 20cm to the new one ?
+            found_close, old_instance_key = self.found_close(instances, point_map, 0.2)
+        
+            if found_close: 
+
+                # update
+                instance = self.objects_dict[old_instance_key]
+                self.objects_dict[old_instance_key] = (new_instance[0], (point_map.point.x +float(instance[1]))/2, (point_map.point.y +float(instance[2]))/2, (point_map.point.z +float(instance[3]))/2, int(instance[4])+1 )  
+                
+                # publish tf
+                self.publish_tf(old_instance_key, point_map)
+            else:
+                # add instance to dict 
                 instance_key = new_instance[0]+str(nb_instances+1)
-                self.objects_dict[instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z)  
+                self.objects_dict[instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)  
 
                 # notify if new object detected
                 rospy.loginfo("New object detected: %s. Position in map: %s", instance_key,point_map.point)
@@ -187,10 +211,24 @@ class Object_computations():
                 # publish tf
                 self.publish_tf(instance_key, point_map)
 
-                # publish instances msg 
-                self.publish_instances()
 
-    
+    def found_close(self, instances, point_map, threshold):
+        
+        found_close = 0
+        instance_key = None
+        for old_instance_key in instances:
+            instance = self.objects_dict[old_instance_key]
+            
+            dist = math.sqrt((point_map.point.x - float(instance[1]))**2 + (point_map.point.y - float(instance[2]))**2 + (point_map.point.z - float(instance[3]))**2 )
+            # rospy.loginfo("dist = %s",dist)
+            if dist < threshold: 
+                found_close = 1
+                instance_key = old_instance_key
+                break
+
+        return found_close, instance_key
+
+
     def save_instance_image(self, instance_key, bb_info):
         # save image of the instance
         image = bb_info[4]
@@ -204,7 +242,6 @@ class Object_computations():
         color = (0, 0, 255)
         thickness = 2
 
-        
         try:
             cv_image = self.bridge.imgmsg_to_cv2(image, "bgr8")
             cv_image = cv2.rectangle(cv_image, start_point, end_point, color, thickness)
@@ -220,7 +257,8 @@ class Object_computations():
 
         # Publish list of current instances on topic /detection/object_instances
         instances_list_msg = ObjectInstanceArray()
-        instances_list_msg.header.stamp = rospy.Time.now()
+        stamp = rospy.Time.now()
+        instances_list_msg.header.stamp = stamp
         instances_list_msg.header.frame_id = "map"
         for instance_key in self.objects_dict:
             instance = self.objects_dict[instance_key]
@@ -232,6 +270,8 @@ class Object_computations():
             point.y = float(instance[2])
             point.z = float(instance[3])
             instance_msg.object_position = point
+            instance_msg.latest_stamp = stamp
+            instance_msg.nb_detections = int(instance[4])
             instances_list_msg.instances.append(instance_msg)
 
         self.instances_pub.publish(instances_list_msg)
@@ -272,6 +312,7 @@ class Object_computations():
         t.transform.translation = point_map.point
         br.sendTransform(t)
 
+
     def remove_instance_callback(self, msg):
         instance_key = msg.instance_name
         # delete instance from dict
@@ -291,7 +332,10 @@ class Object_computations():
             batch = self.cache.getInterval(rospy.Time.now()-rospy.Duration.from_sec(2), rospy.Time.now())
             if len(batch)>0:
                 self.filter(batch, rospy.Time.now()-rospy.Duration.from_sec(1))
-      
+
+
+            # publish instances msg 
+            self.publish_instances()
         
 
     def run(self):
