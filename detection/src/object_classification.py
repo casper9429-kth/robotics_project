@@ -65,11 +65,11 @@ class Object_classifier():
     def image_callback(self, msg): 
         """Callback function for the topic"""
         try:
-            #t0 = time.time()
+            t0 = time.time()
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
             
             if self.depth is not None:
-                self.compute_bb(msg.header.stamp, msg.header.frame_id, self.depth, cv_image) 
+                self.compute_bb(msg.header.stamp, msg.header.frame_id, self.depth, cv_image, t0) 
 
         except CvBridgeError as e:
             print(e)
@@ -124,7 +124,7 @@ class Object_classifier():
 
 
 
-    def compute_bb(self, stamp, frame_id, depth_image, cv_image):     
+    def compute_bb(self, stamp, frame_id, depth_image, cv_image, t0):     
         
         np_arr = np.asarray(cv_image)
         
@@ -192,8 +192,8 @@ class Object_classifier():
             if len(bb_list_msg.bounding_boxes)>0:
                 self.bb_pub.publish(bb_list_msg)
               
-            #tinfer = time.time() - t0
-            # rospy.loginfo(tinfer)
+            # tinfer = time.time() - t0
+            # rospy.loginfo(1/tinfer)
 
 
 

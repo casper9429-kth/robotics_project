@@ -58,7 +58,7 @@ class Object_computations():
     def filter(self, batch, time):
 
         nb_msgs = len(batch)
-        rospy.loginfo("objects len: %s", nb_msgs)
+        #rospy.loginfo("objects len: %s", nb_msgs)
         if nb_msgs > 0:
             # cluster on position
             X = []
@@ -117,7 +117,7 @@ class Object_computations():
                     
                     bb = cluster[6]
                     stamp = bb.stamp
-                    image = self.cache_image.getElemAfterTime(rospy.Time(0, stamp))
+                    image = self.cache_image.getElemAfterTime(stamp)
                     
                     self.save_instances((category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image))
                     #rospy.loginfo("category_name:%s, x=%s, y=%s, z=%s",category_name,x,y,z)
@@ -141,10 +141,11 @@ class Object_computations():
         nb_instances = len(instances)
 
         if nb_instances == 0:
-
+            
             # Is there an instance closer than 5cm to the new instance ?
-            found_close, old_instance_key = self.found_close(instances, point_map, 0.05)
+            found_close, old_instance_key = self.found_close(list(self.objects_dict.keys()), point_map, 0.05, self.objects_dict)
             new_instance_key = new_instance[0]+str(1)
+            rospy.loginfo("no previous instance in the dictionnary but found close : %s", found_close)
 
             if not found_close:
                 # add instance to dict 
@@ -157,12 +158,12 @@ class Object_computations():
                 self.publish_tf(new_instance_key, point_map)
 
             else:
-                # Goal: keep only one in the log term memory. Keep the one with the largest numberof detections
+                # Goal: keep only one in the long term memory. Keep the one with the largest numberof detections
                 temp_instances = [item for item in self.temp_dict if new_instance[0] in item]
 
                 # update temp memory 
                 if len(temp_instances) > 0:
-                    found_close, tmp_old_instance_key = self.found_close(temp_instances, point_map, 0.05)
+                    found_close, tmp_old_instance_key = self.found_close(temp_instances, point_map, 0.05, self.temp_dict)
 
                     if found_close:
                         instance_temp = self.temp_dict[tmp_old_instance_key]
@@ -189,7 +190,7 @@ class Object_computations():
         else:
             
             # Is the old instance closer than 20cm to the new one ?
-            found_close, old_instance_key = self.found_close(instances, point_map, 0.2)
+            found_close, old_instance_key = self.found_close(instances, point_map, 0.2, self.objects_dict)
         
             if found_close: 
 
@@ -212,12 +213,12 @@ class Object_computations():
                 self.publish_tf(instance_key, point_map)
 
 
-    def found_close(self, instances, point_map, threshold):
+    def found_close(self, instances, point_map, threshold, dictionnary):
         
         found_close = 0
         instance_key = None
         for old_instance_key in instances:
-            instance = self.objects_dict[old_instance_key]
+            instance = dictionnary[old_instance_key]
             
             dist = math.sqrt((point_map.point.x - float(instance[1]))**2 + (point_map.point.y - float(instance[2]))**2 + (point_map.point.z - float(instance[3]))**2 )
             # rospy.loginfo("dist = %s",dist)
