@@ -24,53 +24,110 @@ def aruco_callback(msg):
     frame_id = msg.header.frame_id
 
     for marker in msg.markers:
-
-        pose_map = PoseStamped()
-        pose_map.header.frame_id = frame_id
-        pose_map.header.stamp = stamp
-
         id = marker.id
-        pose = marker.pose
+        if id != 500:
+            pose_map = PoseStamped()
+            pose_map.header.frame_id = frame_id
+            pose_map.header.stamp = stamp
 
-        transformed_pose = Marker()
-        transformed_pose.header.stamp = stamp
-        transformed_pose.id = id
-        transformed_pose.header.frame_id = "base_link"
-        transformed_pose.confidence = marker.confidence
+            id = marker.id
+            pose = marker.pose
 
-        # Transform pose from camera_color_optical_frame to map 
-        pose_map.pose.orientation = pose.pose.orientation
-        pose_map.pose.position = pose.pose.position
-        
-        
-        try:
-            transformed_pose.pose.pose = tfBuffer.transform(pose_map, "base_link", rospy.Duration(1.0)).pose
-            pose_map = tfBuffer.transform(pose_map, "map", rospy.Duration(1.0)) 
-            #rospy.loginfo("tf ok")
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-            rospy.logwarn(e)
-            return   
-        
-        pub.publish(transformed_pose)
+            transformed_pose = Marker()
+            transformed_pose.header.stamp = stamp
+            transformed_pose.id = id
+            transformed_pose.header.frame_id = "base_link"
+            transformed_pose.confidence = marker.confidence
 
-        # Publish new tranform to aruco/detectedX
-        
-        br = tf2_ros.TransformBroadcaster()
+            # Transform pose from camera_color_optical_frame to map 
+            pose_map.pose.orientation = pose.pose.orientation
+            pose_map.pose.position = pose.pose.position
+            
+            
+            try:
+                transformed_pose.pose.pose = tfBuffer.transform(pose_map, "base_link", rospy.Duration(1.0)).pose
+                pose_map = tfBuffer.transform(pose_map, "map", rospy.Duration(1.0)) 
+                #rospy.loginfo("tf ok")
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                rospy.logwarn(e)
+                return   
+            
+            pub.publish(transformed_pose)
 
-        t = TransformStamped()
-        t.header.frame_id = "map"
-        t.child_frame_id = "aruco/detected" 
-        t.child_frame_id = t.child_frame_id + str(id)
+            # Publish new tranform to aruco/detectedX
+            
+            br = tf2_ros.TransformBroadcaster()
 
-        t.header.stamp = stamp
+            t = TransformStamped()
+            t.header.frame_id = "map"
+            t.child_frame_id = "aruco/detected" 
+            t.child_frame_id = t.child_frame_id + str(id)
+
+            t.header.stamp = stamp
+            
+            # rospy.loginfo(msg)
         
-        # rospy.loginfo(msg)
+            t.transform.rotation = pose_map.pose.orientation
+            t.transform.translation = pose_map.pose.position
+            br.sendTransform(t)
+
+
+def aruco_anchor_callback(msg):
     
-        t.transform.rotation = pose_map.pose.orientation
-        t.transform.translation = pose_map.pose.position
-        br.sendTransform(t)
+    stamp = msg.header.stamp
+    frame_id = msg.header.frame_id
+
+    for marker in msg.markers:
+        id = marker.id
+        if id == 500:
+            pose_map = PoseStamped()
+            pose_map.header.frame_id = frame_id
+            pose_map.header.stamp = stamp
+
+            id = marker.id
+            pose = marker.pose
+
+            transformed_pose = Marker()
+            transformed_pose.header.stamp = stamp
+            transformed_pose.id = id
+            transformed_pose.header.frame_id = "base_link"
+            transformed_pose.confidence = marker.confidence
+
+            # Transform pose from camera_color_optical_frame to map 
+            pose_map.pose.orientation = pose.pose.orientation
+            pose_map.pose.position = pose.pose.position
+            
+            
+            try:
+                transformed_pose.pose.pose = tfBuffer.transform(pose_map, "base_link", rospy.Duration(1.0)).pose
+                pose_map = tfBuffer.transform(pose_map, "map", rospy.Duration(1.0)) 
+                #rospy.loginfo("tf ok")
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                rospy.logwarn(e)
+                return   
+            
+            pub.publish(transformed_pose)
+
+            # Publish new tranform to aruco/detectedX
+            
+            br = tf2_ros.TransformBroadcaster()
+
+            t = TransformStamped()
+            t.header.frame_id = "map"
+            t.child_frame_id = "aruco/detected" 
+            t.child_frame_id = t.child_frame_id + str(id)
+
+            t.header.stamp = stamp
+            
+            # rospy.loginfo(msg)
+        
+            t.transform.rotation = pose_map.pose.orientation
+            t.transform.translation = pose_map.pose.position
+            br.sendTransform(t)
+
 
 sub_goal = rospy.Subscriber('/aruco/markers', MarkerArray, aruco_callback)
+sub_goal = rospy.Subscriber('/aruco_anchor/markers', MarkerArray, aruco_anchor_callback)
 pub = rospy.Publisher('/aruco/markers/transformed_pose', Marker, queue_size=1)
 
 if __name__ == '__main__':
