@@ -145,7 +145,6 @@ class Object_computations():
             # Is there an instance closer than 5cm to the new instance ?
             found_close, old_instance_key = self.found_close(list(self.objects_dict.keys()), point_map, 0.05, self.objects_dict)
             new_instance_key = new_instance[0]+str(1)
-            rospy.loginfo("no previous instance in the dictionnary but found close : %s", found_close)
 
             if not found_close:
                 # add instance to dict 
@@ -186,11 +185,12 @@ class Object_computations():
                     # publish tf
                     self.publish_tf(new_instance_key, point_map)
                 
+                    #TODO: delete image ?
 
         else:
             
             # Is the old instance closer than 20cm to the new one ?
-            found_close, old_instance_key = self.found_close(instances, point_map, 0.2, self.objects_dict)
+            found_close, old_instance_key = self.found_close(instances, point_map, 0.3, self.objects_dict)
         
             if found_close: 
 
