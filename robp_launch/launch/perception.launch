@@ -15,6 +15,17 @@
       <arg name="align_depth" value="true"/>
     </include>
 
+	<!-- Localization -->
+	<node name="ekf_slam" pkg="localization" type="ekf_slam.py" output='screen'>
+		<param name='anchor_id' value='500'/>
+	</node>
+
+	<!-- Mapping -->
+	<node name="mapping" pkg="mapping" type="mapping.py" output='screen'/>
+
+	<!-- GeoFence -->
+	<node name="geofence" pkg="mapping" type="workspace_manager.py" output='screen'/>
+
 
 	<!-- run the motors -->
     <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
@@ -23,7 +34,7 @@
 	<node name="arm_camera" pkg="arm_camera" type="arm_camera.py" output='screen'/>
 
 	<!-- run odometry -->
-	<node name="odometry" pkg="odometry" type="ekf_odom.py" output='screen'/>
+	<include file="$(find odometry)/include/odometry.launch" />
 
 	<!-- run aruco detection -->
 	<node name="display_markers" pkg="detection" type="display_markers.py" output='screen'/>
