@@ -98,7 +98,6 @@ class Mapping():
         self.grid_map = GridMap(self.resolution)
 
     def callback_slam_ready(self, msg):
-        rospy.loginfo("slam ready")
         self.map_initialized = msg.data
 
     def cloud_callback(self, msg: PointCloud2):
@@ -109,7 +108,6 @@ class Mapping():
             return
         
         if self.map_initialized == False:
-            rospy.loginfo("Map not initialized")
             return
         t1 = rospy.Time.now().to_sec()
 
