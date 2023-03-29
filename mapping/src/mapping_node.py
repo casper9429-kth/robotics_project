@@ -94,6 +94,7 @@ class Mapping():
         
         self.map_initialized = False
         
+        
         # define grid_map
         self.grid_map = GridMap(self.resolution)
 
@@ -102,7 +103,9 @@ class Mapping():
 
     def cloud_callback(self, msg: PointCloud2):
         #rospy.loginfo("##################")
-
+        # rospy.loginfo("time since last cloud callback: %s", rospy.Time.now().to_sec() - self.t_latest_cloud.to_sec())
+        # self.t_latest_cloud = rospy.Time.now()
+        
         if rospy.Time.now() - self.t_latest_cloud < self.t_treshold:
             #rospy.loginfo("cloud callback too fast")
             return
@@ -114,7 +117,7 @@ class Mapping():
 
         # Convert ROS -> Open3D
         cloud = o3drh.rospc_to_o3dpc(msg)
-        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 0.075, 1.2 ])))
+        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 0.075, 1.0 ])))
         cropped = cropped
         
         # Downsample the point cloud to 1/10 of resolution 
@@ -140,7 +143,7 @@ class Mapping():
         #if self.p_cloud_cont%3 == 0:
         #    points = np.vstack(points)
         #    self.p_cloud_buffer = []
-        self.grid_map.import_point_cloud_rays(points,1.2,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2])
+        self.grid_map.import_point_cloud_rays(points,1.0,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2])
         
         return
 
