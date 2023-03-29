@@ -60,6 +60,8 @@ class Mapping():
         # Subscribers 
         self.geo_fence_sub = rospy.Subscriber("/geofence/pose_array", PoseArray, self.callback_geofence)   
         self.sub_goal = rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.cloud_callback)
+        # Subscibe to slam ready 
+        self.slam_ready_sub = rospy.Subscriber("/slam_ready", Bool, self.callback_slam_ready)
         
         # Publisher
         self.OccupancyGrid_pub = rospy.Publisher("/occupancy_grid/walls", OccupancyGrid, queue_size=10)
@@ -90,9 +92,14 @@ class Mapping():
         # Robot pose in map frame [x,y,theta]
         self.robot_pose = [0,0,0]
         
+        self.map_initialized = False
+        
         # define grid_map
         self.grid_map = GridMap(self.resolution)
 
+    def callback_slam_ready(self, msg):
+        rospy.loginfo("slam ready")
+        self.map_initialized = msg.data
 
     def cloud_callback(self, msg: PointCloud2):
         #rospy.loginfo("##################")
@@ -101,13 +108,15 @@ class Mapping():
             #rospy.loginfo("cloud callback too fast")
             return
         
-
+        if self.map_initialized == False:
+            rospy.loginfo("Map not initialized")
+            return
         t1 = rospy.Time.now().to_sec()
 
 
         # Convert ROS -> Open3D
         cloud = o3drh.rospc_to_o3dpc(msg)
-        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 0.075, 1.5 ])))
+        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 0.075, 1.2 ])))
         cropped = cropped
         
         # Downsample the point cloud to 1/10 of resolution 
@@ -133,7 +142,7 @@ class Mapping():
         #if self.p_cloud_cont%3 == 0:
         #    points = np.vstack(points)
         #    self.p_cloud_buffer = []
-        self.grid_map.import_point_cloud_rays(points,1.5,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2])
+        self.grid_map.import_point_cloud_rays(points,1.2,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2])
         
         return
 

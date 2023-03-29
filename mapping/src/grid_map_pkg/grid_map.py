@@ -140,6 +140,7 @@ class GridMap():
         """Update geofence coordinates and bounding box, takes pose array message as input, aslo sets given_geofence to true, if geofence is given will remove old geofence from map"""
         
         if self.given_geofence == True:
+            rospy.loginfo("Geofence already given")
             return
         # save new geofence
         self.geofence_list = [[pose.position.x, pose.position.y] for pose in msg.poses] 
@@ -161,10 +162,10 @@ class GridMap():
                 self.bounding_box[3] = y
 
         # Expand bounding box by resolution on all sides
-        self.bounding_box[0] -= self.resolution*4
-        self.bounding_box[1] += self.resolution*4
-        self.bounding_box[2] -= self.resolution*4
-        self.bounding_box[3] += self.resolution*4
+        self.bounding_box[0] -= self.resolution*30
+        self.bounding_box[1] += self.resolution*30
+        self.bounding_box[2] -= self.resolution*30
+        self.bounding_box[3] += self.resolution*30
 
 
     
@@ -446,7 +447,7 @@ class GridMap():
             map_grid[new_x,new_y] = self.occupied
 
         # Apply mask of geofence to make sure no points outside of geofence are 0
-        map_grid[self.contour_mask==self.wall] = self.wall
+        map_grid[self.contour_mask==self.occupied] = self.occupied
         self.map_grid = map_grid
             
 

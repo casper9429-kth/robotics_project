@@ -27,6 +27,9 @@ class ekf_slam():
         rospy.init_node('ekf_slam')
 
 
+        # Publishers
+        self.slam_ready_pub = rospy.Publisher('/slam_ready', Bool, queue_size=1)
+
         # TF Stuff
         self.tfBuffer = tf2_ros.Buffer(rospy.Duration(100))
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
@@ -133,6 +136,9 @@ class ekf_slam():
             # if anchor is seen, allow slam
             if marker.id == self.anchor_id:
                 # set slam ready
+                data = Bool()
+                data.data = True
+                self.slam_ready_pub.publish(data)
                 self.slam_ready = True
                                                 
             # if allow slam
