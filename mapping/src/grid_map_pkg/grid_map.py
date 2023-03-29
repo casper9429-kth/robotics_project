@@ -409,7 +409,7 @@ class GridMap():
         for ray in rays:
             # make end point of ray 1 
             ang = ray[0]
-            if ray[0] == 0:
+            if ray[1] == 0:
                 ray_end = range_max
             else:
                 ray_end = ray[1]
@@ -437,7 +437,7 @@ class GridMap():
                 
         for ray in rays:
             # make end point of ray 1 
-            if ray[0] == -1:
+            if ray[1] == 0:
                 continue
             ray_end = ray
             new_x = x + ray_end[1]*np.cos(ray_end[0])

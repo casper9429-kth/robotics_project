@@ -61,7 +61,7 @@ class Mapping():
         self.geo_fence_sub = rospy.Subscriber("/geofence/pose_array", PoseArray, self.callback_geofence)   
         self.sub_goal = rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.cloud_callback)
         # Subscibe to slam ready 
-        self.slam_ready_sub = rospy.Subscriber("/slam_ready", Bool, self.callback_slam_ready)
+        self.slam_ready_sub = rospy.Subscriber("slam_ready", Bool, self.callback_slam_ready)
         
         # Publisher
         self.OccupancyGrid_pub = rospy.Publisher("/occupancy_grid/walls", OccupancyGrid, queue_size=10)
