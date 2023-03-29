@@ -9,7 +9,7 @@ import tf2_ros
 import tf2_geometry_msgs
 from nav_msgs.msg import OccupancyGrid
 from std_msgs.msg import Bool
-from mapping.msg import GridMap as GridMapMsg
+from mapping.msg import GridMapMsg
 
 
 
@@ -18,6 +18,13 @@ class explorer():
         
         # Init node
         rospy.init_node('explorer')
+        
+        # tf stuff
+        self.br = tf2_ros.TransformBroadcaster()
+        self.tfBuffer = tf2_ros.Buffer()
+        self.listener = tf2_ros.TransformListener(self.tfBuffer)
+        rospy.sleep(1)
+        print('Tf2 stuff initialized')
 
         # subscribers
         self.grid_map_sub = rospy.Subscriber("/map/GridMap", GridMapMsg, self.map_callback)
@@ -30,12 +37,6 @@ class explorer():
         self.map_coords = []
         self.nearest_goal = None
 
-        # tf stuff
-        self.br = tf2_ros.TransformBroadcaster()
-        self.tfBuffer = tf2_ros.Buffer()
-        self.listener = tf2_ros.TransformListener(self.tfBuffer)
-        rospy.sleep(2)
-        print('Tf2 stuff initialized')
 
         # Position and orientation of the robot
         self.pose = PoseStamped()
@@ -52,6 +53,7 @@ class explorer():
         self.pose.pose.orientation.w = 0.0
 
 
+        
     # # test map_callback
     # def map_callback(self, msg):
     #     Array = []
@@ -77,7 +79,7 @@ class explorer():
 
     def map_callback(self, msg: GridMapMsg):
         # extract the map cells and their values from the message 
-        self.map_coords = msg.header.data
+        self.map_coords = msg.data
         self.map_resolution = msg.resolution
         self.bbminx = msg.bbminx
         self.bbminy = msg.bbminy
@@ -85,7 +87,7 @@ class explorer():
         self.bbmaxy = msg.bbmaxy
         self.origo_index_i = msg.origo_index_i
         self.origo_index_j = msg.origo_index_j
-        print('Map received')
+        # print('Map received')
         self.transforms()
         self.find_goal()
 
@@ -101,6 +103,7 @@ class explorer():
             self.pose_in_gridmap.pose.position.x = self.origo_index_i+delta_i
             self.pose_in_gridmap.pose.position.y = self.origo_index_j+delta_j
             self.position_in_gridmap = np.array([self.pose_in_gridmap.pose.position.x, self.pose_in_gridmap.pose.position.y])
+            # print(self.position_in_gridmap)
         except:
             print('No transform found')
 
@@ -108,23 +111,27 @@ class explorer():
     def find_goal(self):
         self.nearest_goal = None
         self.cells = []
-        # extracts the cells that are unknown space a.k.a -1
-        for i, data_i in enumerate(self.map_coords):
-            for j, data_j in enumerate(data_i):
-                if data_j == -1:
+        # extracts the cells that are unknown space a.k.a float32[] data
+        for i , data_i in enumerate(self.map_coords):
+            for j, data_j in enumerate(data_i.data):
+                if data_j == 1.0:
                     self.cell = [i,j]
                     self.cells.append(self.cell)
+                    
 
-        # calculate the nearest point to the robot
+        # # calculate the nearest point to the robot
         for idx, data in enumerate(self.cells):         
-            distances = np.linalg.norm(np.array(data)-self.point)
+            distances = np.linalg.norm(np.array(data)-self.position_in_gridmap)
+            print(distances)
+            
             if self.nearest_goal is None:
                 self.nearest_goal = data
-            elif distances < np.linalg.norm(self.nearest_goal-self.point):
+            elif distances < np.linalg.norm(np.array(self.nearest_goal)-self.position_in_gridmap):
                 self.nearest_goal = data
-        print(self.nearest_goal)
+        # print(self.nearest_goal)
         
-        # self.publish_goal()
+        
+        self.publish_goal()
 
 
     def publish_goal(self):         #transforms the goal to the map frame
@@ -138,8 +145,7 @@ class explorer():
         # goal.pose.orientation.z = 0.0
         # goal.pose.orientation.w = 0.0
         self.goal_pub.publish(goal)
-        print(goal)
-        print('Goal published')
+        # print('Goal published')
 
 
 

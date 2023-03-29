@@ -141,6 +141,42 @@ class path_tracker():
             pass
 
 
+    def visualize_path(self):
+        # poselist = [(self.pose.position.x, pose.position.y, pose.position.z) for pose in self.pose_array.poses]
+        poselist = [(self.pose_in_map.pose.position.x, self.pose_in_map.pose.position.y, self.pose_in_map.pose.position.z), (self.goal.pose.position.x, self.goal.pose.position.y, self.goal.pose.position.z)]
+
+        mark = Marker()
+        mark.header.frame_id = "map"
+        mark.header.stamp = rospy.Time.now()
+        mark.type = mark.LINE_STRIP
+        mark.action = mark.ADD
+        mark.scale.x = 0.1
+        mark.color.a = 1.0
+        mark.color.r = 1.0
+        mark.color.g = 0.0
+        mark.color.b = 0.0
+        mark.pose.orientation.w = 1.0
+        mark.pose.position.x = 0.0#poselist[0][0]
+        mark.pose.position.y = 0.0#poselist[0][1]
+        mark.pose.position.z = 0.0#poselist[0][2]
+
+        mark.id = 0
+        mark.lifetime = rospy.Duration(0)
+        mark.points = [Point(x=x, y=y, z=z) for x, y, z in poselist]
+        mark.points.append(Point(x=poselist[0][0], y=poselist[0][1], z=poselist[0][2]))
+
+        self.marker_pub.publish(mark)
+        
+        
+    def transform_btm(self):   
+        
+        stamp = self.pose.header.stamp  
+        try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
+            transform_map_2_base_link = self.tfBuffer.lookup_transform('map','base_link', stamp,rospy.Duration(0.5))     # give goal in base link frame
+            self.pose_in_map = tf2_geometry_msgs.do_transform_pose(self.pose, transform_map_2_base_link)   
+        except:
+            print('No transform found')
+
 if __name__ == '__main__':
     node = path_tracker()
     node.main()

@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+<launch>
+
+
+	<!-- Localization -->
+	<node name="ekf_slam" pkg="localization" type="ekf_slam.py" output='screen'>
+		<param name='anchor_id' value='500'/>
+	</node>
+
+	<!-- Mapping -->
+	<node name="mapping" pkg="mapping" type="mapping_node.py" output='screen'/>
+
+	<!-- GeoFence -->
+	<node name="geofence" pkg="mapping" type="workspace_manager.py" output='screen'/>
+
+	<!-- Include phidgets-->
+	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
+
+	<!-- Include teleop_twist_joy -->
+    <include file="$(find teleop_twist_joy)/launch/teleop.launch" />
+
+	<!-- Include realsense2_camera
+	<include file="$(find robp_launch)/launch/rs_camera.launch" /> -->
+	<!-- Include realsense2_camera -->
+	<include file="$(find robp_launch)/launch/rs_camera.launch">
+      <arg name="align_depth" value="true"/>
+    </include>
+
+	<node name="object_classifier" pkg="detection" type="object_classification.py" output='screen'/>
+	<node name="object_computations" pkg="detection" type="object_computations.py" output='screen'/>
+
+
+
+	<!-- run the motors -->
+    <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" output='screen'/>
+
+	<!-- run the arm_camera -->
+	<node name="arm_camera" pkg="arm_camera" type="arm_camera.py" output='screen'/>
+
+	<!-- run rviz -->
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/odometry.rviz" />
+
+	<!-- run aruco detection -->
+	<node name="display_markers" pkg="detection" type="display_markers.py" output='screen'/>
+
+    <node name="aruco" pkg="aruco_ros" type="marker_publisher">
+		<remap from="/camera_info" to="/camera/color/camera_info"/>
+		<remap from="/image" to="/camera/color/image_raw"/>
+		
+		<param name="image_is_rectified" value="True"/>
+		<param name="marker_size"        value="0.05"/> 
+		<param name="reference_frame"    value="camera_color_optical_frame"/>
+		<param name="camera_frame"       value="camera_color_optical_frame"/>
+	</node>
+
+	<node name="aruco_anchor" pkg="aruco_ros" type="marker_publisher">
+		<remap from="/camera_info" to="/camera/color/camera_info"/>
+		<remap from="/image" to="/camera/color/image_raw"/>
+		
+		<param name="image_is_rectified" value="True"/>
+		<param name="marker_size"        value="0.08"/> 
+		<param name="reference_frame"    value="camera_color_optical_frame"/>
+		<param name="camera_frame"       value="camera_color_optical_frame"/>
+	</node>
+
+	<param name="robot_description" command="$(find xacro)/xacro --inorder '$(find realsense2_description)/urdf/test_d435_camera.urdf.xacro' use_nominal_extrinsics:=false"/>
+
+	<!-- run odometry -->
+	<include file="$(find odometry)/include/odometry.launch" />
+
+    <!-- run the explorer -->
+	<!-- <node name="explorer" pkg="path_planner" type="explorer.py" output='screen'/> -->
+
+    <!-- run the path tracker -->
+    <node name="path_tracker" pkg="path_planner" type="path_tracker_server.py" output='screen'/>
+    <node name="path_tracker_client" pkg="path_planner" type="path_tracker_client.py" output='screen'/> 
+
+</launch>

@@ -5,8 +5,10 @@ import tf2_ros
 import actionlib
 import tf2_geometry_msgs
 from robp_msgs.msg import DutyCycles
-from aruco_msgs.msg import MarkerArray, Marker
-from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose
+# from aruco_msgs.msg import MarkerArray, Marker
+from nav_msgs.msg import Path
+from visualization_msgs.msg import Marker, MarkerArray, InteractiveMarker, InteractiveMarkerControl
+from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose, Point 
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedback
 import tf
 
@@ -120,7 +122,7 @@ class PathTracker():
         self.orientaion_tolerance = 0.05
 
         # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
-        self.aruco = Marker()
+        # self.aruco = Marker()
 
         # tf stuff
         self.br = tf2_ros.TransformBroadcaster()
@@ -133,7 +135,7 @@ class PathTracker():
 
         #publishers
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-        # self.duty_pub = rospy.Publisher('/motor/duty_cycles', DutyCycles, queue_size=10)
+
 
         # subscribers
         self.fence_sub = rospy.Subscriber('/workspace_poses/pose_array', PoseArray, self.fence_callback)
@@ -158,7 +160,7 @@ class PathTracker():
         self.goal = goal.target_pose            # target_pose is a PosedStamped
         print('Goal recieved')
         self.path_tracker_server.set_succeeded()
-        #self.main()
+        self.main()
         
 
    
@@ -244,6 +246,7 @@ class PathTracker():
         robot_theta = tf.transformations.euler_from_quaternion([self.pose.pose.orientation.x, self.pose.pose.orientation.y, self.pose.pose.orientation.z, self.pose.pose.orientation.w])[2] 
         goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
         dtheta = goal_orientation - robot_theta
+
         
 
         if distance > self.in_goal_tolerance:
@@ -277,8 +280,6 @@ class PathTracker():
                 self.move.angular.z = 0.0
                 # print('Goal orientation reached')
 
-
-        
         self.cmd_pub.publish(self.move)   
         
 
@@ -323,6 +324,7 @@ class PathTracker():
                 self.rate.sleep()
         except rospy.ROSInterruptException:
             pass
+
 
 
 if __name__ == '__main__':
