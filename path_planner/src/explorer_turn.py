@@ -19,7 +19,7 @@ class ExplorerTurn():
         
         # To control the robots movement
         self.move = Twist()
-        self.angle_speed = 0.8
+        self.angle_speed = 0.4
 
         # Service to explore
         self.turn360_service = Service('/explore', Trigger, self.turn)
