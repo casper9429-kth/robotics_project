@@ -99,7 +99,7 @@ class Explore(Leaf):
 
     def run(self, context):
         rospy.loginfo('Explore')
-        # self.explore()
+        self.explore()
         return RUNNING
 
 
@@ -147,7 +147,6 @@ class GoToPickUp(Leaf): # TODO
 class PickUp(Leaf): # TODO
     def __init__(self):
         self.action_client = SimpleActionClient('arm_actions', ArmAction) # TODO move this check to before the behavior tree or mod BT to check if initialized
-        # self.action_client.wait_for_server()
         self.running = False
 
     def run(self, context):
@@ -162,7 +161,7 @@ class PickUp(Leaf): # TODO
             goal.z = -0.13
             goal.yaw = 0.0
 
-            def done_cb(state, result, context):
+            def done_cb(state, result):
                 self.running = False
                 context['is_holding_object'] = True
 

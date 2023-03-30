@@ -53,12 +53,16 @@
 	<node name="object_computations" pkg="detection" type="object_computations.py" />
 
     <!-- Pathing -->
-    <node name="path_tracker" pkg="path_planner" type="path_tracker_server.py" />
+    <node name="path_tracker" pkg="path_planner" type="path_tracker_server_brain.py" />
     <node name="workspace_manager" pkg="localization" type="workspace_manager.py" />
     <node name="path_tracker_client" pkg="path_planner" type="path_tracker_client.py" />
 
 	<!-- Exploration -->
 	<node name="explorer_turn" pkg="path_planner" type="explorer_turn.py" />
+
+	<!-- Arm -->
+	<node name="arm_services" pkg="arm" type="arm_services.py" />
+	<node name="arm_actions" pkg="arm" type="arm_actions.py" />
 
 	<!-- Brain -->
 	<node name="brain_node" pkg="brain" type="brain_node.py" output="screen" />
