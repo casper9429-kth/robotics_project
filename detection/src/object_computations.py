@@ -92,6 +92,7 @@ class Object_computations():
                     rospy.loginfo("cluster size: %s", nb_msgs)
                     
                 # take mean position and maximum category_name
+                #instances_to_save = []
                 for cluster in bbs_by_cluster:
                     category_names = [o.category_name for o in cluster]
                     x = [o.bb_center.x for o in cluster]
@@ -109,7 +110,7 @@ class Object_computations():
                     bb = cluster[int(self.threshold/2)]
                     stamp = bb.stamp
                     image = self.cache_image.getElemAfterTime(stamp)
-                    
+                    #instances_to_save.append([(category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image)])
                     self.save_instances((category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image))
     
 

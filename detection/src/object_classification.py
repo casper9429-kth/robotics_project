@@ -15,8 +15,11 @@ from detection.msg import BoundingBox, BoundingBoxArray
 import time
 from open3d import open3d as o3d
 from open3d_ros_helper import open3d_ros_helper as o3drh
+import os
 
-
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
+torch.cuda.set_per_process_memory_fraction(0.6,0)
+torch.cuda.empty_cache()
 
 class Object_classifier():
 
@@ -29,15 +32,19 @@ class Object_classifier():
         # self.update_rate = 10 # [Hz] Change this to the rate you want
         # self.update_dt = 1.0/self.update_rate # [s]
         # self.rate = rospy.Rate(self.update_rate) 
-
+        #rospy.loginfo(torch.__version__)
+        
         # Paramethers 
         self.device = "cuda"
-        self.detector = Detector().to(self.device)
+        detector = Detector()
         model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-30_16-06-25-496124.pt" #for robot
         #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
-        model= self.load_model(self.detector, model_path, self.device)
-        self.detector.eval()
+        example_forward_input = torch.rand(8, 3, 640, 480)
+        self.model = self.load_model(detector, model_path, self.device)
+        self.model_opt = torch.jit.trace(self.model, example_forward_input).to(self.device)
+        self.model_opt.eval()
         
+
 
         self.bridge = CvBridge()
 
@@ -129,14 +136,15 @@ class Object_classifier():
         np_arr = np.asarray(cv_image)
         
         test_images = []
-        torch_image  = self.detector.input_transform_inference(cv_image)
+        torch_image  = self.model.input_transform_inference(cv_image)
         test_images.append(torch_image)
         test_images = torch.stack(test_images)
         test_image = test_images.to(self.device)
         
         with torch.no_grad():
-            out = self.detector(test_image).cpu()
-            bbs = self.detector.decode_output(out, 0.85)
+   
+            out = self.model_opt(test_image).cpu()
+            bbs = self.model.decode_output(out, 0.85)
 
             
             bb_list_msg = BoundingBoxArray()
@@ -190,8 +198,8 @@ class Object_classifier():
             if len(bb_list_msg.bounding_boxes)>0:
                 self.bb_pub.publish(bb_list_msg)
               
-            # tinfer = time.time() - t0
-            # rospy.loginfo(1/tinfer)
+            tinfer = time.time() - t0
+            rospy.loginfo(1/tinfer)
 
 
 
