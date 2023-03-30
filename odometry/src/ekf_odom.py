@@ -55,7 +55,7 @@ class ekf_odom():
         self.debug = False
 
         # Define rate
-        self.update_rate = 100 # [Hz] Change this to the rate you want
+        self.update_rate = 30 # [Hz] Change this to the rate you want
         self.update_dt = 1.0/self.update_rate # [s]
         self.rate = rospy.Rate(self.update_rate) 
         

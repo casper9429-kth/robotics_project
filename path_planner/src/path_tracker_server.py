@@ -156,10 +156,10 @@ class PathTracker():
 
     def execute_cb(self, goal):
         self.goal = goal.target_pose            # target_pose is a PosedStamped
-        
-        self.path_tracker_server.set_succeeded()
-        self.main()
         print('Goal recieved')
+        self.path_tracker_server.set_succeeded()
+        #self.main()
+        
 
    
     # To get the position of the goal
