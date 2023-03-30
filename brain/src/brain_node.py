@@ -99,7 +99,7 @@ class Explore(Leaf):
 
     def run(self, context):
         rospy.loginfo('Explore')
-        self.explore()
+        # self.explore()
         return RUNNING
 
 
@@ -122,7 +122,7 @@ class CanPickUp(Leaf): # TODO
     def run(self, context):
         rospy.loginfo('CanPickUp')
         # TODO: Check if distance to goal pose is less than some threshold
-        return FAILURE
+        return SUCCESS
     
 
 class GoToPickUp(Leaf): # TODO

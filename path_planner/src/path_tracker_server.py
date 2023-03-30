@@ -152,7 +152,7 @@ class PathTracker():
         self.path_tracker_server = actionlib.SimpleActionServer('path_tracker', MoveBaseAction, execute_cb=self.execute_cb, auto_start=False)
         self.path_tracker_server.start()
         print('Action server started')
-        rospy.spin()
+
 
     def execute_cb(self, goal):
         self.goal = goal.target_pose            # target_pose is a PosedStamped
@@ -306,11 +306,11 @@ class PathTracker():
         #print(self.goal.pose)
         #print(self.check_if_in_fence(self.goal.pose))
         if self.check_if_in_fence(self.goal.pose): #
-            #print('In fence')
+            rospy.loginfo('In fence')
             self.transforms()
             self.math()
         else:
-            print('Goal Pose not inside workspace')
+            rospy.loginfo('Goal Pose not inside workspace')
             self.move.linear.x = 0.0
             self.move.angular.z = 0.0
             self.cmd_pub.publish(self.move)
@@ -327,4 +327,4 @@ class PathTracker():
 
 if __name__ == '__main__':
     node = PathTracker()
-    # node.main()
+    node.main()
