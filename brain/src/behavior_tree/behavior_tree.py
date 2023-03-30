@@ -1,6 +1,3 @@
-import rospy
-
-
 SUCCESS = 'success'
 FAILURE = 'failure'
 RUNNING = 'running'
@@ -14,14 +11,7 @@ class BehaviorTree:
         self.context = context
 
     def run(self):
-        rospy.loginfo('Running behavior tree')
         return self.root.run(self.context)
-    
-    def run_forever(self, rate):
-        rate = rospy.Rate(rate)
-        while not rospy.is_shutdown():
-            self.run()
-            rate.sleep()
 
 
 class Leaf:

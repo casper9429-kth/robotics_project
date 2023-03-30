@@ -4,7 +4,7 @@ import math
 import rospy
 from geometry_msgs.msg import PoseStamped, Twist
 from rospy import Service
-from std_srvs.srv import Trigger
+from std_srvs.srv import Trigger, TriggerResponse
 
 
 class ExplorerTurn():
@@ -25,11 +25,12 @@ class ExplorerTurn():
         self.turn360_service = Service('/explore', Trigger, self.turn)
         rospy.spin()
 
-    def turn(self):
+    def turn(self, _):
         self.move.angular.z = self.angle_speed
         self.cmd_pub.publish(self.move)
         # self.move.angular.z = 0
         # self.cmd_pub.publish(self.move)
+        return TriggerResponse(True, "Turning")
 
 
 if __name__ == '__main__':

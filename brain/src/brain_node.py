@@ -47,8 +47,10 @@ class BrainNode:
         return context 
 
     def run(self):
-        self.behavior_tree.run_forever(rate=10)
-        rospy.spin()
+        rate = rospy.Rate(10)
+        while not rospy.is_shutdown():
+            self.behavior_tree.run()
+            rate.sleep()
 
 
 class IsLocalized(Leaf):
@@ -77,14 +79,14 @@ class IsExplored(Leaf):
         self.listener = TransformListener(self.buffer)
 
     def run(self, context):
-        rospy.loginfo('IsExplored')
+        rospy.loginfo(f'IsExplored - box: {context["box_found"]}, Binky: {context["animal_found"]}')
         try:
-            self.buffer.lookup_transform('map', 'aruco/detected1', rospy.Time(0))
+            self.buffer.lookup_transform('map', 'aruco/detected3', rospy.Time(0))
             context['box_found'] = True
         except:
             pass
         try:
-            self.buffer.lookup_transform('map', 'object/detected/Binky_1', rospy.Time(0))
+            self.buffer.lookup_transform('map', 'object/detected/Binky1', rospy.Time(0))
             context['animal_found'] = True
         except:
             pass
@@ -145,7 +147,7 @@ class GoToPickUp(Leaf): # TODO
 class PickUp(Leaf): # TODO
     def __init__(self):
         self.action_client = SimpleActionClient('arm_actions', ArmAction) # TODO move this check to before the behavior tree or mod BT to check if initialized
-        self.action_client.wait_for_server()
+        # self.action_client.wait_for_server()
         self.running = False
 
     def run(self, context):
