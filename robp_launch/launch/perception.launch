@@ -21,10 +21,10 @@
 	</node>
 
 	<!-- Mapping -->
-	<node name="mapping" pkg="mapping" type="mapping.py" output='screen'/>
+	<!-- <node name="mapping" pkg="mapping" type="mapping.py" output='screen'/> -->
 
 	<!-- GeoFence -->
-	<node name="geofence" pkg="mapping" type="workspace_manager.py" output='screen'/>
+	<!-- <node name="geofence" pkg="mapping" type="workspace_manager.py" output='screen'/> -->
 
 
 	<!-- run the motors -->

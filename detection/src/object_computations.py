@@ -87,13 +87,14 @@ class Object_computations():
                         bb_cluster.append(bb_list[index])
                     
                     if len(bb_cluster) > self.threshold:
-                        bbs_by_cluster.append(len(bb_cluster))
+                        bbs_by_cluster.append(bb_cluster)
 
                     rospy.loginfo("cluster size: %s", nb_msgs)
                     
                 # take mean position and maximum category_name
                 #instances_to_save = []
                 for cluster in bbs_by_cluster:
+                   
                     category_names = [o.category_name for o in cluster]
                     x = [o.bb_center.x for o in cluster]
                     y = [o.bb_center.y for o in cluster]

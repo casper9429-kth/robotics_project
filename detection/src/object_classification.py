@@ -37,7 +37,7 @@ class Object_classifier():
         # Paramethers 
         self.device = "cuda"
         detector = Detector()
-        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-30_16-06-25-496124.pt" #for robot
+        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
         #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
         example_forward_input = torch.rand(8, 3, 640, 480)
         self.model = self.load_model(detector, model_path, self.device)
@@ -198,8 +198,8 @@ class Object_classifier():
             if len(bb_list_msg.bounding_boxes)>0:
                 self.bb_pub.publish(bb_list_msg)
               
-            tinfer = time.time() - t0
-            rospy.loginfo(1/tinfer)
+            # tinfer = time.time() - t0
+            # rospy.loginfo(1/tinfer)
 
 
 
