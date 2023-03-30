@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import heapq
 import rospy
 from functools import total_ordering
@@ -16,7 +17,7 @@ from scipy.interpolate import CubicSpline
 from queue import PriorityQueue
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
-
+from visualization_msgs.msg import Marker
 #from mapping.grid_map.grid_map import GridMap
 
 
@@ -59,6 +60,7 @@ class Node:
     
     def as_array(self):
         return np.array([self.x, self.y, self.goal[0], self.goal[1], self.g, self.h, self.f])
+#fuzzy controller
 
 
 
@@ -596,6 +598,7 @@ class A_star():
     def reconstruct_path(self,node: Node):
         pathlist = []
         while node.parent is not None:  # found target
+            print('got in while')
             pathlist.append(node)
             node = node.parent
         pathlist.append(node) 
@@ -729,24 +732,32 @@ class A_star():
         #print('no path found')
         #print(f'iter = {iter}')
         #print(f'openset length = {len(openset)}')
+        print(' at the end')
         return False, self.reconstruct_path(current)
+    
+    def path_smoothing(self,path):
+        # check 3 points at a time
+        # if the change in dx and dy is the same, remove the middle point
+        # if the change in dx and dy is not the same, keep the middle point
+        path_length = len(path)
+        print(f'path_length = {path_length}')
+        points_to_remove = []
+        for point in range( 1, path_length-1):
+            #print(f'point = {path[point]}')
+            dx1 = (path[point][0] - path[point-1][0])
+            dy1 = (path[point][1] - path[point-1][1])
+            dx2 = (path[point+1][0] - path[point][0])
+            dy2 = (path[point+1][1] - path[point][1])
+            print(f'dx1 = {dx1}, dy1 = {dy1}, dx2 = {dx2}, dy2 = {dy2}')
+            if dx1 == dx2 and dy1 == dy2:
+                points_to_remove.append(point)
+        points_to_remove.reverse()
 
-
-    def path_smoothing_cubline_split(self,path):
-        x_path = [path[i][0] for i in range(len(path))]
-        y_path = [path[i][1] for i in range(len(path))]
-        cubic_spline = CubicSpline(x_path,y_path)
-        x = np.linspace(path[0][0],path[0][-1],1000)
-        y = cubic_spline(x)
-        return np.array([x,y]).T
-
-    # straight line split path smoothing
-    def path_smoothing_straightline_split(self,path):
-        x_path = [path[i][0] for i in range(len(path))]
-        y_path = [path[i][1] for i in range(len(path))]
-        x = np.linspace(path[0][0],path[0][-1],1000)
-        y = np.interp(x,x_path,y_path)
-        return np.array([x,y]).T
+        print(f'points_to_remove = {points_to_remove}')
+        for point in points_to_remove:
+            path.pop(point)
+        #print(f'smoothened path = {path}')
+        return path
 
 class Path_Planner():
     def __init__(self) -> None:
@@ -755,28 +766,42 @@ class Path_Planner():
         self.client = actionlib.SimpleActionClient('path_tracker', mb.MoveBaseAction)
         print('waiting for server')
         self.client.wait_for_server(rospy.Duration(0.5))
+        print('server found')
 
-        #subscriber
+        #subscribers
         self.sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
         #goal currently a fix
 
         self.goal = PoseStamped()
+        self.init_goal()
         # might need to change in the future
         self.rate = rospy.Rate(1)
 
         self.path_planner = A_star()
 
+        #rospy.roslog('path planner node started')
+
     def goal_callback(self,goal):
         self.goal = goal
         self.main() # this might be bad programming
+
+    def init_goal(self):
+        self.goal.pose.position.x = 0
+        self.goal.pose.position.y = 0
+        self.goal.pose.position.z = 0
+        self.goal.pose.orientation.x = 0
+        self.goal.pose.orientation.y = 0
+        self.goal.pose.orientation.z = 0
+        self.goal.pose.orientation.w = 1
 
     def get_map(self):
         # might call service to get map
         resolution = 0.05
         map = GridMap(resolution=resolution)
+        #map.update_geofence_and_boundingbox()
         #map =None
         return map
-
+    
     def tranform_path_to_posestamped(self,path):
         path_list = []
         """path_tosend = Path
@@ -833,6 +858,8 @@ class Path_Planner():
     """
     def send_path(self,client,path):
         path_list = self.tranform_path_to_posestamped(path)
+        print('paths transformed')
+        #print(path_list)
         for pose_stamped in path_list:
             goal = mb.MoveBaseGoal()
             goal.target_pose = pose_stamped
@@ -842,8 +869,9 @@ class Path_Planner():
 
     def done_cb(self,status,result):
         print('done')
-        print(status)
-        print(result)
+        print(f'status is {status}')
+        print(f'result is {result}')
+
         
     def feedback_cb(self,feedback):
         print('feedback')
@@ -852,8 +880,12 @@ class Path_Planner():
     def main(self):
         #goal = (10,10)
         self.path_planner.map = self.get_map()
+        #print(self.goal)
         status,path = self.path_planner.path(self.goal)
+        path = self.path_planner.path_smoothing(path)
         self.send_path(self.client,path)
+        print('path sent')
+
 
     def spin(self):
         while not rospy.is_shutdown():

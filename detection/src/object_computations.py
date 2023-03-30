@@ -32,7 +32,7 @@ class Object_computations():
 
         self.directory = "/home/robot/dd2419_ws/src/detection/src/saved_instances"
         self.bridge = CvBridge()
-
+        self.threshold =8
 
         # Define rate
         self.update_rate = 1 # [Hz] Change this to the rate you want
@@ -58,7 +58,7 @@ class Object_computations():
     def filter(self, batch, time):
 
         nb_msgs = len(batch)
-        #rospy.loginfo("objects len: %s", nb_msgs)
+        rospy.loginfo("objects len: %s", nb_msgs)
         if nb_msgs > 0:
             # cluster on position
             X = []
@@ -78,7 +78,7 @@ class Object_computations():
                 clusters = fcluster(Z, t=0.05, criterion='distance')
 
 
-                # keep clusters with more than 12 bb detected
+                # keep clusters with more than threshold bb detected
                 bbs_by_cluster = []
                 for i in np.unique(clusters):
                     bb_cluster = []
@@ -86,7 +86,7 @@ class Object_computations():
                     for index in a:
                         bb_cluster.append(bb_list[index])
                     
-                    if len(bb_cluster)>12:
+                    if len(bb_cluster)> self.threshold:
                         bbs_by_cluster.append(bb_cluster)
     
                     
@@ -105,7 +105,7 @@ class Object_computations():
                     y = np.mean(y)
                     z = np.mean(z)
                     
-                    bb = cluster[6]
+                    bb = cluster[int(self.threshold/2)]
                     stamp = bb.stamp
                     image = self.cache_image.getElemAfterTime(stamp)
                     
