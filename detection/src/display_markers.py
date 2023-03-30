@@ -131,8 +131,6 @@ sub_goal = rospy.Subscriber('/aruco_anchor/markers', MarkerArray, aruco_anchor_c
 pub = rospy.Publisher('/aruco/markers/transformed_pose', Marker, queue_size=1)
 
 if __name__ == '__main__':
-    # from launch file import param for id
-    id = int(rospy.get_param("id"))
     name_or_path = rospy.get_param("aruco_name")
     sub_goal = rospy.Subscriber('/'+str(name_or_path)+'/markers', MarkerArray, aruco_callback)
     pub = rospy.Publisher('/aruco/markers/transformed_pose', Marker, queue_size=1)
