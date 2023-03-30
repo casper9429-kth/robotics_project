@@ -33,8 +33,8 @@ class Object_classifier():
         # Paramethers 
         self.device = "cuda"
         self.detector = Detector().to(self.device)
-        #model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
-        model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
+        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
+        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
         model= self.load_model(self.detector, model_path, self.device)
         self.detector.eval()
         
@@ -65,11 +65,11 @@ class Object_classifier():
     def image_callback(self, msg): 
         """Callback function for the topic"""
         try:
-            #t0 = time.time()
+            t0 = time.time()
             cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
             
             if self.depth is not None:
-                self.compute_bb(msg.header.stamp, msg.header.frame_id, self.depth, cv_image) 
+                self.compute_bb(msg.header.stamp, msg.header.frame_id, self.depth, cv_image, t0) 
 
         except CvBridgeError as e:
             print(e)
@@ -124,7 +124,7 @@ class Object_classifier():
 
 
 
-    def compute_bb(self, stamp, frame_id, depth_image, cv_image):     
+    def compute_bb(self, stamp, frame_id, depth_image, cv_image, t0):     
         
         np_arr = np.asarray(cv_image)
         
@@ -160,40 +160,38 @@ class Object_classifier():
                 # Call function to compute point and depth
                 x,y,depth = self.compute_point(bb, depth_image)
 
-                # Confusion on colors of cubes when they are too far
-                if not(bb["category"] == 6 and depth > 0.5):
-                    if bb["category"] == 6 or bb["category"] == 7:
-                        bb_msg.category_name = self.compute_color(bb, np_arr)     
-                    else:
-                        bb_msg.category_name = self.mapping[bb["category"]]
+                if bb["category"] == 6 or bb["category"] == 7:
+                    bb_msg.category_name = self.compute_color(bb, np_arr)     
+                else:
+                    bb_msg.category_name = self.mapping[bb["category"]]
+                
+                if bb_msg.category_name is not None and depth < 2 and bb["width"]*bb["width"] > 100:
                     
-                    if bb_msg.category_name is not None and depth < 2:
-                        
-                        # visualize image with bb in Rviz
-                        start_point = (x_bb, y_bb)
-                        end_point = (int(x_bb+bb["width"]), int(y_bb+bb["height"]))
-                        color = (255, 0, 0)
-                        thickness = 2
-                        cv_image = cv2.rectangle(cv_image, start_point, end_point, color, thickness)
-                        cv_image = cv2.putText(cv_image, bb_msg.category_name, (start_point[0]-10, start_point[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 
-                        1, color, thickness, cv2.LINE_AA)
-                        imgMsg = self.bridge.cv2_to_imgmsg(cv_image, "rgb8")
-                        self.image_bb_pub.publish(imgMsg)
-                        
-                        
-                        point = Point()
-                        point.x = x
-                        point.y = y
-                        point.z = depth
-                        bb_msg.bb_center = point
-                        bb_list_msg.bounding_boxes.append(bb_msg)
+                    # visualize image with bb in Rviz
+                    start_point = (x_bb, y_bb)
+                    end_point = (int(x_bb+bb["width"]), int(y_bb+bb["height"]))
+                    color = (255, 0, 0)
+                    thickness = 2
+                    cv_image = cv2.rectangle(cv_image, start_point, end_point, color, thickness)
+                    cv_image = cv2.putText(cv_image, bb_msg.category_name, (start_point[0]-10, start_point[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 
+                    1, color, thickness, cv2.LINE_AA)
+                    imgMsg = self.bridge.cv2_to_imgmsg(cv_image, "rgb8")
+                    self.image_bb_pub.publish(imgMsg)
+                    
+                    
+                    point = Point()
+                    point.x = x
+                    point.y = y
+                    point.z = depth
+                    bb_msg.bb_center = point
+                    bb_list_msg.bounding_boxes.append(bb_msg)
 
                 
             if len(bb_list_msg.bounding_boxes)>0:
                 self.bb_pub.publish(bb_list_msg)
               
-            #tinfer = time.time() - t0
-            # rospy.loginfo(tinfer)
+            # tinfer = time.time() - t0
+            # rospy.loginfo(1/tinfer)
 
 
 
@@ -214,14 +212,13 @@ class Object_classifier():
         
         # Crop image
         cropped_image = image[int(bb["y"]):int(bb["y"]+bb["height"]),int(bb["x"]):int(bb["x"]+bb["width"])]
-        count_red, count_blue, count_green, count_wooden = 0,0,0,0
-        count_red = np.sum(cropped_image[:,:,0]>180)
-        count_green = np.sum(cropped_image[:,:,1]>160)
-        count_blue = np.sum(cropped_image[:,:,2]>165)
+        mean_red = np.mean(cropped_image[:,:,0])
+        mean_green = np.mean(cropped_image[:,:,1])
+        mean_blue = np.mean(cropped_image[:,:,2])
     
         category_id = bb["category"]
        
-        max_color = max(count_red, count_green, count_blue, count_wooden)
+        max_color = max(mean_red, mean_blue, mean_green)
         mapping = None
         if category_id == 6:
             mapping = self.sub_mapping_cube
@@ -229,26 +226,21 @@ class Object_classifier():
             mapping = self.sub_mapping_sphere
 
         category_name = ""
-        total_sum = count_red + count_green + count_blue
         
-        
+        metric = np.std([mean_red, mean_green, mean_blue])/np.mean([mean_red, mean_green, mean_blue])
 
-        if category_id == 6 and  count_green > 0 and  np.std([count_red, count_green, count_blue])/np.mean([count_red, count_green, count_blue]) < 0.35 and total_sum>40:
-            # rospy.loginfo("%s, %s, %s",count_red, count_green, count_blue)
+        if category_id == 6 and  metric < 0.16:
             category_name = mapping[3]
-        elif max_color == count_green and total_sum>40:
-            # rospy.loginfo("GREEN Object detected")
+        elif max_color == mean_green:
             category_name = mapping[1]
-        elif max_color == count_blue and total_sum>40:
-            # rospy.loginfo("BLUE Object detected")
+        elif max_color == mean_blue:
             category_name = mapping[2]
-        elif  max_color == count_red and total_sum>40:
-            #rospy.loginfo("RED Object detected")
+        elif  max_color == mean_red:
             category_name = mapping[0]
         else: 
             category_name = None
         
-        #rospy.loginfo("%s, %s, %s, %s",count_red, count_green, count_blue, np.std([count_red, count_green, count_blue])/np.mean([count_red, count_green, count_blue]))
+        #rospy.loginfo("%s, %s, %s, %s",mean_red, mean_green, mean_blue, metric)
         return category_name
 
         
