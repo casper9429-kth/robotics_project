@@ -213,7 +213,7 @@ class Detector(nn.Module):
                         A.Sharpen(),
                         A.RandomBrightnessContrast(),
                     ]),
-                    A.Affine(shear = {'x': random.randint(-25, 25), 'y': random.randint(-15, 15)})
+                    A.Affine(shear = {'x': random.randint(-20, 20), 'y': random.randint(-15, 15)})
             ], bbox_params=A.BboxParams(format='coco', label_fields=['class_labels']))
 
             image = np.array(image)
