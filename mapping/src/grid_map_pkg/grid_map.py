@@ -127,8 +127,8 @@ class GridMap():
         # Get index of origo
         i = int((self.bounding_box[0])/self.resolution)
         j = int((self.bounding_box[2])/self.resolution)
-        grid_map_msg.origo_index_i = i
-        grid_map_msg.origo_index_j = j 
+        grid_map_msg.origo_index_i = -i
+        grid_map_msg.origo_index_j = -j 
 
         # Return grid map msg
         return grid_map_msg

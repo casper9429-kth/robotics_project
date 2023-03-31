@@ -73,6 +73,6 @@
 
     <!-- run the path tracker -->
     <node name="path_tracker" pkg="path_planner" type="path_tracker_server.py" output='screen'/>
-    <node name="path_tracker_client" pkg="path_planner" type="path_tracker_client.py" output='screen'/> 
+    <!-- <node name="path_tracker_client" pkg="path_planner" type="path_tracker_client.py" output='screen'/>  -->
 
 </launch>

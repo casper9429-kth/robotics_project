@@ -85,16 +85,16 @@ class explorer():
         self.bbminy = msg.bbminy
         self.bbmaxx = msg.bbmaxx
         self.bbmaxy = msg.bbmaxy
+        self.t_stamp = msg.header.stamp
         self.origo_index_i = msg.origo_index_i
         self.origo_index_j = msg.origo_index_j
-        # print('Map received')
         self.transforms()
         self.find_goal()
 
     def transforms(self):   
         stamp = self.pose.header.stamp  
         try:                                   
-            transform_base_link_2_map = self.tfBuffer.lookup_transform('map','base_link', stamp,rospy.Duration(0.5)) # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
+            transform_base_link_2_map = self.tfBuffer.lookup_transform('map','base_link', self.t_stamp,rospy.Duration(0.5)) # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
             self.pose_in_map = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_2_map)
             # calculates in what cell the robot is   
             delta_i = self.pose_in_map.pose.position.x/self.map_resolution
@@ -103,7 +103,7 @@ class explorer():
             self.pose_in_gridmap.pose.position.x = self.origo_index_i+delta_i
             self.pose_in_gridmap.pose.position.y = self.origo_index_j+delta_j
             self.position_in_gridmap = np.array([self.pose_in_gridmap.pose.position.x, self.pose_in_gridmap.pose.position.y])
-            # print(self.position_in_gridmap)
+
         except:
             print('No transform found')
 
@@ -114,37 +114,45 @@ class explorer():
         # extracts the cells that are unknown space a.k.a float32[] data
         for i , data_i in enumerate(self.map_coords):
             for j, data_j in enumerate(data_i.data):
-                if data_j == 1.0:
-                    self.cell = [i,j]
-                    self.cells.append(self.cell)
+                if int(data_j) == -1:
+                    self.cells.append([i,j])
                     
+        # 
+
+        self.cells = np.array(self.cells)
+        print(self.position_in_gridmap)
+        distances = self.cells - self.position_in_gridmap
+        min_distance_index = np.argmin(np.linalg.norm(distances, axis=1))
+        self.nearest_goal = self.cells[min_distance_index]
 
         # # calculate the nearest point to the robot
-        for idx, data in enumerate(self.cells):         
-            distances = np.linalg.norm(np.array(data)-self.position_in_gridmap)
-            print(distances)
+        # for idx, data in enumerate(self.cells):         
+        #     # Calc
+        #     distances = np.linalg.norm(np.array(data)-self.position_in_gridmap)
+        #     # print(distances)
             
-            if self.nearest_goal is None:
-                self.nearest_goal = data
-            elif distances < np.linalg.norm(np.array(self.nearest_goal)-self.position_in_gridmap):
-                self.nearest_goal = data
-        # print(self.nearest_goal)
-        
-        
+        #     if self.nearest_goal is None:
+        #         self.nearest_goal = data
+        #     elif distances < np.linalg.norm(np.array(self.nearest_goal)-self.position_in_gridmap):
+        #         self.nearest_goal = data
+        # # print(self.nearest_goal)
+    
         self.publish_goal()
 
 
     def publish_goal(self):         #transforms the goal to the map frame
         goal = PoseStamped()
         goal.header.frame_id = 'map'
-        goal.pose.position.x = self.nearest_goal[0]*self.map_resolution-self.origo_index_i
-        goal.pose.position.y = self.nearest_goal[1]*self.map_resolution-self.origo_index_j
+        goal.header.stamp = self.t_stamp
+        goal.pose.position.x = self.bbminx + (self.nearest_goal[0])*self.map_resolution
+        goal.pose.position.y = self.bbminy + (self.nearest_goal[1])*self.map_resolution
         goal.pose.position.z = 0.0
-        # goal.pose.orientation.x = 0.0
-        # goal.pose.orientation.y = 0.0     # it is commented so that the robot keeps its orientation
-        # goal.pose.orientation.z = 0.0
-        # goal.pose.orientation.w = 0.0
+        goal.pose.orientation.x = 0.0
+        goal.pose.orientation.y = 0.0     # it is commented so that the robot keeps its orientation
+        goal.pose.orientation.z = 0.0
+        goal.pose.orientation.w = 0.0
         self.goal_pub.publish(goal)
+        print(goal.pose.position.x, goal.pose.position.y)
         # print('Goal published')
 
 

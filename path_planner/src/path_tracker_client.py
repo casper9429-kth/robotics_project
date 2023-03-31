@@ -35,10 +35,10 @@ class path_planner():
 
 
     def goal_callback(self, msg):
-        
+        rospy.loginfo("Goal received")
         self.goal = MoveBaseGoal()
         self.goal.target_pose.header.frame_id = "map"
-        self.goal.target_pose.header.stamp = rospy.Time.now()
+        self.goal.target_pose.header.stamp = msg.header.stamp
         self.goal.target_pose.pose.position.x = msg.pose.position.x
         self.goal.target_pose.pose.position.y = msg.pose.position.y
         self.goal.target_pose.pose.position.z = msg.pose.position.z
@@ -48,7 +48,6 @@ class path_planner():
         self.goal.target_pose.pose.orientation.w = msg.pose.orientation.w
         self.path_client.send_goal(self.goal)
         self.path_client.wait_for_result()
-        print("Goal received")
 
 
 if __name__ == '__main__':

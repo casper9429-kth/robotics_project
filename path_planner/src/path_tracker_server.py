@@ -58,7 +58,7 @@ class LineSegment():
 class Polygon():
     def __init__(self, point_array) -> None:
         self.segments = self.generate_line_segments(point_array)
-
+        self.point_array = [(point.position.x, point.position.y) for point in point_array] 
     def contains(self, point):
         """
         Returns True if the point is inside the polygon, False otherwise.
@@ -66,11 +66,27 @@ class Polygon():
         """
         # The point is inside the polygon if an imaginary ray starting at the point
         # intersects the polygon an odd number of times.
-        intersections = 0
-        for segment in self.segments:
-            if segment.ray_intersect(point):
-                intersections += 1
-        return intersections % 2 == 1
+        return self.is_point_in_polygon(point.x, point.y, self.point_array)
+
+
+    def is_point_in_polygon(self,x,y,poly):
+        """Check if point is in polygon"""
+        n = len(poly)
+        inside =False
+
+        p1x,p1y = poly[0]
+        for i in range(n+1):
+            p2x,p2y = poly[i % n]
+            if y > min(p1y,p2y):
+                if y <= max(p1y,p2y):
+                    if x <= max(p1x,p2x):
+                        if p1y != p2y:
+                            xints = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
+                        if p1x == p2x or x <= xints:
+                            inside = not inside
+            p1x,p1y = p2x,p2y
+
+        return inside
 
     def generate_line_segments(self, point_array):
         segments = []
@@ -103,7 +119,10 @@ class PathTracker():
         self.pose.pose.orientation.y = 0.0
         self.pose.pose.orientation.z = 0.0
         self.pose.pose.orientation.w = 0.0
-
+        
+        
+        # Flag that a goal has been received
+        self.goal_received = False
 
 
         # Goal position and orientation
@@ -151,15 +170,22 @@ class PathTracker():
         # self.aruco.pose.pose.orientation = msg.pose.pose.orientation
 
 
-        self.path_tracker_server = actionlib.SimpleActionServer('path_tracker', MoveBaseAction, execute_cb=self.execute_cb, auto_start=False)
-        self.path_tracker_server.start()
-        print('Action server started')
-        rospy.spin()
+        # self.path_tracker_server = actionlib.SimpleActionServer('path_tracker', MoveBaseAction, execute_cb=self.execute_cb, auto_start=False)
+        # self.path_tracker_server.start()
+        # print('Action server started')
+        # rospy.spin()
 
     def execute_cb(self, goal):
         self.goal = goal.target_pose            # target_pose is a PosedStamped
         print('Goal recieved')
-        self.path_tracker_server.set_succeeded()
+        rospy.loginfo("##################################")
+        rospy.loginfo("##################################")
+        rospy.loginfo("##################################")
+        rospy.loginfo("##################################")
+        rospy.loginfo("##################################")
+        rospy.loginfo("##################################")
+        
+        # self.path_tracker_server.set_succeeded()
         self.main()
         
 
@@ -168,14 +194,16 @@ class PathTracker():
     def goal_callback(self, msg:PoseStamped):
         self.goal.pose.position = msg.pose.position                 # 2D Nav goal in rviz is in odom frame
         self.goal.pose.orientation = msg.pose.orientation
-        # print(self.goal)
-        
+        self.goal_received = True
 
     def fence_callback(self, msg:PoseArray):
         self.polygon = Polygon(msg.poses)
 
 
     def check_if_in_fence(self, pose: Pose):
+        # Transform pose to map frame
+        #pose_in_map = self.tfBuffer.transform(pose, 'map')
+        print(self.polygon)
         if self.polygon:
             return self.polygon.contains(pose.position)
         else:
@@ -306,6 +334,9 @@ class PathTracker():
     def spin(self):
         #print(self.goal.pose)
         #print(self.check_if_in_fence(self.goal.pose))
+        if not self.goal_received:
+            return
+
         if self.check_if_in_fence(self.goal.pose): #
             #print('In fence')
             self.transforms()
@@ -329,4 +360,4 @@ class PathTracker():
 
 if __name__ == '__main__':
     node = PathTracker()
-    # node.main()
+    node.main()
