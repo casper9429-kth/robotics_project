@@ -14,6 +14,8 @@ import math
 from sensor_msgs.msg import Image
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
+import os
+from std_msgs.msg import String
 
 class Object_computations():
     def __init__(self):
@@ -50,7 +52,7 @@ class Object_computations():
         
         # Publisher
         self.instances_pub = rospy.Publisher("/detection/object_instances", ObjectInstanceArray, queue_size=10)
-        
+        self.speaker_pub = rospy.Publisher("/speaker/speech", String)
         rospy.Rate(4).sleep()
         
         
@@ -92,7 +94,7 @@ class Object_computations():
                     rospy.loginfo("cluster size: %s", nb_msgs)
                     
                 # take mean position and maximum category_name
-                #instances_to_save = []
+                instances_to_save = []
                 for cluster in bbs_by_cluster:
                    
                     category_names = [o.category_name for o in cluster]
@@ -111,99 +113,138 @@ class Object_computations():
                     bb = cluster[int(self.threshold/2)]
                     stamp = bb.stamp
                     image = self.cache_image.getElemAfterTime(stamp)
-                    #instances_to_save.append([(category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image)])
-                    self.save_instances((category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image))
+                    #self.save_instances((category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image))
+
+                instances_to_save.append([(category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image)])
     
 
 
 
-    def save_instances(self, new_instance, time, bb_info):
-        
-        # convert coordinates to map frame
-        point_map = PointStamped()
-        
-        try:
-            point_map = self.instance_to_point_map(new_instance, time)
-        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-            rospy.logwarn(e)
-            return   
-        
-        # test if there is already an instance of that category in the list
-        instances = [item for item in self.objects_dict if new_instance[0] in item]
-        nb_instances = len(instances)
+    #def save_instances(self, new_instance, time, bb_info):
+    def save_instances(self, list_instances):
 
-        if nb_instances == 0:
+        list_instances_batch = []
+        rospy.loginfo("number of instances detected in batch: %s", len(list_instances))
+
+        for instance in list_instances:
             
-            # Is there an object instance closer than 5cm to the new instance ?
-            found_close, old_instance_key = self.found_close(list(self.objects_dict.keys()), point_map, 0.05, self.objects_dict)
-            new_instance_key = new_instance[0]+str(1)
+            new_instance = instance[0]
+            time = instance[1]
+            bb_info = instance[2]
 
-            if not found_close:
-                # add instance to dict 
-                self.objects_dict[new_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)   
-                # notify if new object detected
-                rospy.loginfo("New object detected: %s. Position in map: %s", new_instance_key,point_map.point)
-                self.save_instance_image(new_instance_key, bb_info)
+            # convert coordinates to map frame
+            point_map = PointStamped()
+            try:
+                point_map = self.instance_to_point_map(new_instance, time)
+            except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+                rospy.logwarn(e)
+                return   
+            
+            # test if there is already an instance of that category in the list
+            instances = [item for item in self.objects_dict if new_instance[0] in item]
+            nb_instances = len(instances)
 
-                # publish tf
-                self.publish_tf(new_instance_key, point_map)
-
-            else:
-                # Goal: keep only one in the long term memory. Keep the one with the largest number of detections
-                temp_instances = [item for item in self.temp_dict if new_instance[0] in item]
+            if nb_instances == 0:
                 
-                if len(temp_instances) > 0:
-                    
-                    # check if there is a close instance in the temp memory
-                    found_close, tmp_old_instance_key = self.found_close(temp_instances, point_map, 0.05, self.temp_dict)
+                # Is there an object instance closer than 5cm to the new instance ?
+                found_close, old_instance_key = self.found_close(list(self.objects_dict.keys()), point_map, 0.05, self.objects_dict)
+                new_instance_key = new_instance[0]+str(1)
 
-                    if found_close:
-                        instance_temp = self.temp_dict[tmp_old_instance_key]
-                        self.temp_dict[tmp_old_instance_key] = (instance_temp[0], (point_map.point.x +float(instance_temp[1]))/2, (point_map.point.y +float(instance_temp[2]))/2, (point_map.point.z +float(instance_temp[3]))/2, int(instance_temp[4])+1 ) 
-                        new_instance_key = tmp_old_instance_key
-
-                else:
-                    self.temp_dict[new_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)
-
-                # compare temp and long term memory 
-                if self.objects_dict[old_instance_key][4] <= self.temp_dict[new_instance_key][4]:
-                    del self.objects_dict[old_instance_key]
-                    self.objects_dict[new_instance_key] = self.temp_dict[new_instance_key]
-                    del self.temp_dict[new_instance_key]
-
+                if not found_close:
+                    # add instance to dict 
+                    self.objects_dict[new_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)   
                     # notify if new object detected
                     rospy.loginfo("New object detected: %s. Position in map: %s", new_instance_key,point_map.point)
+                    to_speech = "New object detected: " + str(new_instance_key)
+                    self.speaker_pub.publish(to_speech)
                     self.save_instance_image(new_instance_key, bb_info)
-
+                   
                     # publish tf
                     self.publish_tf(new_instance_key, point_map)
-                
-                    #TODO: delete other image ?
 
-        else:
-            
-            # Is the old instance closer than 20cm to the new one ?
-            found_close, old_instance_key = self.found_close(instances, point_map, 0.3, self.objects_dict)
-        
-            if found_close: 
+                    #test 
+                    list_instances_batch.append(new_instance[0])
 
-                # update
-                instance = self.objects_dict[old_instance_key]
-                self.objects_dict[old_instance_key] = (new_instance[0], (point_map.point.x +float(instance[1]))/2, (point_map.point.y +float(instance[2]))/2, (point_map.point.z +float(instance[3]))/2, int(instance[4])+1 )  
-                
-                # publish tf
-                self.publish_tf(old_instance_key, point_map)
+                else:
+                    # Goal: keep only one in the long term memory. Keep the one with the largest number of detections
+                    temp_instances = [item for item in self.temp_dict if new_instance[0] in item]
+                    
+                    if len(temp_instances) > 0:
+                        
+                        # check if there is a close instance in the temp memory
+                        found_close, tmp_old_instance_key = self.found_close(temp_instances, point_map, 0.05, self.temp_dict)
+
+                        if found_close:
+                            instance_temp = self.temp_dict[tmp_old_instance_key]
+                            self.temp_dict[tmp_old_instance_key] = (instance_temp[0], (point_map.point.x +float(instance_temp[1]))/2, (point_map.point.y +float(instance_temp[2]))/2, (point_map.point.z +float(instance_temp[3]))/2, int(instance_temp[4])+1 ) 
+                            new_instance_key = tmp_old_instance_key
+                            
+                            #test 
+                            list_instances_batch.append(new_instance[0])
+
+                    else:
+                        self.temp_dict[new_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)
+
+                        #test 
+                        list_instances_batch.append(new_instance[0])
+
+                    # compare temp and long term memory 
+                    if self.objects_dict[old_instance_key][4] <= self.temp_dict[new_instance_key][4]:
+                        del self.objects_dict[old_instance_key]
+                        self.objects_dict[new_instance_key] = self.temp_dict[new_instance_key]
+                        del self.temp_dict[new_instance_key]
+
+                        # notify if new object detected
+                        rospy.loginfo("New object detected: %s. Position in map: %s", new_instance_key,point_map.point)
+                        to_speech = "New object detected: " + str(new_instance_key)
+                        self.speaker_pub.publish(to_speech)
+                        self.save_instance_image(new_instance_key, bb_info)
+
+                        # publish tf
+                        self.publish_tf(new_instance_key, point_map)
+                    
+                        # delete other image
+                        old_instance_path = self.directory+"/"+old_instance_key+".jpg"
+                        if os.path.exists(old_instance_path):
+                            os.remove(old_instance_path)
+
             else:
-                # add instance to dict 
-                instance_key = new_instance[0]+str(nb_instances+1)
-                self.objects_dict[instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)  
+                
+                # If we detect the same object two times in the same batch, we want to keep the two
+                if new_instance[0] in list_instances_batch:
+                    found_close, old_instance_key = self.found_close(instances, point_map, 0.05, self.objects_dict)
+                else:
+                    # Is the old instance closer than 30cm to the new one ?
+                    found_close, old_instance_key = self.found_close(instances, point_map, 0.3, self.objects_dict)
+            
+                if found_close: 
 
-                # notify if new object detected
-                rospy.loginfo("New object detected: %s. Position in map: %s", instance_key,point_map.point)
-                self.save_instance_image(instance_key, bb_info)
+                    # update
+                    instance = self.objects_dict[old_instance_key]
+                    self.objects_dict[old_instance_key] = (new_instance[0], (point_map.point.x +float(instance[1]))/2, (point_map.point.y +float(instance[2]))/2, (point_map.point.z +float(instance[3]))/2, int(instance[4])+1 )  
+                    
+                    # publish tf
+                    self.publish_tf(old_instance_key, point_map)
 
-                # publish tf
-                self.publish_tf(instance_key, point_map)
+                    #test 
+                    list_instances_batch.append(new_instance[0])
+
+                else:
+                    # add instance to dict 
+                    instance_key = new_instance[0]+str(nb_instances+1)
+                    self.objects_dict[instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)  
+
+                    # notify if new object detected
+                    rospy.loginfo("New object detected: %s. Position in map: %s", instance_key,point_map.point)
+                    to_speech = "New object detected: " + str(new_instance_key)
+                    self.speaker_pub.publish(to_speech)
+                    self.save_instance_image(instance_key, bb_info)
+
+                    # publish tf
+                    self.publish_tf(instance_key, point_map)
+
+                    #test 
+                    list_instances_batch.append(new_instance[0])
 
 
     def found_close(self, instances, point_map, threshold, dictionnary):

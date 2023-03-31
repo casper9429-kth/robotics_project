@@ -47,7 +47,6 @@ def aruco_callback(msg):
             try:
                 transformed_pose.pose.pose = tfBuffer.transform(pose_map, "base_link", rospy.Duration(1.0)).pose
                 pose_map = tfBuffer.transform(pose_map, "map", rospy.Duration(1.0)) 
-                #rospy.loginfo("tf ok")
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                 rospy.logwarn(e)
                 return   
@@ -101,7 +100,6 @@ def aruco_anchor_callback(msg):
             try:
                 transformed_pose.pose.pose = tfBuffer.transform(pose_map, "base_link", rospy.Duration(1.0)).pose
                 pose_map = tfBuffer.transform(pose_map, "map", rospy.Duration(1.0)) 
-                #rospy.loginfo("tf ok")
             except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                 rospy.logwarn(e)
                 return   
@@ -113,17 +111,33 @@ def aruco_anchor_callback(msg):
             br = tf2_ros.TransformBroadcaster()
 
             t = TransformStamped()
+
             t.header.frame_id = "map"
             t.child_frame_id = "aruco/detected" 
             t.child_frame_id = t.child_frame_id + str(id)
 
             t.header.stamp = stamp
-            
-            # rospy.loginfo(msg)
         
             t.transform.rotation = pose_map.pose.orientation
             t.transform.translation = pose_map.pose.position
             br.sendTransform(t)
+
+
+            # t2 = TransformStamped()
+            # t.header.frame_id = "map"
+            # t.child_frame_id = "aruco/detected/box" 
+            # t.child_frame_id = t.child_frame_id + str(id)
+
+            # t.header.stamp = stamp
+        
+            # t.transform.rotation = pose_map.pose.orientation
+
+            # #TODO: one of these
+            # t.transform.rotation.x += 0.08
+            # t.transform.rotation.x += 0.08
+            # t.transform.rotation.x += 0.08
+            # t.transform.translation = pose_map.pose.position
+            # br.sendTransform(t)
 
 
 sub_goal = rospy.Subscriber('/aruco/markers', MarkerArray, aruco_callback)
