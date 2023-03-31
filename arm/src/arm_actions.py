@@ -51,9 +51,7 @@ class ArmActions():
             'drop_off': [
                 self.straight,
                 self.hover_target,
-                self.on_target, # try without this
                 self.open_gripper,
-                self.hover_target, # and this
                 self.straight
             ]
         }
