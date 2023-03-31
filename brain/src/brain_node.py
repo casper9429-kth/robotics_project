@@ -36,17 +36,17 @@ class BrainNode:
                                        DropOff()])])
         return_to_anchor = ReturnToAnchor()
         root = Sequence([localize, explore, pick_up, drop_off, return_to_anchor])
-        behavior_tree = BehaviorTree(root, context=self._create_context())
+        behavior_tree = BehaviorTree(root, context=self.Context())
         return behavior_tree
     
-    def _create_context(self):
-        context = {'anchor_id': 500,
-                   'target_type': 'cube',
-                   'is_holding_object': False,
-                   'objects_remaining': 1,
-                   'can_pick_up': False,
-                   'can_drop_off': False,}
-        return context 
+    class Context:
+        def __init__(self):
+            self.anchor_id = 500
+            self.target_type = 'cube'
+            self.is_holding_object = False
+            self.objects_remaining = 1
+            self.can_pick_up = False
+            self.can_drop_off = False
 
     def run(self):
         rate = rospy.Rate(10)
@@ -120,19 +120,19 @@ class Explore(Leaf):
 class ObjectsRemaining(Leaf):
     def run(self):
         rospy.loginfo('ObjectsRemaining')
-        return SUCCESS if self.context['objects_remaining'] > 0 else FAILURE
+        return SUCCESS if self.context.objects_remaining > 0 else FAILURE
     
 
 class IsHoldingObject(Leaf):
     def run(self):
         rospy.loginfo('IsHoldingObject')
-        return SUCCESS if self.context['is_holding_object'] else FAILURE
+        return SUCCESS if self.context.is_holding_object else FAILURE
     
 
 class CanPickUp(Leaf):
     def run(self):
         rospy.loginfo('CanPickUp')
-        return SUCCESS if self.context['can_pick_up'] else FAILURE
+        return SUCCESS if self.context.can_pick_up else FAILURE
     
 
 class GoToPickUp(Leaf):
@@ -161,7 +161,7 @@ class GoToPickUp(Leaf):
             self.start()
         elif not self.path_tracker_is_running().value:
             self.is_running = False
-            self.context['can_pick_up'] = True
+            self.context.can_pick_up = True
         return RUNNING
     
 
@@ -177,7 +177,7 @@ class PickUp(Leaf):
             self.is_running = True
             goal = ArmGoal()
             goal.action = 'pick_up'
-            goal.type = self.context['target_type']
+            goal.type = self.context.target_type
             goal.x = -0.145
             goal.y = 0.0
             goal.z = -0.13
@@ -185,8 +185,8 @@ class PickUp(Leaf):
 
             def done_cb(state, result):
                 self.is_running = False
-                self.context['is_holding_object'] = True
-                self.context['can_pick_up'] = False
+                self.context.is_holding_object = True
+                self.context.can_pick_up = False
 
             self.action_client.send_goal(goal, done_cb=done_cb)
         return RUNNING
@@ -195,7 +195,7 @@ class PickUp(Leaf):
 class CanDropOff(Leaf):
     def run(self):
         rospy.loginfo('CanDropOff')
-        return SUCCESS if self.context['can_drop_off'] else FAILURE
+        return SUCCESS if self.context.can_drop_off else FAILURE
     
 
 class GoToDropOff(Leaf):
@@ -224,7 +224,7 @@ class GoToDropOff(Leaf):
             self.start()
         elif not self.path_tracker_is_running().value:
             self.is_running = False
-            self.context['can_drop_off'] = True
+            self.context.can_drop_off = True
                 
         return RUNNING
     
@@ -241,7 +241,7 @@ class DropOff(Leaf):
             self.is_running = True
             goal = ArmGoal()
             goal.action = 'drop_off'
-            goal.type = self.context['target_type']
+            goal.type = self.context.target_type
             goal.x = -0.145
             goal.y = 0.0
             goal.z = -0.13
@@ -249,9 +249,9 @@ class DropOff(Leaf):
 
             def done_cb(state, result):
                 self.is_running = False
-                self.context['is_holding_object'] = False
-                self.context['can_drop_off'] = False
-                self.context['objects_remaining'] -= 1
+                self.context.is_holding_object = False
+                self.context.can_drop_off = False
+                self.context.objects_remaining -= 1
 
             self.action_client.send_goal(goal, done_cb=done_cb)
         return RUNNING
@@ -286,7 +286,7 @@ class ReturnToAnchor(Leaf):
             self.start()
         elif not self.path_tracker_is_running().value:
             self.is_running = False
-            self.context['can_drop_off'] = True
+            self.context.can_drop_off = True
             self.is_finished = True
             return SUCCESS # TODO check for this in BehaviorTree.run so we know when to stop
                 
