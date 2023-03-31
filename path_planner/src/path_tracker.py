@@ -124,8 +124,8 @@ class PathTracker():
         self.aruco = Marker()
 
         #server
-        self.server = actionlib.SimpleActionServer('path_tracker',move_base_msgs.msg.MoveBaseAction , self.execute_callback, False)
-        self.server.wait_for_server()
+        # self.server = actionlib.SimpleActionServer('path_tracker',move_base_msgs.msg.MoveBaseAction , self.execute_callback, False)
+        # self.server.wait_for_server()
         # tf stuff
         self.br = tf2_ros.TransformBroadcaster()
         self.tfBuffer = tf2_ros.Buffer()
@@ -178,7 +178,7 @@ class PathTracker():
         
         stamp = self.pose.header.stamp  
         try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
-            transform_map_2_base_link = self.tfBuffer.lookup_transform('base_link','odom', stamp,rospy.Duration(0.5))     # give goal in base link frame
+            transform_map_2_base_link = self.tfBuffer.lookup_transform('base_link','map', stamp,rospy.Duration(0.5))     # give goal in base link frame
             self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)   
         except:
             print('No transform found')
@@ -270,8 +270,8 @@ class PathTracker():
                 print('Goal orientation reached')
 
 
-        
-        self.cmd_pub.publish(self.move)   
+        print(self.move)
+        # self.cmd_pub.publish(self.move)   
         
 
 
