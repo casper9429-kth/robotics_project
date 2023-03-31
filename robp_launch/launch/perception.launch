@@ -21,10 +21,10 @@
 	</node>
 
 	<!-- Mapping -->
-	<node name="mapping" pkg="mapping" type="mapping.py" output='screen'/>
+	<!-- <node name="mapping" pkg="mapping" type="mapping.py" output='screen'/> -->
 
 	<!-- GeoFence -->
-	<node name="geofence" pkg="mapping" type="workspace_manager.py" output='screen'/>
+	<!-- <node name="geofence" pkg="mapping" type="workspace_manager.py" output='screen'/> -->
 
 
 	<!-- run the motors -->
@@ -41,6 +41,9 @@
 
 	<node name="object_classifier" pkg="detection" type="object_classification.py" output='screen'/>
 	<node name="object_computations" pkg="detection" type="object_computations.py" output='screen'/>
+
+
+	<node name="speaker" pkg="speak" type="speaker.py" output='screen'/>
 
 	<!-- run rviz -->
 	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/perception.rviz" />
