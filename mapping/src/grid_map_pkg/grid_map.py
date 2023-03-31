@@ -52,7 +52,7 @@ from std_msgs.msg import Float32
 
 
 class GridMap():
-    def __init__(self,resolution=0.05,inf_range=0.4):
+    def __init__(self,resolution=0.05,inf_range=0.1):
         self.resolution = resolution
         self.inflation_range = inf_range
         # map grid (tuples)
@@ -195,17 +195,25 @@ class GridMap():
         print("#######################")
         
         # Deflate geofence
-        deflated_geofence = self.deflate_polygon(self.resolution*1.5,self.geofence_list)
 
                 
         # Change all cordiantes to grid coordinates if they are on our outside of the geofence polygon
         # arange but exclude last value
+        
         for i in range(self.map_grid.shape[0]):
             for j in range(self.map_grid.shape[1]):
                 x = self.resolution*i + self.bounding_box[0]
                 y = self.resolution*j + self.bounding_box[2]
-                if not self.is_point_in_polygon(x,y,deflated_geofence):
-                    self.map_grid[i,j] = self.occupied
+                if not self.is_point_in_polygon(x,y,self.geofence_list):
+                    
+                    if i > 10 and i < self.map_grid.shape[0]-10 and j > 10 and j < self.map_grid.shape[1]-10: 
+                        mask = self.circle_mask.copy() 
+                        mask[:,0] = mask[:,0] + i
+                        mask[:,1] = mask[:,1] + j
+                        
+                        self.map_grid[(mask[:,0],mask[:,1])] = self.occupied
+                    else:
+                        self.map_grid[i,j] = self.occupied
 
         self.contour_mask = self.map_grid.copy()
 
@@ -213,34 +221,7 @@ class GridMap():
         # Set given geofence to true
         self.given_geofence = True
 
-    def deflate_polygon(dist,poly):
-        """
-        Deflate polygon by distance dist
-        """
-        n = len(poly)
-        new_poly = []
-        for i in range(n):
-            p1x,p1y = poly[i]
-            p2x,p2y = poly[(i+1)%n]
-            p3x,p3y = poly[(i+2)%n]
-            # Find vector from p2 to p1
-            v1x = p1x-p2x
-            v1y = p1y-p2y
-            # Find vector from p2 to p3
-            v2x = p3x-p2x
-            v2y = p3y-p2y
-            # Find angle between vectors
-            v1mag = math.sqrt(v1x*v1x+v1y*v1y)
-            v2mag = math.sqrt(v2x*v2x+v2y*v2y)
-            angle = math.acos((v1x*v2x+v1y*v2y)/(v1mag*v2mag))
-            # Find normal vector
-            nx = -v1y/v1mag
-            ny = v1x/v1mag
-            # Find new point
-            p2newx = p2x + dist*math.sin(angle/2)*nx
-            p2newy = p2y + dist*math.sin(angle/2)*ny
-            new_poly.append([p2newx,p2newy])
-        return new_poly
+
 
     def is_point_in_polygon(self,x,y,poly):
         """Check if point is in polygon"""

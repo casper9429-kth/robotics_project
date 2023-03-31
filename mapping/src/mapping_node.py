@@ -140,7 +140,7 @@ class Mapping():
         #if self.p_cloud_cont%3 == 0:
         #    points = np.vstack(points)
         #    self.p_cloud_buffer = []
-        self.grid_map.import_point_cloud_rays(points,1.2,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2])
+        self.grid_map.import_point_cloud_rays_inf(points,1.2,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2])
         
         return
 
