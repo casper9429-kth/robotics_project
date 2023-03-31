@@ -47,7 +47,7 @@ class Object_computations():
         #self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBoxArray)
         self.sub = message_filters.Subscriber("detection/bounding_boxes", BoundingBoxArray)
         self.sub_image = message_filters.Subscriber("/camera/color/image_raw", Image) 
-        self.sub_remove_instance = rospy.Subscriber("/detection/remove_instance", ObjectInstance, self.remove_instance_callback)
+        self.sub_remove_instance = rospy.Subscriber("/detection/remove_instance", String, self.remove_instance_callback)
         self.cache = message_filters.Cache(self.sub, 100)
         self.cache_image = message_filters.Cache(self.sub_image, 100)
         
@@ -341,7 +341,7 @@ class Object_computations():
 
 
     def remove_instance_callback(self, msg):
-        instance_key = msg.instance_name
+        instance_key = msg.data
         # delete instance from dict
         try:
             del self.objects_dict[instance_key]
