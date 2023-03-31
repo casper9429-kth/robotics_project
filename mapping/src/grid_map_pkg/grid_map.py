@@ -518,8 +518,8 @@ class GridMap():
         #angle = np.mod(angle+np.pi,2*np.pi)-np.pi        
 
         
-        if len(angle) == 0:
-            return
+        #if len(angle) == 0:
+        #    return
 
 
 
@@ -538,7 +538,7 @@ class GridMap():
         
         # Filter unique rays
         rays, counts = np.unique(rays_ind,axis=0,return_counts=True)
-        rays = rays[counts > 1]
+        rays = rays[counts > 2]
         index = rays[:,0].astype(int)
         ranges = rays[:,1]
         # Ray array

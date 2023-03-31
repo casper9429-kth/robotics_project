@@ -114,7 +114,7 @@ class Mapping():
 
         # Convert ROS -> Open3D
         cloud = o3drh.rospc_to_o3dpc(msg)
-        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 0.075, 1.2 ])))
+        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 0.0, 1.2 ])))
         cropped = cropped
         
         # Downsample the point cloud to 1/10 of resolution 
@@ -127,8 +127,8 @@ class Mapping():
 
         
         # import points in to grid map         
-        if len(points) == 0:
-            return
+        #if len(points) == 0:
+        #    return
                         
         new_points = np.zeros((len(points),2))
         new_points[:,0] = points[:,2]
