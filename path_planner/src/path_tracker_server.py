@@ -135,7 +135,7 @@ class PathTracker():
         self.acceleration = 0.05
         self.max_speed = 0.6
         self.max_angle = 0.1
-        self.angle_speed = 0.7
+        self.angle_speed = 0.1
         self.deceleration_distance = 0.0
         self.in_goal_tolerance = 0.02
         self.orientaion_tolerance = 0.05

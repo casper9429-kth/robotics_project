@@ -81,7 +81,7 @@ class workspace_manager():
         Main loop, instead of changing run function,
         write your code here to make it more readable.
         """
-        filepath = '/home/robot/dd2419_ws/src/localization/src/test_workspace.tsv'
+        filepath = '/home/robot/dd2419_ws/src/mapping/src/workspace_test.tsv'
         with open(filepath) as file:
             for line in file:
                 value = line.strip().split('\t')
