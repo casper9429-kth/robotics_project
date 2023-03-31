@@ -76,7 +76,7 @@ class Sequence:
 
 
 class Inverter:
-    def __init__(self, child, context):
+    def __init__(self, child):
         self._context = None
         self.child = child
 

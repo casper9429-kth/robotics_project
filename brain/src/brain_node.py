@@ -42,7 +42,7 @@ class BrainNode:
     class Context:
         def __init__(self):
             self.anchor_id = 500
-            self.target_type = 'cube'
+            self.target_type = 'sphere'
             self.is_holding_object = False
             self.objects_remaining = 1
             self.can_pick_up = False
@@ -93,7 +93,7 @@ class IsExplored(Leaf):
         except:
             pass
         try:
-            self.buffer.lookup_transform('map', 'object/detected/Red_cube1', rospy.Time(0))
+            self.buffer.lookup_transform('map', 'object/detected/Green_ball1', rospy.Time(0))
             self.object_found = True
         except:
             pass
@@ -101,7 +101,7 @@ class IsExplored(Leaf):
     
     def _object_instances_callback(self, msg):
         for object in msg.instances:
-            if object.category_name == 'Red_cube':
+            if object.category_name == 'Green_ball':
                 # self.object_found = True
                 break
     
