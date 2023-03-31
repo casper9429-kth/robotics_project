@@ -35,6 +35,7 @@ class Object_computations():
         self.directory = "/home/robot/dd2419_ws/src/detection/src/saved_instances"
         self.bridge = CvBridge()
         self.threshold = 8
+        self.id = 0
 
         # Define rate
         self.update_rate = 1 # [Hz] Change this to the rate you want
@@ -150,7 +151,8 @@ class Object_computations():
 
                 if not found_close:
                     # add instance to dict 
-                    self.objects_dict[new_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)   
+                    self.objects_dict[new_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1, self.id)  
+                    self.id += 1 
                     # notify if new object detected
                     rospy.loginfo("New object detected: %s. Position in map: %s", new_instance_key,point_map.point)
                     to_speech = "New object detected: " + str(new_instance_key)
@@ -172,7 +174,7 @@ class Object_computations():
 
                         if found_close:
                             instance_temp = self.temp_dict[tmp_old_instance_key]
-                            self.temp_dict[tmp_old_instance_key] = (instance_temp[0], (point_map.point.x +float(instance_temp[1]))/2, (point_map.point.y +float(instance_temp[2]))/2, (point_map.point.z +float(instance_temp[3]))/2, int(instance_temp[4])+1 ) 
+                            self.temp_dict[tmp_old_instance_key] = (instance_temp[0], (point_map.point.x +float(instance_temp[1]))/2, (point_map.point.y +float(instance_temp[2]))/2, (point_map.point.z +float(instance_temp[3]))/2, int(instance_temp[4])+1) 
                             new_instance_key = tmp_old_instance_key
                                
 
@@ -181,8 +183,9 @@ class Object_computations():
 
                     # compare temp and long term memory 
                     if self.objects_dict[old_instance_key][4] <= self.temp_dict[new_instance_key][4]:
+                        old_id = self.objects_dict[old_instance_key][5]
                         del self.objects_dict[old_instance_key]
-                        self.objects_dict[new_instance_key] = self.temp_dict[new_instance_key]
+                        self.objects_dict[new_instance_key] = (self.temp_dict[new_instance_key][0], self.temp_dict[new_instance_key][1],self.temp_dict[new_instance_key][2], self.temp_dict[new_instance_key][3], self.temp_dict[new_instance_key][4], old_id)
                         del self.temp_dict[new_instance_key]
 
                         # notify if new object detected
@@ -212,7 +215,7 @@ class Object_computations():
                     point_map.point.x = (point_map.point.x +float(instance[1]))/2
                     point_map.point.y = (point_map.point.y +float(instance[2]))/2
                     point_map.point.z = (point_map.point.z +float(instance[3]))/2
-                    self.objects_dict[old_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, int(instance[4])+1 )  
+                    self.objects_dict[old_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, int(instance[4])+1, instance[5])  
                     
                     # publish tf
                     self.publish_tf(old_instance_key, point_map)
@@ -220,7 +223,8 @@ class Object_computations():
                 else:
                     # add instance to dict 
                     instance_key = new_instance[0]+str(nb_instances+1)
-                    self.objects_dict[instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)  
+                    self.objects_dict[instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1, self.id)  
+                    self.id += 1
 
                     # notify if new object detected
                     rospy.loginfo("New object detected: %s. Position in map: %s", instance_key,point_map.point)
@@ -293,6 +297,7 @@ class Object_computations():
             instance_msg.object_position = point
             instance_msg.latest_stamp = stamp
             instance_msg.nb_detections = int(instance[4])
+            instance_msg.id = instance[5]
             instances_list_msg.instances.append(instance_msg)
 
         self.instances_pub.publish(instances_list_msg)
