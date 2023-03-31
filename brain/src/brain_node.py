@@ -57,33 +57,35 @@ class BrainNode:
 
 class IsLocalized(Leaf):
     def __init__(self):
+        super().__init__()
         self.slam_ready = False
         self.slam_ready_subscriber = Subscriber('/slam_ready', Bool, self._slam_ready_callback, queue_size=1)
     
     def _slam_ready_callback(self, slam_ready_msg):
         self.slam_ready = slam_ready_msg.data
 
-    def run(self, context):
+    def run(self):
         rospy.loginfo('IsLocalized')
         return SUCCESS if self.slam_ready else FAILURE
         
     
 
 class Localize(Leaf):
-    def run(self, context):
+    def run(self):
         rospy.loginfo('Localize')
         return RUNNING
     
 
 class IsExplored(Leaf):
     def __init__(self):
+        super().__init__()
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
         self.object_subscriber = Subscriber('/detection/object_instances', ObjectInstanceArray, self._object_instances_callback, queue_size=1)
         self.box_found = False
         self.object_found = False
 
-    def run(self, context):
+    def run(self):
         rospy.loginfo(f'IsExplored - box: {self.box_found}, Red Cube: {self.object_found}')
         try:
             self.buffer.lookup_transform('map', 'aruco/detected3', rospy.Time(0))
@@ -106,40 +108,42 @@ class IsExplored(Leaf):
 
 class Explore(Leaf):
     def __init__(self):
+        super().__init__()
         self.explore = ServiceProxy('/explore', Trigger)
 
-    def run(self, context):
+    def run(self):
         rospy.loginfo('Explore')
         self.explore()
         return RUNNING
 
 
 class ObjectsRemaining(Leaf):
-    def run(self, context):
+    def run(self):
         rospy.loginfo('ObjectsRemaining')
-        return SUCCESS if context['objects_remaining'] > 0 else FAILURE
+        return SUCCESS if self.context['objects_remaining'] > 0 else FAILURE
     
 
 class IsHoldingObject(Leaf):
-    def run(self, context):
+    def run(self):
         rospy.loginfo('IsHoldingObject')
-        return SUCCESS if context['is_holding_object'] else FAILURE
+        return SUCCESS if self.context['is_holding_object'] else FAILURE
     
 
 class CanPickUp(Leaf):
-    def run(self, context):
+    def run(self):
         rospy.loginfo('CanPickUp')
-        return SUCCESS if context['can_pick_up'] else FAILURE
+        return SUCCESS if self.context['can_pick_up'] else FAILURE
     
 
 class GoToPickUp(Leaf):
     def __init__(self):
+        super().__init__()
         self.move_base_simple_publisher = Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
         self.start = ServiceProxy('/path_tracker/start', Trigger)
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
         self.is_running = False
 
-    def run(self, context):
+    def run(self):
         rospy.loginfo('GoToPickUp')
         # TODO: get pick up pose from detection
         pick_up_pose = PoseStamped()
@@ -157,22 +161,23 @@ class GoToPickUp(Leaf):
             self.start()
         elif not self.path_tracker_is_running().value:
             self.is_running = False
-            context['can_pick_up'] = True
+            self.context['can_pick_up'] = True
         return RUNNING
     
 
 class PickUp(Leaf):
     def __init__(self):
+        super().__init__()
         self.action_client = SimpleActionClient('arm_actions', ArmAction)
         self.is_running = False
 
-    def run(self, context):
+    def run(self):
         rospy.loginfo('PickUp')
         if not self.is_running:
             self.is_running = True
             goal = ArmGoal()
             goal.action = 'pick_up'
-            goal.type = context['target_type']
+            goal.type = self.context['target_type']
             goal.x = -0.145
             goal.y = 0.0
             goal.z = -0.13
@@ -180,27 +185,28 @@ class PickUp(Leaf):
 
             def done_cb(state, result):
                 self.is_running = False
-                context['is_holding_object'] = True
-                context['can_pick_up'] = False
+                self.context['is_holding_object'] = True
+                self.context['can_pick_up'] = False
 
             self.action_client.send_goal(goal, done_cb=done_cb)
         return RUNNING
     
 
 class CanDropOff(Leaf):
-    def run(self, context):
+    def run(self):
         rospy.loginfo('CanDropOff')
-        return SUCCESS if context['can_drop_off'] else FAILURE
+        return SUCCESS if self.context['can_drop_off'] else FAILURE
     
 
 class GoToDropOff(Leaf):
     def __init__(self):
+        super().__init__()
         self.move_base_simple_publisher = Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
         self.start = ServiceProxy('/path_tracker/start', Trigger)
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
         self.is_running = False
 
-    def run(self, context):
+    def run(self):
         rospy.loginfo('GoToDropOff')
         # TODO: get drop off pose from detection
         pick_up_pose = PoseStamped()
@@ -218,23 +224,24 @@ class GoToDropOff(Leaf):
             self.start()
         elif not self.path_tracker_is_running().value:
             self.is_running = False
-            context['can_drop_off'] = True
+            self.context['can_drop_off'] = True
                 
         return RUNNING
     
 
 class DropOff(Leaf):
     def __init__(self):
+        super().__init__()
         self.action_client = SimpleActionClient('arm_actions', ArmAction)
         self.is_running = False
 
-    def run(self, context):
+    def run(self):
         rospy.loginfo('DropOff')
         if not self.is_running:
             self.is_running = True
             goal = ArmGoal()
             goal.action = 'drop_off'
-            goal.type = context['target_type']
+            goal.type = self.context['target_type']
             goal.x = -0.145
             goal.y = 0.0
             goal.z = -0.13
@@ -242,9 +249,9 @@ class DropOff(Leaf):
 
             def done_cb(state, result):
                 self.is_running = False
-                context['is_holding_object'] = False
-                context['can_drop_off'] = False
-                context['objects_remaining'] -= 1
+                self.context['is_holding_object'] = False
+                self.context['can_drop_off'] = False
+                self.context['objects_remaining'] -= 1
 
             self.action_client.send_goal(goal, done_cb=done_cb)
         return RUNNING
@@ -252,13 +259,14 @@ class DropOff(Leaf):
 
 class ReturnToAnchor(Leaf):
     def __init__(self):
+        super().__init__()
         self.move_base_simple_publisher = Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
         self.start = ServiceProxy('/path_tracker/start', Trigger)
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
         self.is_running = False
         self.is_finished = False
 
-    def run(self, context):
+    def run(self):
         if self.is_finished:
             return SUCCESS
         rospy.loginfo('ReturnToAnchor')
@@ -278,7 +286,7 @@ class ReturnToAnchor(Leaf):
             self.start()
         elif not self.path_tracker_is_running().value:
             self.is_running = False
-            context['can_drop_off'] = True
+            self.context['can_drop_off'] = True
             self.is_finished = True
             return SUCCESS # TODO check for this in BehaviorTree.run so we know when to stop
                 
