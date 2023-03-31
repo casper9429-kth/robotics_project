@@ -3,6 +3,7 @@
 import math
 import rospy
 import random
+
 import numpy as np
 from geometry_msgs.msg import PoseStamped, Twist
 import tf2_ros 
@@ -27,8 +28,10 @@ class explorer():
         print('Tf2 stuff initialized')
 
         # subscribers
-        # self.grid_map_sub = rospy.Subscriber("/map/GridMap", GridMapMsg, self.map_callback)
-        self.bool_sub = rospy.Subscriber('/bool', Bool, self.map_callback)
+        self.grid_map_sub = rospy.Subscriber("/map/GridMap", GridMapMsg, self.map_callback)
+        
+        ########## test subscriber ##########
+        # self.bool_sub = rospy.Subscriber('/bool', Bool, self.map_callback)
 
         # publishers
         self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10) # change to the topic to what the path_planner subscribes to
@@ -36,12 +39,13 @@ class explorer():
         # Parameters
         self.map_coords = []
         self.nearest_goal = None
-
+        self.timer = rospy.Time.now()
 
         # Position and orientation of the robot
         self.pose = PoseStamped()
         self.pose_in_map = PoseStamped()
         self.pose_in_gridmap = PoseStamped()
+
         # Position and orientation of the robot in the base_link frame
         self.pose.header.frame_id = 'base_link'
         self.pose.pose.position.x = 0.0
@@ -53,18 +57,8 @@ class explorer():
         self.pose.pose.orientation.w = 0.0
 
 
-<<<<<<< HEAD
-    # test map_callback
-    def map_callback(self, msg):
-        Array = []
-        for i in range(10):
-            array = [random.choice([-1, 0, 1]) for _ in range(10)]
-            Array.append(array)
-        self.map_coords = np.array([4,2])  #Array
-        # print(self.map_coords)
-=======
         
-    # # test map_callback
+    ########## test callbacks ##########
     # def map_callback(self, msg):
     #     Array = []
     #     for i in range(10):
@@ -85,7 +79,7 @@ class explorer():
             
     #     except:
     #         print('No transform found')
-
+    ########################################
 
     def map_callback(self, msg: GridMapMsg):
         # extract the map cells and their values from the message 
@@ -98,20 +92,17 @@ class explorer():
         self.t_stamp = msg.header.stamp
         self.origo_index_i = msg.origo_index_i
         self.origo_index_j = msg.origo_index_j
->>>>>>> 412073895ca67a043e9f9259ccb4c9c85b4d5a79
-        self.transforms()
-        self.find_goal()
+        if rospy.Time.now() - self.timer > rospy.Duration(0.5):
+            self.timer = rospy.Time.now()
+            self.transforms()
+            self.find_goal()
 
-    # test transform
-    def transforms(self):
+    def transforms(self):   
         stamp = self.pose.header.stamp  
         try:                                   
             transform_base_link_2_map = self.tfBuffer.lookup_transform('map','base_link', self.t_stamp,rospy.Duration(0.5)) # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
             self.pose_in_map = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_2_map)
-<<<<<<< HEAD
-            self.point = np.array([1,1])
             
-=======
             # calculates in what cell the robot is   
             delta_i = self.pose_in_map.pose.position.x/self.map_resolution
             delta_j = self.pose_in_map.pose.position.y/self.map_resolution
@@ -120,96 +111,29 @@ class explorer():
             self.pose_in_gridmap.pose.position.y = self.origo_index_j+delta_j
             self.position_in_gridmap = np.array([self.pose_in_gridmap.pose.position.x, self.pose_in_gridmap.pose.position.y])
 
->>>>>>> 412073895ca67a043e9f9259ccb4c9c85b4d5a79
         except:
             print('No transform found')
 
+
     def find_goal(self):
-<<<<<<< HEAD
-        self.nearest_goal = self.map_coords-self.point
-        print(self.nearest_goal)
-
-    # def map_callback(self, msg: GridMapMsg):
-    #     # extract the map cells and their values from the message 
-    #     self.map_coords = msg.header.data
-    #     self.map_resolution = msg.resolution
-    #     self.bbminx = msg.bbminx
-    #     self.bbminy = msg.bbminy
-    #     self.bbmaxx = msg.bbmaxx
-    #     self.bbmaxy = msg.bbmaxy
-    #     self.origo_index_i = msg.origo_index_i
-    #     self.origo_index_j = msg.origo_index_j
-    #     print('Map received')
-    #     self.transforms()
-    #     self.find_goal()
-
-    # def transforms(self):   
-    #     stamp = self.pose.header.stamp  
-    #     try:                                   
-    #         transform_base_link_2_map = self.tfBuffer.lookup_transform('map','base_link', stamp,rospy.Duration(0.5)) # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
-    #         self.pose_in_map = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_2_map)
-    #         # calculates in what cell the robot is   
-    #         delta_i = self.pose_in_map.pose.position.x/self.map_resolution
-    #         delta_j = self.pose_in_map.pose.position.y/self.map_resolution
-    #         self.pose_in_gridmap = self.pose_in_map
-    #         self.pose_in_gridmap.pose.position.x = self.origo_index_i+delta_i
-    #         self.pose_in_gridmap.pose.position.y = self.origo_index_j+delta_j
-    #         self.position_in_gridmap = np.array([self.pose_in_gridmap.pose.position.x, self.pose_in_gridmap.pose.position.y])
-    #     except:
-    #         print('No transform found')
-
-
-    # def find_goal(self):
-    #     self.nearest_goal = None
-    #     self.cells = []
-    #     # extracts the cells that are unknown space a.k.a -1
-    #     for i, data_i in enumerate(self.map_coords):
-    #         for j, data_j in enumerate(data_i.data):
-    #             if data_j == -1.0:
-    #                 self.cell = [i,j]
-    #                 self.cells.append(self.cell)
-
-    #     # calculate the nearest point to the robot
-    #     for idx, data in enumerate(self.cells):         
-    #         distances = np.linalg.norm(np.array(data)-self.point)
-    #         if self.nearest_goal is None:
-    #             self.nearest_goal = data
-    #         elif distances < np.linalg.norm(np.array(self.nearest_goal)-self.point):
-    #             self.nearest_goal = data
-    #     print(self.nearest_goal)
-        
-        # self.publish_goal()
-=======
         self.nearest_goal = None
         self.cells = []
+
         # extracts the cells that are unknown space a.k.a float32[] data
         for i , data_i in enumerate(self.map_coords):
             for j, data_j in enumerate(data_i.data):
                 if int(data_j) == -1:
                     self.cells.append([i,j])
-                    
-        # 
 
+
+        # calculate the nearest point to the robot
         self.cells = np.array(self.cells)
         print(self.position_in_gridmap)
         distances = self.cells - self.position_in_gridmap
         min_distance_index = np.argmin(np.linalg.norm(distances, axis=1))
         self.nearest_goal = self.cells[min_distance_index]
-
-        # # calculate the nearest point to the robot
-        # for idx, data in enumerate(self.cells):         
-        #     # Calc
-        #     distances = np.linalg.norm(np.array(data)-self.position_in_gridmap)
-        #     # print(distances)
-            
-        #     if self.nearest_goal is None:
-        #         self.nearest_goal = data
-        #     elif distances < np.linalg.norm(np.array(self.nearest_goal)-self.position_in_gridmap):
-        #         self.nearest_goal = data
-        # # print(self.nearest_goal)
     
         self.publish_goal()
->>>>>>> 412073895ca67a043e9f9259ccb4c9c85b4d5a79
 
 
     def publish_goal(self):         #transforms the goal to the map frame
@@ -223,11 +147,10 @@ class explorer():
         goal.pose.orientation.y = 0.0     # it is commented so that the robot keeps its orientation
         goal.pose.orientation.z = 0.0
         goal.pose.orientation.w = 0.0
+
         self.goal_pub.publish(goal)
-        print(goal.pose.position.x, goal.pose.position.y)
+        # print(goal.pose.position.x, goal.pose.position.y)
         # print('Goal published')
-
-
 
 
 if __name__ == '__main__':
