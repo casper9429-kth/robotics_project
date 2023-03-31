@@ -25,6 +25,7 @@ Move to your catkin workspace directory and clean it out:
 cd dd2419_ws
 catkin clean
 ```
+hi
 
 Delete the src folder.
 
