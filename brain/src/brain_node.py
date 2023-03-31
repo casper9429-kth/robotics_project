@@ -11,6 +11,7 @@ from tf2_ros import Buffer, TransformListener
 from arm.msg import ArmAction, ArmGoal, ArmResult, ArmFeedback
 from path_planner.srv import Bool as BoolSrv
 from behavior_tree.behavior_tree import BehaviorTree, Selector, Sequence, Inverter, Leaf, SUCCESS, FAILURE, RUNNING
+from detection.msg import ObjectInstanceArray
 
 No = Not = Inverter
 
@@ -40,11 +41,9 @@ class BrainNode:
     
     def _create_context(self):
         context = {'anchor_id': 500,
-                   'target_type': 'animal',
+                   'target_type': 'cube',
                    'is_holding_object': False,
                    'objects_remaining': 1,
-                   'box_found': False,
-                   'object_found': False,
                    'can_pick_up': False,
                    'can_drop_off': False,}
         return context 
@@ -80,20 +79,29 @@ class IsExplored(Leaf):
     def __init__(self):
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
+        self.object_subscriber = Subscriber('/detection/object_instances', ObjectInstanceArray, self._object_instances_callback, queue_size=1)
+        self.box_found = False
+        self.object_found = False
 
     def run(self, context):
-        rospy.loginfo(f'IsExplored - box: {context["box_found"]}, Red Cube: {context["object_found"]}')
+        rospy.loginfo(f'IsExplored - box: {self.box_found}, Red Cube: {self.object_found}')
         try:
             self.buffer.lookup_transform('map', 'aruco/detected3', rospy.Time(0))
-            context['box_found'] = True
+            self.box_found = True
         except:
             pass
         try:
             self.buffer.lookup_transform('map', 'object/detected/Red_cube1', rospy.Time(0))
-            context['object_found'] = True
+            self.object_found = True
         except:
             pass
-        return SUCCESS if context['box_found'] and context['object_found'] else FAILURE
+        return SUCCESS if self.box_found and self.object_found else FAILURE
+    
+    def _object_instances_callback(self, msg):
+        for object in msg.instances:
+            if object.category_name == 'Red_cube':
+                self.object_found = True
+                break
     
 
 class Explore(Leaf):
