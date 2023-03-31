@@ -52,9 +52,9 @@ from std_msgs.msg import Float32
 
 
 class GridMap():
-    def __init__(self,resolution=0.05):
+    def __init__(self,resolution=0.05,inf_range=0.4):
         self.resolution = resolution
-        
+        self.inflation_range = inf_range
         # map grid (tuples)
         self.map_grid = None#defaultdict(lambda: -1)
         self.contour_mask = None
@@ -76,7 +76,20 @@ class GridMap():
         self.robot_pose_time = 0
         self.robot_pose = [0,0,0]
         
-        # 
+        # Create Inflated mask
+        Dij = 2*int(inf_range/resolution) + 1
+        Dij_half = int(inf_range/resolution)
+        circle_mask = np.zeros((Dij,Dij,2))
+        # Create array with its indices as values
+        circle_mask[:,:,0] = np.arange(-Dij_half,Dij_half+1,1)[None,:].T
+        circle_mask[:,:,1] = np.arange(-Dij_half,Dij_half+1,1)[None,:]
+        # Radius of circle mask is 0.4, normalized to resolution it is 
+        radius = inf_range/resolution
+        # save elements of circle_mask that are inside the circle
+        circle_mask = circle_mask[np.sqrt(circle_mask[:,:,0]**2 + circle_mask[:,:,1]**2) <= radius]
+        #add index to all elements of array circle_mask
+        circle_mask = circle_mask.astype(int)
+        self.circle_mask = circle_mask
 
     
     def get_GridMapMsg(self):
@@ -181,6 +194,9 @@ class GridMap():
         print("#######################")
         print("#######################")
         
+        # Deflate geofence
+        deflated_geofence = self.deflate_polygon(self.resolution*1.5,self.geofence_list)
+
                 
         # Change all cordiantes to grid coordinates if they are on our outside of the geofence polygon
         # arange but exclude last value
@@ -188,7 +204,7 @@ class GridMap():
             for j in range(self.map_grid.shape[1]):
                 x = self.resolution*i + self.bounding_box[0]
                 y = self.resolution*j + self.bounding_box[2]
-                if not self.is_point_in_polygon(x,y,self.geofence_list):
+                if not self.is_point_in_polygon(x,y,deflated_geofence):
                     self.map_grid[i,j] = self.occupied
 
         self.contour_mask = self.map_grid.copy()
@@ -197,6 +213,34 @@ class GridMap():
         # Set given geofence to true
         self.given_geofence = True
 
+    def deflate_polygon(dist,poly):
+        """
+        Deflate polygon by distance dist
+        """
+        n = len(poly)
+        new_poly = []
+        for i in range(n):
+            p1x,p1y = poly[i]
+            p2x,p2y = poly[(i+1)%n]
+            p3x,p3y = poly[(i+2)%n]
+            # Find vector from p2 to p1
+            v1x = p1x-p2x
+            v1y = p1y-p2y
+            # Find vector from p2 to p3
+            v2x = p3x-p2x
+            v2y = p3y-p2y
+            # Find angle between vectors
+            v1mag = math.sqrt(v1x*v1x+v1y*v1y)
+            v2mag = math.sqrt(v2x*v2x+v2y*v2y)
+            angle = math.acos((v1x*v2x+v1y*v2y)/(v1mag*v2mag))
+            # Find normal vector
+            nx = -v1y/v1mag
+            ny = v1x/v1mag
+            # Find new point
+            p2newx = p2x + dist*math.sin(angle/2)*nx
+            p2newy = p2y + dist*math.sin(angle/2)*ny
+            new_poly.append([p2newx,p2newy])
+        return new_poly
 
     def is_point_in_polygon(self,x,y,poly):
         """Check if point is in polygon"""
@@ -455,6 +499,144 @@ class GridMap():
 
         return            
     
+
+
+    def import_point_cloud_rays_inf(self,pointcloud,range_max = 1.5,x=None,y=None,theta=None):
+        """
+        Import point cloud and set values in map grid
+        pointcloud should be numpy Nx2 array
+        will assume frame of latest given robot pose        
+        """
+
+        # if no geofence given, return
+        if not self.given_geofence:
+            rospy.logwarn("No geofence given, but trying to get map grid")
+            return None
+        
+        # get robot pose in map frame
+        if x == None or y == None or theta == None:
+            x = self.robot_pose[0]
+            y = self.robot_pose[1]
+            theta = self.robot_pose[2]
+        
+        # add x and y to pointcloud
+        pointcloud[:,0] = pointcloud[:,0] 
+        pointcloud[:,1] = pointcloud[:,1] 
+        
+                
+        # calc a range and angle for each point in pointcloud
+        ranges = np.sqrt(np.sum(pointcloud**2,axis=1))
+        
+        # Discritize ranges
+        #ranges = np.floor(ranges/(10*self.resolution))*self.resolution*10
+        ranges[ranges > range_max] = range_max
+        #ranges = np.floor(ranges/self.resolution)*self.resolution
+        angle = np.arctan2(pointcloud[:,1],pointcloud[:,0])
+
+        # map angle from -pi to pi
+        #angle = np.mod(angle+np.pi,2*np.pi)-np.pi        
+
+        
+        if len(angle) == 0:
+            return
+
+
+
+        # Create array of possible angles
+        arc_length = range_max*1
+        steps_in_ang = int(arc_length/self.resolution) # might need to be bigger
+        d_ang = 1
+        ang_res = d_ang/steps_in_ang # d_ang = 1        
+        # Create angle array of possible angle indexes
+        ang_ind_list = (np.floor((angle + 0.5)/ang_res)).astype(int)
+        ang_ind_list[ang_ind_list < 0] = 0
+        ang_ind_list[ang_ind_list > steps_in_ang-1] = steps_in_ang-1
+        
+        # Create rays
+        rays_ind = np.stack((ang_ind_list,ranges),axis=1)
+        
+        # Filter unique rays
+        rays, counts = np.unique(rays_ind,axis=0,return_counts=True)
+        rays = rays[counts > 1]
+        index = rays[:,0].astype(int)
+        ranges = rays[:,1]
+        # Ray array
+        rays = []
+        for i in range(steps_in_ang):
+            rang = ranges[index==i]
+            if len(rang) > 0:
+                range_min = np.min(rang)
+            else:
+                range_min = 0
+            ang = -0.5 + i*ang_res
+            rays.append([ang,range_min]) 
+            
+            
+        
+        # make rays np array
+        rays = np.array(rays)
+        
+        # offset rays by robot theta
+        rays[:,0] = rays[:,0] + theta
+        
+
+        # Make all points inbetween robot and ray 0, make end of ray 1
+        map_grid = self.map_grid.copy() # maybe need to add a copy here
+        for ray in rays:
+            # make end point of ray 1 
+            ang = ray[0]
+            if ray[1] == 0:
+                ray_end = range_max
+            else:
+                ray_end = ray[1]
+            new_x = x + ray_end*np.cos(ang)
+            new_y = y + ray_end*np.sin(ang)
+            #self.set_value_of_pos(new_x,new_y,1)
+            
+            # make all points inbetween 0
+            # get points inbetween
+            dx = new_x - x
+            dy = new_y - y
+            
+            # get number of points
+            n = int(2*(np.sqrt(dx**2 + dy**2)/self.resolution))
+            
+            # get points
+            xs = np.linspace(x,new_x,n)
+            ys = np.linspace(y,new_y,n)
+            
+            xs = ((xs-self.bounding_box[0])/self.resolution).astype(int)
+            ys = ((ys-self.bounding_box[2])/self.resolution).astype(int)
+            map_grid[(xs[:],ys[:])] = self.free
+                
+                
+        
+
+            
+        for ray in rays:
+            # make end point of ray 1 
+            if ray[1] == 0:
+                continue
+            ray_end = ray
+            new_x = x + ray_end[1]*np.cos(ray_end[0])
+            new_y = y + ray_end[1]*np.sin(ray_end[0])
+            new_x = int((new_x-self.bounding_box[0])/self.resolution)
+            new_y = int((new_y-self.bounding_box[2])/self.resolution)
+            mask = self.circle_mask.copy()
+            mask[:,0] = mask[:,0] + new_x
+            mask[:,1] = mask[:,1] + new_y
+            map_grid[(mask[:,0],mask[:,1])] = self.occupied
+
+            
+        # Apply mask of geofence to make sure no points outside of geofence are 0
+        map_grid[self.contour_mask==self.occupied] = self.occupied
+        self.map_grid = map_grid
+            
+
+        
+
+        return            
+
 
     def get_OccupancyGrid(self):
         """
