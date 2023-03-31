@@ -44,7 +44,7 @@ class BrainNode:
                    'is_holding_object': False,
                    'objects_remaining': 1,
                    'box_found': False,
-                   'animal_found': False,
+                   'object_found': False,
                    'can_pick_up': False,
                    'can_drop_off': False,}
         return context 
@@ -82,18 +82,18 @@ class IsExplored(Leaf):
         self.listener = TransformListener(self.buffer)
 
     def run(self, context):
-        rospy.loginfo(f'IsExplored - box: {context["box_found"]}, Binky: {context["animal_found"]}')
+        rospy.loginfo(f'IsExplored - box: {context["box_found"]}, Red Cube: {context["object_found"]}')
         try:
             self.buffer.lookup_transform('map', 'aruco/detected3', rospy.Time(0))
             context['box_found'] = True
         except:
             pass
         try:
-            self.buffer.lookup_transform('map', 'object/detected/Binky1', rospy.Time(0))
-            context['animal_found'] = True
+            self.buffer.lookup_transform('map', 'object/detected/Red_cube1', rospy.Time(0))
+            context['object_found'] = True
         except:
             pass
-        return SUCCESS if context['box_found'] and context['animal_found'] else FAILURE
+        return SUCCESS if context['box_found'] and context['object_found'] else FAILURE
     
 
 class Explore(Leaf):

@@ -89,7 +89,7 @@ class Object_computations():
                     if len(bb_cluster)> self.threshold:
                         bbs_by_cluster.append(bb_cluster)
     
-                    
+                    rospy.loginfo("Number of clusters: %s", len(bb_cluster))
                 # take mean position and maximum category_name
                 for cluster in bbs_by_cluster:
                     category_names = [o.category_name for o in cluster]
