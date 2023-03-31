@@ -3,7 +3,6 @@
 import math
 import rospy
 import random
-
 import numpy as np
 from geometry_msgs.msg import PoseStamped, Twist
 import tf2_ros 
@@ -147,7 +146,6 @@ class explorer():
         goal.pose.orientation.y = 0.0     # it is commented so that the robot keeps its orientation
         goal.pose.orientation.z = 0.0
         goal.pose.orientation.w = 0.0
-
         self.goal_pub.publish(goal)
         # print(goal.pose.position.x, goal.pose.position.y)
         # print('Goal published')

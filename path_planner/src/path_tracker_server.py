@@ -7,6 +7,7 @@ import tf2_geometry_msgs
 from robp_msgs.msg import DutyCycles
 # from aruco_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Path
+from std_msgs.msg import Bool
 from visualization_msgs.msg import Marker, MarkerArray, InteractiveMarker, InteractiveMarkerControl
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose, Point 
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedback
@@ -154,6 +155,7 @@ class PathTracker():
 
         #publishers
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.goal_reached_pub = rospy.Publisher('/goal_reached', Bool, queue_size=10)
 
 
         # subscribers
@@ -170,23 +172,16 @@ class PathTracker():
         # self.aruco.pose.pose.orientation = msg.pose.pose.orientation
 
 
-        # self.path_tracker_server = actionlib.SimpleActionServer('path_tracker', MoveBaseAction, execute_cb=self.execute_cb, auto_start=False)
-        # self.path_tracker_server.start()
-        # print('Action server started')
-        # rospy.spin()
-
-    def execute_cb(self, goal):
-        self.goal = goal.target_pose            # target_pose is a PosedStamped
-        print('Goal recieved')
-        rospy.loginfo("##################################")
-        rospy.loginfo("##################################")
-        rospy.loginfo("##################################")
-        rospy.loginfo("##################################")
-        rospy.loginfo("##################################")
-        rospy.loginfo("##################################")
+    #     self.path_tracker_server = actionlib.SimpleActionServer('path_tracker', MoveBaseAction, execute_cb=self.execute_cb, auto_start=False)
+    #     self.path_tracker_server.start()
+    #     print('Action server started')
         
-        # self.path_tracker_server.set_succeeded()
-        self.main()
+
+    # def execute_cb(self, goal):
+    #     self.goal = goal.target_pose            # target_pose is a PosedStamped
+    #     print('Goal recieved')
+    #     self.path_tracker_server.set_succeeded()
+    #     self.main()
         
 
    
@@ -241,9 +236,9 @@ class PathTracker():
             self.move.linear.x  = min(self.move.linear.x ,self.max_speed) # max speed
             
             
-            self.move.angular.z= w
-            self.move.angular.z  = max(self.move.angular.z ,0.0)
-            self.move.angular.z  = min(self.move.angular.z ,self.max_angle) # max angular speed
+            self.move.angular.z = w
+            self.move.angular.z = max(self.move.angular.z ,0.0)
+            self.move.angular.z = min(self.move.angular.z ,self.max_angle) # max angular speed
             
             
             
@@ -275,8 +270,6 @@ class PathTracker():
         goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
         dtheta = goal_orientation - robot_theta
 
-        
-
         if distance > self.in_goal_tolerance:
 
             if angle_to_goal >= self.max_angle:
@@ -306,6 +299,7 @@ class PathTracker():
             else:
                 self.move.linear.x = 0.0
                 self.move.angular.z = 0.0
+                self.goal_reached_pub.publish(True)
                 # print('Goal orientation reached')
 
         self.cmd_pub.publish(self.move)   
