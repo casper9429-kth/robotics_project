@@ -538,7 +538,7 @@ class GridMap():
         
         # Filter unique rays
         rays, counts = np.unique(rays_ind,axis=0,return_counts=True)
-        rays = rays[counts > 2]
+        rays = rays[counts > 0]
         index = rays[:,0].astype(int)
         ranges = rays[:,1]
         # Ray array

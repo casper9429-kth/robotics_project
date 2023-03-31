@@ -114,7 +114,7 @@ class Mapping():
 
         # Convert ROS -> Open3D
         cloud = o3drh.rospc_to_o3dpc(msg)
-        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 0.0, 1.2 ])))
+        cropped = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 0.04, 2.0 ])))
         cropped = cropped
         
         # Downsample the point cloud to 1/10 of resolution 
@@ -129,6 +129,15 @@ class Mapping():
         # import points in to grid map         
         #if len(points) == 0:
         #    return
+
+        try:
+            map_base_link = self.tf_buffer.lookup_transform('map', 'base_link', msg.header.stamp) # TransformStamped
+            #self.grid_map.update_robot_pose(map_base_link)
+            self.robot_pose = [map_base_link.transform.translation.x, map_base_link.transform.translation.y, tf.transformations.euler_from_quaternion([map_base_link.transform.rotation.x, map_base_link.transform.rotation.y, map_base_link.transform.rotation.z, map_base_link.transform.rotation.w])[2]]
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.logwarn(e)
+
+
                         
         new_points = np.zeros((len(points),2))
         new_points[:,0] = points[:,2]
@@ -140,7 +149,7 @@ class Mapping():
         #if self.p_cloud_cont%3 == 0:
         #    points = np.vstack(points)
         #    self.p_cloud_buffer = []
-        self.grid_map.import_point_cloud_rays_inf(points,1.2,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2])
+        self.grid_map.import_point_cloud_rays_inf(points,2.0,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2])
         
         return
 
