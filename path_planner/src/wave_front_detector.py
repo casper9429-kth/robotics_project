@@ -4,11 +4,7 @@ from nav_msgs.msg import OccupancyGrid
 from geometry_msgs.msg import PointStamped, Point, PoseStamped
 from std_msgs.msg import Header
 from queue import Queue
-
-from mapping.grid_map.grid_map import GridMap
 from mapping.msg import GridMap as GridMapMsg
-
-from GridMapMsg.msg import GridMap as GridMapMsg
 
 
 class WaveFrontDetector:
@@ -17,31 +13,22 @@ class WaveFrontDetector:
         
 
         # subscribers
-        self.map_sub = rospy.Subscriber('/map', OccupancyGrid, self.map_callback) # change to the topic that the map is published on
-        self.OccupancyGrid_pub = rospy.Subscriber("/occupancy_grid/walls", OccupancyGrid, queue_size=10)
-        self.grid_map_pub = rospy.Subscriber("/map/GridMap", GridMapMsg, queue_size=1)
+        self.grid_map_sub = rospy.Subscriber("/map/GridMap", GridMapMsg, self.map_callback)
 
         # publishers
         self.frontiers_pub = rospy.Publisher('/frontiers', PointStamped, queue_size=10)
 
         self.visited = set()
 
-    def map_callback(self, msg):
-
-# Header header
-# Array_float[] data
-# float32 resolution
-# float32 bbminx
-# float32 bbminy
-# float32 bbmaxx
-# float32 bbmaxy
-# float32 origo_index_i
-# float32 origo_index_j
-
-        width = msg.info.width
-        height = msg.info.height
-        resolution = msg.info.resolution
-        data = msg.data
+    def map_callback(self, msg: GridMapMsg):
+        self.map_coords = msg.header.data
+        self.map_resolution = msg.resolution
+        self.bbminx = msg.bbminx
+        self.bbminy = msg.bbminy
+        self.bbmaxx = msg.bbmaxx
+        self.bbmaxy = msg.bbmaxy
+        self.origo_index_i = msg.origo_index_i
+        self.origo_index_j = msg.origo_index_j
 
         queue_m = Queue()
         for i in range(width):
@@ -110,4 +97,31 @@ class WaveFrontDetector:
                 if i == 0 and j == 0:
                     continue
                 neighbor = Point(point.x + i, point.y + j, 0)
-                if neighbor.x >= 0 and neighbor.x < width and neighbor.y >= 0 and neighbor
+                if neighbor.x >= 0 and neighbor.x < width and neighbor.y >= 0 and neighbor.y < height:
+                    neighbors.append(neighbor)
+        return neighbors
+    
+    def publish_frontiers(self, frontiers):
+        for frontier in frontiers:
+            point = PointStamped()
+            point.header.frame_id = "map"
+            point.header.stamp = rospy.Time.now()
+            point.point = frontier
+            self.frontiers_pub.publish(point)
+
+    def mark(self, point, label):
+        self.visited.add((point.x, point.y, label))
+
+    def is_marked(self, point, label):
+        if isinstance(label, str):
+            return (point.x, point.y, label) in self.visited
+        else:
+            for l in label:
+                if (point.x, point.y, l) in self.visited:
+                    return True
+            return False
+        
+if __name__ == '__main__':
+    rospy.init_node('wave_front_detector')
+    WaveFrontDetector()
+    rospy.spin()

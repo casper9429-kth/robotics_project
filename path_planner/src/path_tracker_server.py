@@ -158,7 +158,7 @@ class PathTracker():
         self.goal = goal.target_pose            # target_pose is a PosedStamped
         print('Goal recieved')
         self.path_tracker_server.set_succeeded()
-        #self.main()
+        self.main()
         
 
    
@@ -278,7 +278,6 @@ class PathTracker():
                 # print('Goal orientation reached')
 
 
-        
         self.cmd_pub.publish(self.move)   
         
 
