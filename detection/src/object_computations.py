@@ -52,7 +52,7 @@ class Object_computations():
         
         # Publisher
         self.instances_pub = rospy.Publisher("/detection/object_instances", ObjectInstanceArray, queue_size=10)
-        self.speaker_pub = rospy.Publisher("/speaker/speech", String)
+        self.speaker_pub = rospy.Publisher("/speaker/speech", String, queue_size=10)
         rospy.Rate(4).sleep()
         
         
@@ -91,7 +91,7 @@ class Object_computations():
                     if len(bb_cluster) > self.threshold:
                         bbs_by_cluster.append(bb_cluster)
 
-                    rospy.loginfo("cluster size: %s", nb_msgs)
+                    #rospy.loginfo("cluster size: %s", nb_msgs)
                     
                 # take mean position and maximum category_name
                 instances_to_save = []
@@ -114,17 +114,16 @@ class Object_computations():
                     stamp = bb.stamp
                     image = self.cache_image.getElemAfterTime(stamp)
                     #self.save_instances((category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image))
-
-                instances_to_save.append([(category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image)])
+                    instances_to_save.append([(category_name, x, y, z), time, (bb.x, bb.y, bb.width, bb.height, image)])
     
-
+                self.save_instances(instances_to_save)
 
 
     #def save_instances(self, new_instance, time, bb_info):
     def save_instances(self, list_instances):
 
-        list_instances_batch = []
-        rospy.loginfo("number of instances detected in batch: %s", len(list_instances))
+        
+        #rospy.loginfo("number of instances detected in batch: %s", len(list_instances))
 
         for instance in list_instances:
             
@@ -162,8 +161,6 @@ class Object_computations():
                     # publish tf
                     self.publish_tf(new_instance_key, point_map)
 
-                    #test 
-                    list_instances_batch.append(new_instance[0])
 
                 else:
                     # Goal: keep only one in the long term memory. Keep the one with the largest number of detections
@@ -178,15 +175,10 @@ class Object_computations():
                             instance_temp = self.temp_dict[tmp_old_instance_key]
                             self.temp_dict[tmp_old_instance_key] = (instance_temp[0], (point_map.point.x +float(instance_temp[1]))/2, (point_map.point.y +float(instance_temp[2]))/2, (point_map.point.z +float(instance_temp[3]))/2, int(instance_temp[4])+1 ) 
                             new_instance_key = tmp_old_instance_key
-                            
-                            #test 
-                            list_instances_batch.append(new_instance[0])
+                               
 
                     else:
                         self.temp_dict[new_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1)
-
-                        #test 
-                        list_instances_batch.append(new_instance[0])
 
                     # compare temp and long term memory 
                     if self.objects_dict[old_instance_key][4] <= self.temp_dict[new_instance_key][4]:
@@ -210,24 +202,21 @@ class Object_computations():
 
             else:
                 
-                # If we detect the same object two times in the same batch, we want to keep the two
-                if new_instance[0] in list_instances_batch:
-                    found_close, old_instance_key = self.found_close(instances, point_map, 0.05, self.objects_dict)
-                else:
-                    # Is the old instance closer than 30cm to the new one ?
-                    found_close, old_instance_key = self.found_close(instances, point_map, 0.3, self.objects_dict)
+               
+                # Is the old instance closer than 30cm to the new one ?
+                found_close, old_instance_key = self.found_close(instances, point_map, 0.3, self.objects_dict)
             
                 if found_close: 
 
                     # update
                     instance = self.objects_dict[old_instance_key]
-                    self.objects_dict[old_instance_key] = (new_instance[0], (point_map.point.x +float(instance[1]))/2, (point_map.point.y +float(instance[2]))/2, (point_map.point.z +float(instance[3]))/2, int(instance[4])+1 )  
+                    point_map.point.x = (point_map.point.x +float(instance[1]))/2
+                    point_map.point.y = (point_map.point.y +float(instance[2]))/2
+                    point_map.point.z = (point_map.point.z +float(instance[3]))/2
+                    self.objects_dict[old_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, int(instance[4])+1 )  
                     
                     # publish tf
                     self.publish_tf(old_instance_key, point_map)
-
-                    #test 
-                    list_instances_batch.append(new_instance[0])
 
                 else:
                     # add instance to dict 
@@ -236,15 +225,13 @@ class Object_computations():
 
                     # notify if new object detected
                     rospy.loginfo("New object detected: %s. Position in map: %s", instance_key,point_map.point)
-                    to_speech = "New object detected: " + str(new_instance_key)
+                    to_speech = "New object detected: " + str(instance_key)
                     self.speaker_pub.publish(to_speech)
                     self.save_instance_image(instance_key, bb_info)
 
                     # publish tf
                     self.publish_tf(instance_key, point_map)
 
-                    #test 
-                    list_instances_batch.append(new_instance[0])
 
 
     def found_close(self, instances, point_map, threshold, dictionnary):

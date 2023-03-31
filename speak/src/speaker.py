@@ -16,9 +16,11 @@ class Speaker():
         
     def speaker_callback(self, msg): 
         
+        rospy.logwarn("I will speak")
+        
         text = msg.data
         # Language in which you want to convert
-        language = 'sv'
+        language = 'en'
         
         myobj = gTTS(text, lang=language, slow=False)
         
