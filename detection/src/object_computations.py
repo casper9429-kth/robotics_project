@@ -35,7 +35,7 @@ class Object_computations():
         self.directory = "/home/robot/dd2419_ws/src/detection/src/saved_instances"
         self.bridge = CvBridge()
         self.threshold = 8
-        self.id = 1
+        self.id = 0
 
         # Define rate
         self.update_rate = 1 # [Hz] Change this to the rate you want
