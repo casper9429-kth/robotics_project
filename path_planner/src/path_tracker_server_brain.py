@@ -88,8 +88,8 @@ class Polygon():
 
 class PathTracker():
     def __init__(self):
-        rospy.init_node('path_tracker')
-        print('path_tracker node initalized')
+        rospy.init_node('path_tracker_server_brain')
+        print('path_tracker_server_brain node initalized')
         self.robot_frame = 'base_link'
         self.rate = rospy.Rate(10)
 

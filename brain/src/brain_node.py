@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import rospy
-from rospy import Subscriber, ServiceProxy
+from rospy import Subscriber, ServiceProxy, Publisher
 from std_msgs.msg import Bool
 from geometry_msgs.msg import PoseStamped
 from std_srvs.srv import Trigger
@@ -9,6 +9,7 @@ from actionlib import SimpleActionClient
 from tf2_ros import Buffer, TransformListener
 
 from arm.msg import ArmAction, ArmGoal, ArmResult, ArmFeedback
+from path_planner.srv import Bool as BoolSrv
 from behavior_tree.behavior_tree import BehaviorTree, Selector, Sequence, Inverter, Leaf, SUCCESS, FAILURE, RUNNING
 
 No = Not = Inverter
@@ -43,7 +44,8 @@ class BrainNode:
                    'is_holding_object': False,
                    'objects_remaining': 1,
                    'box_found': False,
-                   'animal_found': False,}
+                   'animal_found': False,
+                   'can_pick_up': False,}
         return context 
 
     def run(self):
@@ -115,44 +117,50 @@ class IsHoldingObject(Leaf):
         return SUCCESS if context['is_holding_object'] else FAILURE
     
 
-class CanPickUp(Leaf): # TODO
-    def __init__(self):
-        pass
-
+class CanPickUp(Leaf):
     def run(self, context):
         rospy.loginfo('CanPickUp')
-        # TODO: Check if distance to goal pose is less than some threshold
-        return SUCCESS
+        return SUCCESS if context['can_pick_up'] else FAILURE
     
 
-class GoToPickUp(Leaf): # TODO
+class GoToPickUp(Leaf):
     def __init__(self):
-        self.move_base_simple_publisher = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
+        self.move_base_simple_publisher = Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
+        self.start = ServiceProxy('/path_tracker/start', Trigger)
+        self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
+        self.is_running = False
 
     def run(self, context):
         rospy.loginfo('GoToPickUp')
-        pick_up_pose = PoseStamped()
-        pick_up_pose.header.frame_id = 'map'
-        pick_up_pose.pose.position.x = 1.0
-        pick_up_pose.pose.position.y = 0.0
-        pick_up_pose.pose.position.z = 0.0
-        pick_up_pose.pose.orientation.x = 0.0
-        pick_up_pose.pose.orientation.y = 0.0
-        pick_up_pose.pose.orientation.z = 0.0
-        pick_up_pose.pose.orientation.w = 1.0
-        self.move_base_simple_publisher.publish(pick_up_pose)
+        if not self.is_running:
+            self.is_running = True
+            self.start()
+            pick_up_pose = PoseStamped()
+            pick_up_pose.header.frame_id = 'map'
+            pick_up_pose.pose.position.x = 1.0
+            pick_up_pose.pose.position.y = 0.0
+            pick_up_pose.pose.position.z = 0.0
+            pick_up_pose.pose.orientation.x = 0.0
+            pick_up_pose.pose.orientation.y = 0.0
+            pick_up_pose.pose.orientation.z = 0.0
+            pick_up_pose.pose.orientation.w = 1.0
+            self.move_base_simple_publisher.publish(pick_up_pose)
+        elif not self.path_tracker_is_running().value:
+            self.is_running = False
+            context['can_pick_up'] = True
+                
         return RUNNING
     
 
-class PickUp(Leaf): # TODO
+class PickUp(Leaf):
     def __init__(self):
-        self.action_client = SimpleActionClient('arm_actions', ArmAction) # TODO move this check to before the behavior tree or mod BT to check if initialized
-        self.running = False
+        self.action_client = SimpleActionClient('arm_actions', ArmAction)
+        self.is_running = False
 
     def run(self, context):
         rospy.loginfo('PickUp')
-        if not self.running:
-            self.running = True
+        if not self.is_running:
+            self.is_running = True
             goal = ArmGoal()
             goal.action = 'pick_up'
             goal.type = context['target_type']
@@ -162,8 +170,9 @@ class PickUp(Leaf): # TODO
             goal.yaw = 0.0
 
             def done_cb(state, result):
-                self.running = False
+                self.is_running = False
                 context['is_holding_object'] = True
+                context['can_pick_up'] = False
 
             self.action_client.send_goal(goal, done_cb=done_cb)
         return RUNNING

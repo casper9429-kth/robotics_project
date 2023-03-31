@@ -19,14 +19,16 @@ class ExplorerTurn():
         
         # To control the robots movement
         self.move = Twist()
-        self.angle_speed = 0.4
+        self.i = 0
+        self.angle_speeds = [0.6] * 7 + [0.0] * 7
 
         # Service to explore
         self.turn360_service = Service('/explore', Trigger, self.turn)
         rospy.spin()
 
     def turn(self, _):
-        self.move.angular.z = self.angle_speed
+        self.move.angular.z = self.angle_speeds[self.i]
+        self.i = (self.i + 1) % len(self.angle_speeds)
         self.cmd_pub.publish(self.move)
         # self.move.angular.z = 0
         # self.cmd_pub.publish(self.move)
