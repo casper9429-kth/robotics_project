@@ -102,7 +102,7 @@ class IsExplored(Leaf):
     def _object_instances_callback(self, msg):
         for object in msg.instances:
             if object.category_name == 'Red_cube':
-                self.object_found = True
+                # self.object_found = True
                 break
     
 
