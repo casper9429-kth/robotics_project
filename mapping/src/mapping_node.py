@@ -60,6 +60,8 @@ class Mapping():
         # Subscribers 
         self.geo_fence_sub = rospy.Subscriber("/geofence/pose_array", PoseArray, self.callback_geofence)   
         self.sub_goal = rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.cloud_callback)
+        self.sub_goal_v2 = rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.cloud_callback_v2s)
+
         # Subscibe to slam ready 
         self.slam_ready_sub = rospy.Subscriber("slam_ready", Bool, self.callback_slam_ready)
         
@@ -154,6 +156,19 @@ class Mapping():
         return
 
 
+    def cloud_callback_v2(self, msg: PointCloud2):
+        #rospy.loginfo("##################")
+
+        if rospy.Time.now() - self.t_latest_cloud < self.t_treshold:
+            #rospy.loginfo("cloud callback too fast")
+            return
+        
+        # Convert ROS -> Open3D
+        cloud = o3drh.rospc_to_o3dpc(msg)
+        
+        
+         
+        return
 
     def callback_geofence(self, msg):
         """Save geofence coordinates in map frame 2D and find bounding box of geofence in form [x_min, x_max, y_min, y_max]"""
