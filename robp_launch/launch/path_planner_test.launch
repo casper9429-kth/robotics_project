@@ -10,8 +10,7 @@
 	<!-- Mapping -->
 	<node name="mapping" pkg="mapping" type="mapping_node.py" output='screen'/>
 
-	<!-- Path planner -->
-	<node name="path_planner" pkg="path_planner" type="path_planner.py" output='screen'/>
+
 
 	<!-- GeoFence -->
 	<node name="geofence" pkg="mapping" type="workspace_manager.py" output='screen'/>
@@ -72,10 +71,13 @@
 	<include file="$(find odometry)/include/odometry.launch" />
 
     <!-- run the explorer -->
-	<!-- <node name="explorer" pkg="path_planner" type="explorer.py" output='screen'/> -->
+	<node name="explorer" pkg="path_planner" type="explorer.py" output='screen'/> 
 
     <!-- run the path tracker -->
     <node name="path_tracker" pkg="path_planner" type="path_tracker_server.py" output='screen'/>
     <!-- <node name="path_tracker_client" pkg="path_planner" type="path_tracker_client.py" output='screen'/>  -->
+
+	<!-- Path planner -->
+	<node name="path_planner" pkg="path_planner" type="path_planner.py" output='screen'/>
 
 </launch>

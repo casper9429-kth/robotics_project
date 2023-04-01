@@ -23,7 +23,7 @@ class explorer():
         self.br = tf2_ros.TransformBroadcaster()
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
-        rospy.sleep(2)
+        rospy.sleep(1)
         print('Tf2 stuff initialized')
         self.rate = rospy.Rate(10)
         # subscribers
@@ -117,10 +117,11 @@ class explorer():
         #print(start_and_goal)
 
         self.start_and_goal_pub.publish(start_and_goal)
-        print('sent start and goal to path_planner')
+        rospy.loginfo('sent start and goal to path_planner')
 
     def map_callback(self, msg: GridMapMsg):
         # extract the map cells and their values from the message 
+        #   rospy.loginfo('Explorer: enter callback')
         self.map_coords = msg.data
         self.map_resolution = msg.resolution
         self.bbminx = msg.bbminx
@@ -134,7 +135,7 @@ class explorer():
             self.timer = rospy.Time.now()
             self.transforms()
             #self.find_goal()
-            self.publish_start_goal()
+            self.find_goal()
 
     def transforms(self):   
         stamp = self.pose.header.stamp  
@@ -172,7 +173,7 @@ class explorer():
         min_distance_index = np.argmin(np.linalg.norm(distances, axis=1))
         self.nearest_goal = self.cells[min_distance_index]
     
-        self.publish_goal()
+        self.publish_start_goal()
 
 
     def publish_goal(self):         #transforms the goal to the map frame
@@ -205,8 +206,8 @@ class explorer():
         start = PoseStamped()
         start.header.frame_id = 'map'
         start.header.stamp = self.t_stamp
-        start.pose.position.x= self.pose_in_gridmap.pose.position.x
-        start.pose.position.y= self.pose_in_gridmap.pose.position.y
+        start.pose.position.x= self.pose_in_map.pose.position.x
+        start.pose.position.y= self.pose_in_map.pose.position.y
         start.pose.position.z = 0.0
         start.pose.orientation.x = 0.0
         start.pose.orientation.y = 0.0     # it is commented so that the robot keeps its orientation
@@ -220,6 +221,10 @@ class explorer():
         start_and_goal.poses.append(start)
         start_and_goal.poses.append(goal)
         self.start_and_goal_pub.publish(start_and_goal)
+        rospy.loginfo('Explorer: Start and goal published')
+        print(f'Explorer: start: {start.pose.position.x}, {start.pose.position.y}')
+        
+        print(f'Explorer: goal: {goal.pose.position.x}, {goal.pose.position.y}')
         
     def spin(self):
         while not rospy.is_shutdown():

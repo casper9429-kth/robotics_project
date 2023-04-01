@@ -149,7 +149,7 @@ class PathTracker():
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
         rospy.sleep(2)
-        print('Tf2 stuff initialized')
+        print('Path Tracker: Tf2 stuff initialized')
 
         self.polygon = None
 
@@ -162,7 +162,7 @@ class PathTracker():
         self.fence_sub = rospy.Subscriber('/workspace_poses/pose_array', PoseArray, self.fence_callback)
         self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  
         # self.aruco_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  
-        print('Subscribers initalized')
+        print('Path tracker: Subscribers initalized')
 
     # To get the position of the goal from camera
     # def aruco_callback(self, msg:Marker):
@@ -198,7 +198,7 @@ class PathTracker():
     def check_if_in_fence(self, pose: Pose):
         # Transform pose to map frame
         #pose_in_map = self.tfBuffer.transform(pose, 'map')
-        print(self.polygon)
+        #print(self.polygon)
         if self.polygon:
             return self.polygon.contains(pose.position)
         else:
@@ -214,7 +214,7 @@ class PathTracker():
             transform_map_2_base_link = self.tfBuffer.lookup_transform('base_link','map', stamp,rospy.Duration(0.5))     # give goal in base link frame
             self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)   
         except:
-            print('No transform found')
+            print('Path tracker: No transform found')
                         
 
     def pure_pursuit(self):
@@ -336,7 +336,7 @@ class PathTracker():
             self.transforms()
             self.math()
         else:
-            print('Goal Pose not inside workspace')
+            print('Path tracker: Goal Pose not inside workspace')
             self.move.linear.x = 0.0
             self.move.angular.z = 0.0
             self.cmd_pub.publish(self.move)
