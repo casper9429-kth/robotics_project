@@ -60,7 +60,7 @@ class Mapping():
         # Subscribers 
         self.geo_fence_sub = rospy.Subscriber("/geofence/pose_array", PoseArray, self.callback_geofence)   
         self.sub_goal = rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.cloud_callback)
-        self.sub_goal_v2 = rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.cloud_callback_v2s)
+        self.sub_goal_v2 = rospy.Subscriber('/camera/depth/color/points', PointCloud2, self.cloud_callback_v2)
 
         # Subscibe to slam ready 
         self.slam_ready_sub = rospy.Subscriber("slam_ready", Bool, self.callback_slam_ready)
@@ -69,6 +69,9 @@ class Mapping():
         self.OccupancyGrid_pub = rospy.Publisher("/occupancy_grid/walls", OccupancyGrid, queue_size=10)
         # Publish GridMapMsg 
         self.grid_map_pub = rospy.Publisher("/map/GridMap", GridMapMsg, queue_size=1)
+        # Publish pointcloud
+        self.pub_cloud = rospy.Publisher("/cloud", PointCloud2, queue_size=1)
+
 
 
         # Define rate
@@ -156,19 +159,91 @@ class Mapping():
         return
 
 
-    def cloud_callback_v2(self, msg: PointCloud2):
+    def cloud_callback_v3(self, msg: PointCloud2):
         #rospy.loginfo("##################")
-
-        if rospy.Time.now() - self.t_latest_cloud < self.t_treshold:
-            #rospy.loginfo("cloud callback too fast")
-            return
         
         # Convert ROS -> Open3D
         cloud = o3drh.rospc_to_o3dpc(msg)
+        cloud = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 100.0, 3.0 ])))
+        cloud = cloud.voxel_down_sample(voxel_size=0.005)
+
+        
+        cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+        normals = np.asarray(cloud.normals)
+        # Filter out points with normals with x,z magnitude > 0.5
+        cloud = cloud.select_by_index(np.where(np.sqrt(normals[:,0]**2 + normals[:,2]**2) > 0.85)[0])
+        
+        # Downsample the point cloud to 1/10 of resolution 
+        
+        # Publish downsampled point cloud for visualization in rviz
+        # Create a point cloud message
+        pc = o3drh.o3dpc_to_rospc(cloud)
+        pc.header.frame_id = msg.header.frame_id
+        pc.header.stamp = msg.header.stamp
+      
+        self.pub_cloud.publish(pc)
         
         
-         
+        # Estimate normals
+        cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+        normals = np.asarray(cloud.normals)
+        # Filter out points with normals with x,z magnitude > 0.5
+        cloud = cloud.select_by_index(np.where(np.sqrt(normals[:,0]**2 + normals[:,2]**2) > 0.95)[0])
+        
+        # Downsample the point cloud to 1/10 of resolution 
+        
+        # Publish downsampled point cloud for visualization in rviz
+        # Create a point cloud message
+        pc = o3drh.o3dpc_to_rospc(cloud)
+        pc.header.frame_id = msg.header.frame_id
+        pc.header.stamp = msg.header.stamp
+      
+        self.pub_cloud.publish(pc)
+        
+
+    def cloud_callback_v2(self, msg: PointCloud2):
+        # Convert ROS -> Open3D
+        cloud = o3drh.rospc_to_o3dpc(msg)
+
+        # Downsample the point cloud using a voxel grid filter with a specified voxel size
+        cloud = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.4, -100.0]), max_bound=np.array([100.0, 100.0, 2.5 ])))
+        cloud = cloud.voxel_down_sample(voxel_size=0.01)
+
+        # Segment ground plane using RANSAC
+        plane_model, inliers = cloud.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
+        [a, b, c, d] = plane_model
+        
+        # U
+        
+        print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
+
+        # Segment ground plane using RANSAC
+        plane_model, inliers = cloud.segment_plane(distance_threshold=0.01, ransac_n=3, num_iterations=1000)
+        [a, b, c, d] = plane_model
+        print(f"Original plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
+
+        # Raise the plane by 1 cm (0.01 meters)
+        d += 0.01
+        print(f"Raised plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
+
+        # Extract points below the raised plane as ground points
+        ground_points = np.asarray(cloud.points)
+        ground_indices = np.where(a * ground_points[:, 0] + b * ground_points[:, 1] + c * ground_points[:, 2] + d < 0)[0]
+        ground_cloud = cloud.select_by_index(ground_indices)
+
+        # Extract points above the raised plane as object points
+        object_cloud = cloud.select_by_index(ground_indices, invert=True)
+
+
+
+        # Publish ground and object point clouds for visualization in RViz
+        ground_pc_msg = o3drh.o3dpc_to_rospc(ground_cloud)
+        ground_pc_msg.header.frame_id = msg.header.frame_id
+        ground_pc_msg.header.stamp = msg.header.stamp
+        self.pub_cloud.publish(ground_pc_msg)
+
         return
+         
 
     def callback_geofence(self, msg):
         """Save geofence coordinates in map frame 2D and find bounding box of geofence in form [x_min, x_max, y_min, y_max]"""
