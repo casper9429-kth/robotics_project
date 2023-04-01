@@ -15,9 +15,11 @@ from numba import jit
 from typing import Dict,Tuple
 from scipy.interpolate import CubicSpline
 from queue import PriorityQueue
-from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Bool
+from geometry_msgs.msg import PoseStamped, PoseArray
 from nav_msgs.msg import Path
 from visualization_msgs.msg import Marker
+from mapping.msg import GridMapMsg
 #from mapping.grid_map.grid_map import GridMap
 
 
@@ -60,7 +62,7 @@ class Node:
     
     def as_array(self):
         return np.array([self.x, self.y, self.goal[0], self.goal[1], self.g, self.h, self.f])
-#fuzzy controller
+
 
 
 
@@ -462,7 +464,7 @@ class GridMap():
         for key in angle_range_dict.keys():
             ray_list = angle_range_dict[key]
             # find first highest count ray in list
-            # find max valu
+            # find max valget_value_of_posu
             ray_list = np.array(ray_list)
 
             # find shortest ray with count > count_threshold
@@ -589,9 +591,73 @@ class A_star():
 
     def __init__(self):
         #self.client = actionlib.SimpleActionClient('path_tracker', move_base_msgs.msg.MoveBaseAction)
-        self.map = None
-        self.iterations = 500
+        self.map_coords = None
+        self.map_resolution = None
+        self.bbminx = None
+        self.bbminy = None
+        self.bbmaxx = None
+        self.bbmaxy = None
+        self.t_stamp = None
+        self.origo_index_i = None
+        self.origo_index_j = None
 
+        self.iterations = 500
+        self.goal_reached = Bool()
+        self.goal_reached.data = False
+        # subscriber 
+        self.sub_map = rospy.Subscriber("/map/GridMap", GridMapMsg, self.map_callback)
+        self.sub_goal_reached = rospy.Subscriber('/path_tracker/feedback', Bool, self.goal_reached_callback)
+        #self.sub_start_and_goal = rospy.Subscriber("/start_and_goal", PoseArray, self.start_and_goal_callback)
+        
+
+    def goal_reached_callback(self,msg): # TODO figure it out
+        self.goal_reached = msg.data
+
+    def map_callback(self,msg):
+        self.map_resolution = msg.resolution
+        self.bbminx = msg.bbminx
+        self.bbminy = msg.bbminy
+        self.bbmaxx = msg.bbmaxx
+        self.bbmaxy = msg.bbmaxy
+        self.t_stamp = msg.header.stamp
+        self.origo_index_i = msg.origo_index_i
+        self.origo_index_j = msg.origo_index_j
+        self.map_coords = msg.data # TODO look at explorer find goal and see how to get the map
+
+    def get_index_of_pos(self,x,y):
+        """Return index of position in map grid, if not given geofence, return None"""
+        if not self.given_geofence:
+            rospy.logwarn("No geofence given, but trying to get map grid")
+            return None
+        
+        x_index = int((x-self.bbminx)/self.map_resolution)
+        y_index = int((y-self.bbminy)/self.map_resolution)
+        
+        return x_index, y_index
+    
+    def get_value_of_index(self,i,j):
+        """Return value of index in map grid, if not given geofence, return None"""
+        if not self.given_geofence:
+            rospy.logwarn("No geofence given, but trying to get map grid")
+            return None
+        
+        # if out of bounds, return 1
+
+        if i < 0 or i > int((self.bbmaxx-self.bbminx)/self.map_resolution) or j < 0 or j > int((self.bbmaxy-self.bbminy)/self.map_resolution):
+            return 1
+        
+        return self.map_coords[i].data[j]
+    
+    def get_value_of_pos(self,x,y):
+        """Return value of position in map grid, if not given geofence, return None"""
+        if not self.given_geofence:
+            rospy.logwarn("No geofence given, but trying to get map grid")
+            return None
+        
+        i,j = self.get_index_of_pos(x,y)
+        
+        return self.get_value_of_index(i,j)
+        
     def distance(self,node1: Node,node2:Node):
         return math.dist(node1.position(),node2.position())
 
@@ -606,54 +672,34 @@ class A_star():
         path.reverse()
         return path
     
-    # checks if inbounds according to the paramethes of the map
-    """def isinbounds(self,node):
-        # retrives the limits for the map
-        #TODO improve this for different maps
-        limits = self.map.limits
-        xmin = limits[0]
-        xmax = limits[1]
-        ymin = limits[2]
-        ymax = limits[3]
-        if node.x < xmin or node.x > xmax:
-            #print('out of x bounds')
-            return False
-        if node.y < ymin or node.y > ymax:
-            #print('out of y bounds')
-            return False
-        return True"""
+
     
-    def is_in_bounds(self,node,buffer):
-        for longditude in range(-1,2,1):
-            for latitude in range(-1,2,1):
-                new_x = node.x + buffer*longditude
-                new_y = node.y + buffer*latitude
-                if not self.map.is_point_in_polygon(new_x,new_y,self.map.geofence_list):
-                    return False
-        return True
+    # checks if inbounds according to the paramethes of the map
+    def is_in_bounds(self,node):
+        if self.bbminy < node.y < self.bbmaxy:
+            if self.bbminx < node.x < self.bbmaxx:
+                return True
+        else:
+            return False
         #self.map.is_point_in_polygon(new_x,new_y,self.map.geofence_list):
 
     #TODO implement dx,dy 
     def generate_neighbours(self,node):
         neighbourlist = {}
-        buffer = 0.5
+        buffer = 0.1
         #walllist = []
         dx = self.map.resolution # 5 cm
         dy = self.map.resolution
-        #dx = map.dx
-        #dy = map.dy
         for longditude in range(-1,2,1):
             for latitude in range(-1,2,1):
                 new_x = node.x + dx*longditude
                 new_y = node.y + dy*latitude
                 neighbour = Node(new_x, new_y, parent = node, goal= node.goal)
-                #if self.isinbounds(neighbour):
-                if self.is_in_bounds(neighbour,buffer):
+                if self.is_in_bounds(neighbour):
                     #print(f'send in coord {new_x,new_y}')
                     #index_x,index_y = self.map.get_index_of_pos(new_x,new_y)
                     #print(f'cell value {cell.value}, {cell.position()}')
-                    #cell = self.map
-                    if self.map.get_value_of_pos(new_x,new_y)>=0.8: # will always work due to checking inbounds
+                    if self.get_value_of_pos(new_x,new_y)>=0.8: # will always work due to checking inbounds
                         #walllist.append((neighbour.position()))
                         neighbour.g = np.inf
                         neighbour.f = neighbour.g + neighbour.h
@@ -668,10 +714,10 @@ class A_star():
         return neighbourlist
 
 
-    def path(self,goal):
+    def path(self,start,goal):
         # usually min heap
         goal = (goal.pose.position.x,goal.pose.position.y)
-        start = self.map.robot_pose[0:2] # gets the start position from the map
+        start = (start.pose.position.x,start.pose.position.y)
         heap = []
         heapq.heapify(heap)
         openset = {}
@@ -740,7 +786,7 @@ class A_star():
         # if the change in dx and dy is the same, remove the middle point
         # if the change in dx and dy is not the same, keep the middle point
         path_length = len(path)
-        print(f'path_length = {path_length}')
+        #print(f'path_length = {path_length}')
         points_to_remove = []
         for point in range( 1, path_length-1):
             #print(f'point = {path[point]}')
@@ -748,12 +794,12 @@ class A_star():
             dy1 = (path[point][1] - path[point-1][1])
             dx2 = (path[point+1][0] - path[point][0])
             dy2 = (path[point+1][1] - path[point][1])
-            print(f'dx1 = {dx1}, dy1 = {dy1}, dx2 = {dx2}, dy2 = {dy2}')
+            #print(f'dx1 = {dx1}, dy1 = {dy1}, dx2 = {dx2}, dy2 = {dy2}')
             if dx1 == dx2 and dy1 == dy2:
                 points_to_remove.append(point)
         points_to_remove.reverse()
 
-        print(f'points_to_remove = {points_to_remove}')
+        #print(f'points_to_remove = {points_to_remove}')
         for point in points_to_remove:
             path.pop(point)
         #print(f'smoothened path = {path}')
@@ -763,46 +809,54 @@ class Path_Planner():
     def __init__(self) -> None:
         rospy.init_node('path_planner')
         #server
-        self.client = actionlib.SimpleActionClient('path_tracker', mb.MoveBaseAction)
-        print('waiting for server')
-        self.client.wait_for_server(rospy.Duration(0.5))
-        print('server found')
+        #self.client = actionlib.SimpleActionClient('path_tracker', mb.MoveBaseAction)
+        #print('waiting for server')
+        #self.client.wait_for_server(rospy.Duration(0.5))
+        #print('server found')
 
         #subscribers
         self.sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
-        #goal currently a fix
+        self.start_and_goa_sub = rospy.Subscriber('/start_and_goal', Path, self.start_and_goal_callback)
 
+        #publishers
+        self.move_to_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
+
+        self.start = PoseStamped()
         self.goal = PoseStamped()
-        self.init_goal()
+        
         # might need to change in the future
         self.rate = rospy.Rate(1)
 
         self.path_planner = A_star()
-
+        self.last_msg = PoseStamped()
+        
+        print('path planner node started')
         #rospy.roslog('path planner node started')
+############################################ Callbacks ############################################
+
+    def start_and_goal_callback(self,msg):
+        self.start = msg.poses[0]
+        self.goal = msg.poses[1]
+        self.main()
 
     def goal_callback(self,goal):
         self.goal = goal
         self.main() # this might be bad programming
 
-    def init_goal(self):
-        self.goal.pose.position.x = 0
-        self.goal.pose.position.y = 0
-        self.goal.pose.position.z = 0
-        self.goal.pose.orientation.x = 0
-        self.goal.pose.orientation.y = 0
-        self.goal.pose.orientation.z = 0
-        self.goal.pose.orientation.w = 1
+    def map_callback(self,msg):
+        self.map_resolution = msg.resolution
+        self.bbminx = msg.bbminx
+        self.bbminy = msg.bbminy
+        self.bbmaxx = msg.bbmaxx
+        self.bbmaxy = msg.bbmaxy
+        self.t_stamp = msg.header.stamp
+        self.origo_index_i = msg.origo_index_i
+        self.origo_index_j = msg.origo_index_j
+        self.path_planner.map = msg.data # TODO look at explorer find goal and see how to get the map
+        
+############################################ Main ############################################
 
-    def get_map(self):
-        # might call service to get map
-        resolution = 0.05
-        map = GridMap(resolution=resolution)
-        #map.update_geofence_and_boundingbox()
-        #map =None
-        return map
-    
-    def tranform_path_to_posestamped(self,path):
+    def tranform_path_to_posestamped(self,path):#fuzzy controller
         path_list = []
         """path_tosend = Path
         path_tosend.header.frame_id = "map"
@@ -856,18 +910,25 @@ class Path_Planner():
             float64 w
 
     """
-    def send_path(self,client,path):
+    def send_path(self,path): #TODO  fix to publish
         path_list = self.tranform_path_to_posestamped(path)
-        print('paths transformed')
+        #print('paths transformed')
         #print(path_list)
-        for pose_stamped in path_list:
+        
+        if self.last_msg != path_list[0]:
+            self.move_to_pub.publish(path_list[0])
+            self.last_msg = path_list[0]
+            #print('published')
+        
+        """for pose_stamped in path_list:
             goal = mb.MoveBaseGoal()
             goal.target_pose = pose_stamped
             client.send_goal(goal,done_cb=self.done_cb,feedback_cb=self.feedback_cb)
             client.wait_for_result() # result callback 
-            print(client.get_result())
+            print(client.get_result())"""
+        
 
-    def done_cb(self,status,result):
+    """def done_cb(self,status,result):
         print('done')
         print(f'status is {status}')
         print(f'result is {result}')
@@ -875,16 +936,17 @@ class Path_Planner():
         
     def feedback_cb(self,feedback):
         print('feedback')
-        print(feedback)
+        print(feedback)"""
 
     def main(self):
         #goal = (10,10)
-        self.path_planner.map = self.get_map()
+        #self.path_planner.map = self.get_map()
         #print(self.goal)
-        status,path = self.path_planner.path(self.goal)
+        status,path = self.path_planner.path(self.start,self.goal)
         path = self.path_planner.path_smoothing(path)
-        self.send_path(self.client,path)
-        print('path sent')
+        print(path)
+        self.send_path(path)
+        #print('path sent')
 
 
     def spin(self):

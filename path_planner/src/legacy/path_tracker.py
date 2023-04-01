@@ -4,6 +4,7 @@ import rospy
 import tf2_ros
 import actionlib
 import tf2_geometry_msgs
+from std_msgs import bool
 from robp_msgs.msg import DutyCycles
 from aruco_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose
@@ -137,6 +138,7 @@ class PathTracker():
 
         #publishers
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.goal_reached_pub = rospy.Publisher('/path_tracker/feedback', bool, queue_size=10)
         # self.duty_pub = rospy.Publisher('/motor/duty_cycles', DutyCycles, queue_size=10)
 
         # subscribers
@@ -222,7 +224,7 @@ class PathTracker():
                     self.move.linear.x = 0.0
                     self.move.angular.z = 0.0
                     print('Goal orientation reached')
-                    
+                    self.goal_reached_pub.publish(True)
                     
             self.cmd_pub.publish(self.move)
 
@@ -268,6 +270,7 @@ class PathTracker():
                 self.move.linear.x = 0.0
                 self.move.angular.z = 0.0
                 print('Goal orientation reached')
+                
 
 
         print(self.move)
