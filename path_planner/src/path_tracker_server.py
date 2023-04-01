@@ -136,9 +136,9 @@ class PathTracker():
         self.acceleration = 0.05
         self.max_speed = 0.6
         self.max_angle = 0.1
-        self.angle_speed = 0.1
+        self.angle_speed = 0.4
         self.deceleration_distance = 0.0
-        self.in_goal_tolerance = 0.02
+        self.in_goal_tolerance = 0.03
         self.orientaion_tolerance = 0.05
 
         # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
@@ -190,6 +190,7 @@ class PathTracker():
         self.goal.pose.position = msg.pose.position                 # 2D Nav goal in rviz is in odom frame
         self.goal.pose.orientation = msg.pose.orientation
         self.goal_received = True
+        rospy.loginfo('Tracker: recived goal')
 
     def fence_callback(self, msg:PoseArray):
         self.polygon = Polygon(msg.poses)
@@ -269,6 +270,7 @@ class PathTracker():
         robot_theta = tf.transformations.euler_from_quaternion([self.pose.pose.orientation.x, self.pose.pose.orientation.y, self.pose.pose.orientation.z, self.pose.pose.orientation.w])[2] 
         goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
         dtheta = goal_orientation - robot_theta
+        print(f'distance is {distance}')
 
         if distance > self.in_goal_tolerance:
 
@@ -287,7 +289,8 @@ class PathTracker():
                 self.move.angular.z = 0.0
                 
         else:
-            # print('Goal reached')
+            print('Goal reached')
+            print(f'Theta {dtheta}')
             if abs(dtheta) >= self.orientaion_tolerance:
                 self.move.linear.x = 0.0
                 if dtheta >= 0:
@@ -300,7 +303,7 @@ class PathTracker():
                 self.move.linear.x = 0.0
                 self.move.angular.z = 0.0
                 self.goal_reached_pub.publish(True)
-                # print('Goal orientation reached')
+                print('Goal orientation reached')
 
         self.cmd_pub.publish(self.move)   
         

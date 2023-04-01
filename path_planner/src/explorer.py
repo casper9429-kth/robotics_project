@@ -33,8 +33,8 @@ class explorer():
         # self.bool_sub = rospy.Subscriber('/bool', Bool, self.map_callback)
 
         # publishers
-        self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10) # change to the topic to what the path_planner subscribes to
-        self.start_and_goal_pub = rospy.Publisher('/start_and_goal', Path, queue_size=10)
+        self.goal_pub = rospy.Publisher('/start_and_goal', PoseStamped, queue_size=10) # change to the topic to what the path_planner subscribes to
+        #self.start_and_goal_pub = rospy.Publisher('/start_and_goal', PoseStamped, queue_size=10)
 
         # Parameters
         self.map_coords = []
@@ -108,9 +108,8 @@ class explorer():
         start_and_goal.header.frame_id = 'map'
         start_and_goal.header.stamp = rospy.Time.now()
 
-        for pose in start_and_goal.poses:
-            self.goal_pub.publish(pose)
-        
+
+
 
         start_and_goal.poses.append(start)
         start_and_goal.poses.append(goal)
@@ -168,12 +167,12 @@ class explorer():
         #self.map_coords[i].data[j] == -1
         # calculate the nearest point to the robot
         self.cells = np.array(self.cells)
-        print(self.position_in_gridmap)
+        #print(self.position_in_gridmap)
         distances = self.cells - self.position_in_gridmap
         min_distance_index = np.argmin(np.linalg.norm(distances, axis=1))
         self.nearest_goal = self.cells[min_distance_index]
     
-        self.publish_start_goal()
+        self.publish_goal()
 
 
     def publish_goal(self):         #transforms the goal to the map frame
@@ -220,11 +219,11 @@ class explorer():
 
         start_and_goal.poses.append(start)
         start_and_goal.poses.append(goal)
-        self.start_and_goal_pub.publish(start_and_goal)
+        #self.start_and_goal_pub.publish(start_and_goal)
         rospy.loginfo('Explorer: Start and goal published')
-        print(f'Explorer: start: {start.pose.position.x}, {start.pose.position.y}')
+        #print(f'Explorer: start: {start.pose.position.x}, {start.pose.position.y}')
         
-        print(f'Explorer: goal: {goal.pose.position.x}, {goal.pose.position.y}')
+        #print(f'Explorer: goal: {goal.pose.position.x}, {goal.pose.position.y}')
         
     def spin(self):
         while not rospy.is_shutdown():
