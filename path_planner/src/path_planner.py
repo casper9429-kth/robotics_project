@@ -19,6 +19,8 @@ from std_msgs.msg import Bool
 from geometry_msgs.msg import PoseStamped, PoseArray
 from nav_msgs.msg import Path
 from visualization_msgs.msg import Marker
+import tf2_ros 
+import tf2_geometry_msgs
 from mapping.msg import GridMapMsg
 #from mapping.grid_map.grid_map import GridMap
 
@@ -86,6 +88,7 @@ class A_star():
         self.sub_goal_reached = rospy.Subscriber('/path_tracker/feedback', Bool, self.goal_reached_callback)
         #self.sub_start_and_goal = rospy.Subscriber("/start_and_goal", PoseArray, self.start_and_goal_callback)
         
+        
 
     def goal_reached_callback(self,msg): # TODO figure it out
         self.goal_reached = msg.data
@@ -105,7 +108,7 @@ class A_star():
     def get_index_of_pos(self,x,y):
         """Return index of position in map grid, if not given geofence, return None"""
         if not self.given_geofence:
-            rospy.logwarn("No geofence given, but trying to get map grid")
+            rospy.logwarn("Path planner: No geofence given, but trying to get map grid")
             return None
         
         x_index = int((x-self.bbminx)/self.map_resolution)
@@ -116,7 +119,7 @@ class A_star():
     def get_value_of_index(self,i,j):
         """Return value of index in map grid, if not given geofence, return None"""
         if not self.given_geofence:
-            rospy.logwarn("No geofence given, but trying to get map grid")
+            rospy.logwarn("Path planner: No geofence given, but trying to get map grid")
             return None
         
         # if out of bounds, return 1
@@ -192,6 +195,7 @@ class A_star():
                 
         return neighbourlist
 
+    
 
     def path(self,start,goal):
         # usually min heap
@@ -312,6 +316,22 @@ class Path_Planner():
         self.goal = PoseStamped()
         self.has_recived_goal = False
         
+        # tf things
+        self.tfBuffer = tf2_ros.Buffer()
+        self.listener = tf2_ros.TransformListener(self.tfBuffer)
+
+        # robot pose in base_link
+        self.pose = PoseStamped()
+        self.pose.header.frame_id = 'base_link'
+        self.pose.pose.position.x = 0.0
+        self.pose.pose.position.y = 0.0
+        self.pose.pose.position.z = 0.0
+        self.pose.pose.orientation.x = 0.0
+        self.pose.pose.orientation.y = 0.0
+        self.pose.pose.orientation.z = 0.0
+        self.pose.pose.orientation.w = 0.0
+
+
         # might need to change in the future
         self.rate = rospy.Rate(1)
 
@@ -346,6 +366,15 @@ class Path_Planner():
         self.path_planner.map = msg.data # TODO look at explorer find goal and see how to get the map
         
 ############################################ Main ############################################
+
+    def get_robot_pose_in_map(self):
+        try:                                   
+            transform_base_link_2_map = self.tfBuffer.lookup_transform('map','base_link', self.t_stamp,rospy.Duration(0.5)) # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
+            self.pose_in_map = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_2_map)
+            return self.pose_in_map
+        except:
+            print('No transform found')
+            return None
 
     def tranform_path_to_posestamped(self,path):#fuzzy controller
         path_list = []
@@ -436,6 +465,8 @@ class Path_Planner():
         if self.has_recived_goal == False:
             rospy.loginfo('Path planner: No goal yet')
             return
+        self.start = self.get_robot_pose_in_map()
+        rospy.loginfo(f'Path planner: start {self.start.pose.position.x} {self.start.pose.position.y}')
         status,path = self.path_planner.path(self.start,self.goal)
         path = self.path_planner.path_smoothing(path)
         #print(path)
