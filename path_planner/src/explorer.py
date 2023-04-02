@@ -57,31 +57,6 @@ class explorer():
         self.pose.pose.orientation.w = 0.0
 
         
-    ########## test callbacks ##########
-    # def map_callback(self, msg):
-    #     Array = []
-    #     for i in range(10):
-    #         array = [random.choice([-1, 0, 1]) for _ in range(10)]
-    #         Array.append(array)
-    #     self.map_coords = Array
-    #     # print(self.map_coords)
-    #     self.transforms()
-    #     self.find_goal()
-
-    # # test transform
-    # def transforms(self):
-    #     stamp = self.pose.header.stamp  
-    #     try:                                   
-    #         transform_base_link_2_map = self.tfBuffer.lookup_transform('map','base_link', stamp,rospy.Duration(0.5)) # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
-    #         self.pose_in_map = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_2_map)
-    #         self.point = np.array([1,4])
-            
-    #     except:
-    #         print('No transform found')
-    ########################################
-
-    # dummy function to test if the path_planner communication is working properly
-    def test_path_planner_communication(self):
         goal = PoseStamped()
         goal.header.frame_id = 'map'
         goal.header.stamp = rospy.Time.now()
@@ -190,40 +165,6 @@ class explorer():
         # print(goal.pose.position.x, goal.pose.position.y)
         # print('Goal published')
 
-    def publish_start_goal(self):
-        goal = PoseStamped()
-        goal.header.frame_id = 'map'
-        goal.header.stamp = self.t_stamp
-        goal.pose.position.x = self.bbminx + (self.nearest_goal[0])*self.map_resolution
-        goal.pose.position.y = self.bbminy + (self.nearest_goal[1])*self.map_resolution
-        goal.pose.position.z = 0.0
-        goal.pose.orientation.x = 0.0
-        goal.pose.orientation.y = 0.0     # it is commented so that the robot keeps its orientation
-        goal.pose.orientation.z = 0.0
-        goal.pose.orientation.w = 0.0
-
-        start = PoseStamped()
-        start.header.frame_id = 'map'
-        start.header.stamp = self.t_stamp
-        start.pose.position.x= self.pose_in_map.pose.position.x
-        start.pose.position.y= self.pose_in_map.pose.position.y
-        start.pose.position.z = 0.0
-        start.pose.orientation.x = 0.0
-        start.pose.orientation.y = 0.0     # it is commented so that the robot keeps its orientation
-        start.pose.orientation.z = 0.0
-
-
-        start_and_goal = Path()
-        start_and_goal.header.frame_id = 'map'
-        start_and_goal.header.stamp = self.t_stamp
-
-        start_and_goal.poses.append(start)
-        start_and_goal.poses.append(goal)
-        #self.start_and_goal_pub.publish(start_and_goal)
-        rospy.loginfo('Explorer: Start and goal published')
-        #print(f'Explorer: start: {start.pose.position.x}, {start.pose.position.y}')
-        
-        #print(f'Explorer: goal: {goal.pose.position.x}, {goal.pose.position.y}')
         
     def spin(self):
         while not rospy.is_shutdown():
