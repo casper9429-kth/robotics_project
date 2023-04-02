@@ -7,7 +7,6 @@ from geometry_msgs.msg import TransformStamped, Point, Quaternion
 import message_filters 
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import pdist
-from matplotlib import pyplot as plt
 import numpy as np
 from collections import Counter
 import math
