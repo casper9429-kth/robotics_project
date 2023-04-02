@@ -467,7 +467,7 @@ class Path_Planner():
     def spin(self):
         while not rospy.is_shutdown():
             self.main()
-            print('spinning like a cat')
+            #print('spinning like a cat')
             #rospy.sleep(0.5)
             self.rate.sleep()
 
