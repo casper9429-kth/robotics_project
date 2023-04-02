@@ -185,13 +185,6 @@ class GridMap():
         # Create numpy array of bounding box
         self.map_grid = np.ones([int(((self.bounding_box[1]-self.bounding_box[0])/self.resolution)),int(((self.bounding_box[3]-self.bounding_box[2])/self.resolution))])*self.unkown
         self.map_grid = self.map_grid.astype(int)
-        print("#######################")
-        print("#######################")
-        print("#######################")
-        print(self.map_grid.shape)
-        print("#######################")
-        print("#######################")
-        print("#######################")
         
         # Deflate geofence
 
