@@ -26,15 +26,12 @@ class explorer():
         rospy.sleep(1)
         print('Tf2 stuff initialized')
         self.rate = rospy.Rate(10)
+
         # subscribers
         self.grid_map_sub = rospy.Subscriber("/map/GridMap", GridMapMsg, self.map_callback)
-        
-        ########## test subscriber ##########
-        # self.bool_sub = rospy.Subscriber('/bool', Bool, self.map_callback)
 
         # publishers
         self.goal_pub = rospy.Publisher('/start_and_goal', PoseStamped, queue_size=10) # change to the topic to what the path_planner subscribes to
-        #self.start_and_goal_pub = rospy.Publisher('/start_and_goal', PoseStamped, queue_size=10)
 
         # Parameters
         self.map_coords = []
@@ -45,7 +42,6 @@ class explorer():
         self.pose = PoseStamped()
         self.pose_in_map = PoseStamped()
         self.pose_in_gridmap = PoseStamped()
-
         # Position and orientation of the robot in the base_link frame
         self.pose.header.frame_id = 'base_link'
         self.pose.pose.position.x = 0.0
@@ -56,46 +52,8 @@ class explorer():
         self.pose.pose.orientation.z = 0.0
         self.pose.pose.orientation.w = 0.0
 
-        
-        goal = PoseStamped()
-        goal.header.frame_id = 'map'
-        goal.header.stamp = rospy.Time.now()
-        goal.pose.position.x = 1.0
-        goal.pose.position.y = 1.0
-        goal.pose.position.z = 0.0
-        goal.pose.orientation.x = 0.0
-        goal.pose.orientation.y = 0.0     # it is commented so that the robot keeps its orientation
-        goal.pose.orientation.z = 0.0
-        goal.pose.orientation.w = 1.0
-        #print(f'goal: {goal}')
-        start = PoseStamped()
-        start.header.frame_id = 'map'
-        start.header.stamp = rospy.Time.now()
-        start.pose.position.x = 0.0
-        start.pose.position.y = 0.0
-        start.pose.position.z = 0.0
-        start.pose.orientation.x = 0.0
-        start.pose.orientation.y = 0.0     # it is commented so that the robot keeps its orientation
-        start.pose.orientation.z = 0.0
-        start.pose.orientation.w = 1.0
-        #print(f'start: {start}')
-        start_and_goal = Path()
-        start_and_goal.header.frame_id = 'map'
-        start_and_goal.header.stamp = rospy.Time.now()
-
-
-
-
-        start_and_goal.poses.append(start)
-        start_and_goal.poses.append(goal)
-        #print(start_and_goal)
-
-        self.start_and_goal_pub.publish(start_and_goal)
-        rospy.loginfo('sent start and goal to path_planner')
 
     def map_callback(self, msg: GridMapMsg):
-        # extract the map cells and their values from the message 
-        #   rospy.loginfo('Explorer: enter callback')
         self.map_coords = msg.data
         self.map_resolution = msg.resolution
         self.bbminx = msg.bbminx
@@ -108,8 +66,8 @@ class explorer():
         if rospy.Time.now() - self.timer > rospy.Duration(0.5):
             self.timer = rospy.Time.now()
             self.transforms()
-            #self.find_goal()
             self.find_goal()
+
 
     def transforms(self):   
         stamp = self.pose.header.stamp  
@@ -133,16 +91,14 @@ class explorer():
         self.nearest_goal = None
         self.cells = []
 
-        # extracts the cells that are unknown space a.k.a float32[] data
+        # extracts the cells that are unknown space
         for i , data_i in enumerate(self.map_coords):
             for j, data_j in enumerate(data_i.data):
                 if int(data_j) == -1:
                     self.cells.append([i,j])
 
-        #self.map_coords[i].data[j] == -1
         # calculate the nearest point to the robot
         self.cells = np.array(self.cells)
-        #print(self.position_in_gridmap)
         distances = self.cells - self.position_in_gridmap
         min_distance_index = np.argmin(np.linalg.norm(distances, axis=1))
         self.nearest_goal = self.cells[min_distance_index]
@@ -162,13 +118,10 @@ class explorer():
         goal.pose.orientation.z = 0.0
         goal.pose.orientation.w = 0.0
         self.goal_pub.publish(goal)
-        # print(goal.pose.position.x, goal.pose.position.y)
-        # print('Goal published')
 
         
     def spin(self):
         while not rospy.is_shutdown():
-            #self.test_path_planner_communication()
             self.rate.sleep()
 
 
