@@ -202,19 +202,19 @@ class Detector(nn.Module):
            
             #image augmentation 
             transform = A.Compose([
-                    A.GaussNoise(p=0.3),
+                    A.GaussNoise(p=0.2),
+                    A.MotionBlur(p=0.8),
                     A.OneOf([
-                        A.MotionBlur(p=0.2),
-                        A.MedianBlur(blur_limit=3, p=0.1),
-                        A.Blur(blur_limit=3, p=0.1),
-                    ], p=0.3),
+                        A.MedianBlur(blur_limit=3),
+                        A.Blur(blur_limit=3),
+                    ],p=0.2),
                     A. OneOf([
-                        A.CLAHE(clip_limit=2),
-                        A.Sharpen(),
-                        A.RandomBrightnessContrast(),
-                    ], p=0.3),
-                    A.Affine(shear = {'x': random.randint(-15, 15), 'y': random.randint(-15, 15)}, p=0.3)
-            ], p=0.3, bbox_params=A.BboxParams(format='coco', label_fields=['class_labels']))
+                        A.CLAHE(clip_limit=2, p=0.2),
+                        A.Sharpen(p=0.2),
+                        A.RandomBrightnessContrast(p = 0.6),
+                    ],p=0.2),
+                    A.Affine(shear = {'x': random.randint(-15, 15), 'y': random.randint(-15, 15)},p=0.2)
+            ], bbox_params=A.BboxParams(format='coco', label_fields=['class_labels']), p=0.5)
 
             image = np.array(image)
             transformed = transform(image=image, bboxes=boxes[0], class_labels=class_labels)

@@ -99,6 +99,7 @@ class Mapping():
         
         self.map_initialized = False
         
+        
         # define grid_map
         self.grid_map = GridMap(self.resolution)
 
@@ -107,7 +108,9 @@ class Mapping():
 
     def cloud_callback(self, msg: PointCloud2):
         #rospy.loginfo("##################")
-
+        # rospy.loginfo("time since last cloud callback: %s", rospy.Time.now().to_sec() - self.t_latest_cloud.to_sec())
+        # self.t_latest_cloud = rospy.Time.now()
+        
         if rospy.Time.now() - self.t_latest_cloud < self.t_treshold:
             #rospy.loginfo("cloud callback too fast")
             return

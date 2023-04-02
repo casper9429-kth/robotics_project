@@ -3,3 +3,4 @@ string category_name
 geometry_msgs/Point object_position
 time latest_stamp
 uint8 nb_detections
+uint8 id
