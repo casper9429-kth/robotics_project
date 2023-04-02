@@ -5,7 +5,6 @@ import tf2_ros
 import actionlib
 import tf2_geometry_msgs
 from robp_msgs.msg import DutyCycles
-# from aruco_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Path
 from std_msgs.msg import Bool
 from visualization_msgs.msg import Marker, MarkerArray, InteractiveMarker, InteractiveMarkerControl
@@ -134,15 +133,12 @@ class PathTracker():
         # To control the robots movement
         self.move = Twist()
         self.acceleration = 0.05
-        self.max_speed = 0.6
+        self.max_speed = 0.5
         self.max_angle = 0.1
-        self.angle_speed = 0.4
+        self.angle_speed = 0.2
         self.deceleration_distance = 0.0
         self.in_goal_tolerance = 0.03
         self.orientaion_tolerance = 0.05
-
-        # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
-        # self.aruco = Marker()
 
         # tf stuff
         self.br = tf2_ros.TransformBroadcaster()
@@ -157,15 +153,9 @@ class PathTracker():
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         self.goal_reached_pub = rospy.Publisher('/goal_reached', Bool, queue_size=10)
 
-
         # subscribers
         self.fence_sub = rospy.Subscriber('/workspace_poses/pose_array', PoseArray, self.fence_callback)
         self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  
-        # self.aruco_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  
-        print('Path tracker: Subscribers initalized')
-
-   
-        
 
    
     # To get the position of the goal
@@ -193,55 +183,11 @@ class PathTracker():
         
         stamp = self.pose.header.stamp  
         try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
-            transform_map_2_base_link = self.tfBuffer.lookup_transform('base_link','map', stamp,rospy.Duration(0.5))     # give goal in base link frame
+            transform_map_2_base_link = self.tfBuffer.lookup_transform('base_link','map', stamp,rospy.Duration(0.5))    
             self.goal_in_base_link= tf2_geometry_msgs.do_transform_pose(self.goal, transform_map_2_base_link)   
         except:
             print('Path tracker: No transform found')
                         
-
-    def pure_pursuit(self):
-            k = 0.4
-            L = 0.30 
-            z= 0.3
-            
-            angle_to_goal =  1 * math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
-            distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
-            robot_theta = tf.transformations.euler_from_quaternion([self.pose.pose.orientation.x, self.pose.pose.orientation.y, self.pose.pose.orientation.z, self.pose.pose.orientation.w])[2] 
-            goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
-            dtheta = goal_orientation - robot_theta
-            print(f'goal pos {self.goal_in_base_link.pose.position}')
-            v=k*distance
-            w=2*v*math.sin(angle_to_goal)/L
-            print(w)
-            self.move.linear.x = v
-            self.move.linear.x  = max(self.move.linear.x ,0.0)
-            self.move.linear.x  = min(self.move.linear.x ,self.max_speed) # max speed
-            
-            
-            self.move.angular.z = w
-            self.move.angular.z = max(self.move.angular.z ,0.0)
-            self.move.angular.z = min(self.move.angular.z ,self.max_angle) # max angular speed
-            
-            
-            
-            if distance<= self.in_goal_tolerance:
-                if abs(dtheta) >= self.orientaion_tolerance:
-                    self.move.linear.x = 0.0
-                    if dtheta >= 0:
-                        self.move.angular.z = self.angle_speed
-                        # print('rotating left')
-                    elif dtheta < 0:
-                        self.move.angular.z = -self.angle_speed
-                        # print('rotating right')
-                else:
-                    self.move.linear.x = 0.0
-                    self.move.angular.z = 0.0
-                    print('Goal orientation reached')
-                    
-                    
-            self.cmd_pub.publish(self.move)
-
-
         
      # Calculate the direction the robot should go
     def math(self):
