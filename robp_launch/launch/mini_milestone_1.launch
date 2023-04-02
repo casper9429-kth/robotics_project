@@ -52,6 +52,9 @@
 	<node name="object_classifier" pkg="detection" type="object_classification.py" />
 	<node name="object_computations" pkg="detection" type="object_computations.py" />
 
+	<!-- Speaker -->
+	<node name="speaker" pkg="speak" type="speaker.py"/>
+
     <!-- Pathing -->
     <node name="path_tracker_server_brain" pkg="path_planner" type="path_tracker_server_brain.py" />
     <node name="workspace_manager" pkg="localization" type="workspace_manager.py" />

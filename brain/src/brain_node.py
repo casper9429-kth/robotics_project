@@ -233,6 +233,7 @@ class DropOff(Leaf):
         super().__init__()
         self.action_client = SimpleActionClient('arm_actions', ArmAction)
         self.is_running = False
+        self.speak_publisher = Publisher('/speaker/speech', String, queue_size=1) 
 
     def run(self):
         rospy.loginfo('DropOff')
@@ -254,6 +255,7 @@ class DropOff(Leaf):
         self.context.is_holding_object = False
         self.context.can_drop_off = False
         self.context.objects_remaining -= 1
+        self.speak_publisher.publish("Object is in the box")
     
 
 class ReturnToAnchor(Leaf):
@@ -262,7 +264,7 @@ class ReturnToAnchor(Leaf):
         self.move_base_simple_publisher = Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
         self.start = ServiceProxy('/path_tracker/start', Trigger)
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
-        self.speak_publisher = Publisher('/speak', String, queue_size=1) # TODO
+        self.speak_publisher = Publisher('/speaker/speech', String, queue_size=1) 
         self.is_running = False
         self.is_finished = False
 
@@ -288,6 +290,7 @@ class ReturnToAnchor(Leaf):
             self.is_running = False
             self.context.can_drop_off = True
             self.is_finished = True
+            self.speak_publisher.publish("I am done! Sleepy is going to sleep now.")
             return SUCCESS # TODO check for this in BehaviorTree.run so we know when to stop
                 
         return RUNNING
