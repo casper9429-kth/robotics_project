@@ -153,7 +153,6 @@ class GridMap():
         """Update geofence coordinates and bounding box, takes pose array message as input, aslo sets given_geofence to true, if geofence is given will remove old geofence from map"""
         
         if self.given_geofence == True:
-            rospy.loginfo("Geofence already given")
             return
         # save new geofence
         self.geofence_list = [[pose.position.x, pose.position.y] for pose in msg.poses] 
@@ -482,7 +481,7 @@ class GridMap():
     
 
 
-    def import_point_cloud_rays_inf(self,pointcloud,range_max = 1.5,x=None,y=None,theta=None):
+    def import_point_cloud_rays_inf(self,pointcloud,range_max = 1.5,x=None,y=None,theta=None,inflate=True):
         """
         Import point cloud and set values in map grid
         pointcloud should be numpy Nx2 array
@@ -606,8 +605,10 @@ class GridMap():
             mask = self.circle_mask.copy()
             mask[:,0] = mask[:,0] + new_x
             mask[:,1] = mask[:,1] + new_y
-            map_grid[(mask[:,0],mask[:,1])] = self.occupied
-
+            if inflate:
+                map_grid[(mask[:,0],mask[:,1])] = self.occupied
+            else:
+                map_grid[new_x,new_y] = self.occupied
             
         # Apply mask of geofence to make sure no points outside of geofence are 0
         map_grid[self.contour_mask==self.occupied] = self.occupied
@@ -617,6 +618,78 @@ class GridMap():
         
 
         return            
+
+    def import_point_cloud_rays_inf_v2(self, pointcloud, range_max=1.5, x=None, y=None, theta=None, inflate=True):
+        if not self.given_geofence:
+            rospy.logwarn("No geofence given, but trying to get map grid")
+            return None
+
+        if x is None or y is None or theta is None:
+            x, y, theta = self.robot_pose
+
+        ranges = np.sqrt(np.sum(pointcloud ** 2, axis=1))
+        ranges = np.clip(ranges, a_min=None, a_max=range_max)
+        angles = np.arctan2(pointcloud[:, 1], pointcloud[:, 0])
+
+        arc_length = range_max
+        steps_in_ang = int(arc_length / self.resolution)
+        ang_res = 1 / steps_in_ang
+        ang_ind_list = np.floor((angles + 0.5) / ang_res).astype(int)
+        ang_ind_list = np.clip(ang_ind_list, a_min=0, a_max=steps_in_ang - 1)
+
+        rays_ind = np.stack((ang_ind_list, ranges), axis=1)
+        rays, counts = np.unique(rays_ind, axis=0, return_counts=True)
+        rays = rays[counts > 0]
+
+        index = rays[:, 0].astype(int)
+        ranges = rays[:, 1]
+        rays = np.array([[-0.5 + i * ang_res, np.min(ranges[index == i]) if len(ranges[index == i]) > 0 else 0]
+                        for i in range(steps_in_ang)])
+
+        rays[:, 0] += theta
+
+
+        map_grid = self.map_grid.copy()
+
+        angs, ray_ends = rays[:, 0], rays[:, 1]
+        ray_ends[ray_ends == 0] = range_max
+
+        new_xs = x + ray_ends * np.cos(angs)
+        new_ys = y + ray_ends * np.sin(angs)
+
+        dxs, dys = new_xs - x, new_ys - y
+        ns = (2 * (np.sqrt(dxs ** 2 + dys ** 2) / self.resolution)).astype(int)
+
+        linspace_x = [np.linspace(x, new_x, n) for new_x, n in zip(new_xs, ns)]
+        linspace_y = [np.linspace(y, new_y, n) for new_y, n in zip(new_ys, ns)]
+
+        linspace_x = [(x_line - self.bounding_box[0]) / self.resolution for x_line in linspace_x]
+        linspace_y = [(y_line - self.bounding_box[2]) / self.resolution for y_line in linspace_y]
+
+        for i, (ray, n) in enumerate(zip(rays, ns)):
+            ang, ray_end = ray
+
+            # Make all points inbetween robot and ray 0
+            xs, ys = linspace_x[i].astype(int), linspace_y[i].astype(int)
+            map_grid[(xs, ys)] = self.free
+
+        # Set the end points of rays to 1
+        for ray in rays:
+            if ray[1] != range_max:
+                new_x = int((x + ray[1] * np.cos(ray[0]) - self.bounding_box[0]) / self.resolution)
+                new_y = int((y + ray[1] * np.sin(ray[0]) - self.bounding_box[2]) / self.resolution)
+
+                if inflate:
+                    mask = self.circle_mask.copy()
+                    mask[:, 0] += new_x
+                    mask[:, 1] += new_y
+                    map_grid[(mask[:, 0], mask[:, 1])] = self.occupied
+                else:
+                    map_grid[new_x, new_y] = self.occupied
+
+        map_grid[self.contour_mask == self.occupied] = self.occupied
+        self.map_grid = map_grid
+        return
 
 
     def get_OccupancyGrid(self):

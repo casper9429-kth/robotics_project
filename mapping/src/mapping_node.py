@@ -161,7 +161,6 @@ class Mapping():
 
     def cloud_callback_v3(self, msg: PointCloud2):
         #rospy.loginfo("##################")
-
         if rospy.Time.now() - self.t_latest_cloud < self.t_treshold:
             #rospy.loginfo("cloud callback too fast")
             return
@@ -175,7 +174,7 @@ class Mapping():
 
         # Downsample the point cloud using a voxel grid filter with a specified voxel size
         cloud = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.3, -100.0]), max_bound=np.array([100.0, 100.0, 2.5 ])))
-        cloud = cloud.voxel_down_sample(voxel_size=0.01)
+        cloud = cloud.voxel_down_sample(voxel_size=self.resolution/4.5)
         a = 0.00
         b = 1.00
         c = 0.01
@@ -207,9 +206,11 @@ class Mapping():
         new_points[:,1] = -points[:,0]
         points = new_points
 
-        self.grid_map.import_point_cloud_rays_inf(points,2.5,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2])
+        self.grid_map.import_point_cloud_rays_inf_v2(points,2.5,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2],False)
         
         return
+
+
         
 
     def cloud_callback_v2(self, msg: PointCloud2):
