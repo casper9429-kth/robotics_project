@@ -164,24 +164,7 @@ class PathTracker():
         # self.aruco_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  
         print('Path tracker: Subscribers initalized')
 
-    # To get the position of the goal from camera
-    # def aruco_callback(self, msg:Marker):
-        # self.aruco.header = msg.header
-        # self.aruco.id = msg.id
-        # self.aruco.pose.pose.position = msg.pose.pose.position
-        # self.aruco.pose.pose.orientation = msg.pose.pose.orientation
-
-
-    #     self.path_tracker_server = actionlib.SimpleActionServer('path_tracker', MoveBaseAction, execute_cb=self.execute_cb, auto_start=False)
-    #     self.path_tracker_server.start()
-    #     print('Action server started')
-        
-
-    # def execute_cb(self, goal):
-    #     self.goal = goal.target_pose            # target_pose is a PosedStamped
-    #     print('Goal recieved')
-    #     self.path_tracker_server.set_succeeded()
-    #     self.main()
+   
         
 
    
@@ -198,8 +181,6 @@ class PathTracker():
 
     def check_if_in_fence(self, pose: Pose):
         # Transform pose to map frame
-        #pose_in_map = self.tfBuffer.transform(pose, 'map')
-        #print(self.polygon)
         if self.polygon:
             return self.polygon.contains(pose.position)
         else:
@@ -329,8 +310,6 @@ class PathTracker():
 
 
     def spin(self):
-        #print(self.goal.pose)
-        #print(self.check_if_in_fence(self.goal.pose))
         if not self.goal_received:
             return
 
