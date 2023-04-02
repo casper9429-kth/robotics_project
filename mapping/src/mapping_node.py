@@ -173,12 +173,12 @@ class Mapping():
         cloud = o3drh.rospc_to_o3dpc(msg)
 
         # Downsample the point cloud using a voxel grid filter with a specified voxel size
-        cloud = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.3, -100.0]), max_bound=np.array([100.0, 100.0, 1.5 ])))
+        cloud = cloud.crop(o3d.geometry.AxisAlignedBoundingBox(min_bound=np.array([-100.0, -0.3, -100.0]), max_bound=np.array([100.0, 100.0, 1.3 ])))
         cloud = cloud.voxel_down_sample(voxel_size=self.resolution/7)
         a = 0.00
         b = 1.00
         c = 0.01
-        d = -0.075
+        d = -0.073
 
 
 
@@ -209,7 +209,7 @@ class Mapping():
         new_points[:,1] = -points[:,0]
         points = new_points
 
-        self.grid_map.import_point_cloud_rays_inf_v2(points,1.5,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2],True)
+        self.grid_map.import_point_cloud_rays_inf_v2(points,1.3,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2],True)
         
         return
 
