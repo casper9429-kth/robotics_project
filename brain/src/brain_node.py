@@ -2,7 +2,7 @@
 
 import rospy
 from rospy import Subscriber, ServiceProxy, Publisher
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String
 from geometry_msgs.msg import PoseStamped
 from std_srvs.srv import Trigger
 from actionlib import SimpleActionClient
@@ -67,8 +67,7 @@ class IsLocalized(Leaf):
     def run(self):
         rospy.loginfo('IsLocalized')
         return SUCCESS if self.slam_ready else FAILURE
-        
-    
+
 
 class Localize(Leaf):
     def run(self):
@@ -86,7 +85,7 @@ class IsExplored(Leaf):
         self.object_found = False
 
     def run(self):
-        rospy.loginfo(f'IsExplored - box: {self.box_found}, Red Cube: {self.object_found}')
+        rospy.loginfo(f'IsExplored - box: {self.box_found}, object: {self.object_found}')
         try:
             self.buffer.lookup_transform('map', 'aruco/detected3', rospy.Time(0))
             self.box_found = True
@@ -183,14 +182,14 @@ class PickUp(Leaf):
             goal.z = -0.13
             goal.yaw = 0.0
 
-            def done_cb(state, result):
-                self.is_running = False
-                self.context.is_holding_object = True
-                self.context.can_pick_up = False
-
-            self.action_client.send_goal(goal, done_cb=done_cb)
+            self.action_client.send_goal(goal, done_cb=self._done_cb)
         return RUNNING
-    
+
+    def _done_cb(self, state, result):
+        self.is_running = False
+        self.context.is_holding_object = True
+        self.context.can_pick_up = False
+
 
 class CanDropOff(Leaf):
     def run(self):
@@ -247,14 +246,14 @@ class DropOff(Leaf):
             goal.z = -0.13
             goal.yaw = 0.0
 
-            def done_cb(state, result):
-                self.is_running = False
-                self.context.is_holding_object = False
-                self.context.can_drop_off = False
-                self.context.objects_remaining -= 1
-
-            self.action_client.send_goal(goal, done_cb=done_cb)
+            self.action_client.send_goal(goal, done_cb=self._done_cb)
         return RUNNING
+
+    def _done_cb(self, state, result):
+        self.is_running = False
+        self.context.is_holding_object = False
+        self.context.can_drop_off = False
+        self.context.objects_remaining -= 1
     
 
 class ReturnToAnchor(Leaf):
@@ -263,6 +262,7 @@ class ReturnToAnchor(Leaf):
         self.move_base_simple_publisher = Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
         self.start = ServiceProxy('/path_tracker/start', Trigger)
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
+        self.speak_publisher = Publisher('/speak', String, queue_size=1) # TODO
         self.is_running = False
         self.is_finished = False
 
