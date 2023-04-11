@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 
+from math import atan2
+
 import rospy
 from rospy import Subscriber, ServiceProxy, Publisher
 from std_msgs.msg import Bool, String
 from geometry_msgs.msg import PoseStamped
 from std_srvs.srv import Trigger
 from actionlib import SimpleActionClient
-from tf2_ros import Buffer, TransformListener
+from tf2_ros import Buffer, TransformListener, LookupException
+from tf.transformations import quaternion_from_euler # using original tf is deprecated, but oh well
 
 from arm.msg import ArmAction, ArmGoal, ArmResult, ArmFeedback
 from path_planner.srv import Bool as BoolSrv
@@ -42,11 +45,11 @@ class BrainNode:
     class Context:
         def __init__(self):
             self.anchor_id = 500
-            self.target_type = 'sphere'
             self.is_holding_object = False
             self.objects_remaining = 1
             self.can_pick_up = False
             self.can_drop_off = False
+            self.target = None
 
     def run(self):
         rate = rospy.Rate(10)
@@ -80,40 +83,32 @@ class IsExplored(Leaf):
         super().__init__()
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
-        self.object_subscriber = Subscriber('/detection/object_instances', ObjectInstanceArray, self._object_instances_callback, queue_size=1)
-        self.box_found = False
-        self.object_found = False
 
     def run(self):
-        rospy.loginfo(f'IsExplored - box: {self.box_found}, object: {self.object_found}')
+        rospy.loginfo(f'IsExplored')
         try:
             self.buffer.lookup_transform('map', 'aruco/detected3', rospy.Time(0))
-            self.box_found = True
+            return SUCCESS if self.context.target else FAILURE
         except:
-            pass
-        try:
-            self.buffer.lookup_transform('map', 'object/detected/Green_ball1', rospy.Time(0))
-            self.object_found = True
-        except:
-            pass
-        return SUCCESS if self.box_found and self.object_found else FAILURE
-    
-    def _object_instances_callback(self, msg):
-        for object in msg.instances:
-            if object.category_name == 'Green_ball':
-                # self.object_found = True
-                break
-    
+            return FAILURE
+
 
 class Explore(Leaf):
     def __init__(self):
         super().__init__()
         self.explore = ServiceProxy('/explore', Trigger)
+        self.object_subscriber = Subscriber('/detection/object_instances', ObjectInstanceArray, self._object_instances_callback, queue_size=1)
 
     def run(self):
         rospy.loginfo('Explore')
         self.explore()
         return RUNNING
+    
+    def _object_instances_callback(self, msg):
+        for object in msg.instances:
+            if object.id == 0: # we only care about the first found object
+                self.context.target = object
+                break
 
 
 class ObjectsRemaining(Leaf):
@@ -132,7 +127,27 @@ class CanPickUp(Leaf):
     def run(self):
         rospy.loginfo('CanPickUp')
         return SUCCESS if self.context.can_pick_up else FAILURE
-    
+
+
+def calculate_move_target_pose(target_tf_frame, tf_buffer):
+    target = tf_buffer.lookup_transform('map', target_tf_frame, rospy.Time(0))
+    base_link = tf_buffer.lookup_transform('map', 'base_link', rospy.Time(0))
+    target_pose = PoseStamped()
+    target_pose.header.frame_id = 'map'
+    target_pose.pose.position.x = target.transform.translation.x
+    target_pose.pose.position.y = target.transform.translation.y
+    target_pose.pose.position.z = target.transform.translation.z
+    # get orientation from vector from base_link to target using quaternion_from_euler and math.atan2
+    x = target.transform.translation.x - base_link.transform.translation.x
+    y = target.transform.translation.y - base_link.transform.translation.y
+    yaw = atan2(y, x)
+    q = quaternion_from_euler(0, 0, yaw)
+    target_pose.pose.orientation.x = q[0]
+    target_pose.pose.orientation.y = q[1]
+    target_pose.pose.orientation.z = q[2]
+    target_pose.pose.orientation.w = q[3]
+    return target_pose
+
 
 class GoToPickUp(Leaf):
     def __init__(self):
@@ -141,20 +156,22 @@ class GoToPickUp(Leaf):
         self.start = ServiceProxy('/path_tracker/start', Trigger)
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
         self.is_running = False
+        # listen to tf frame object/detected/instance_name to get target pose
+        self.buffer = Buffer(cache_time=rospy.Duration(60.0))
+        self.listener = TransformListener(Buffer())
 
     def run(self):
         rospy.loginfo('GoToPickUp')
-        # TODO: get pick up pose from detection
-        pick_up_pose = PoseStamped()
-        pick_up_pose.header.frame_id = 'map'
-        pick_up_pose.pose.position.x = 1.0
-        pick_up_pose.pose.position.y = 0.0
-        pick_up_pose.pose.position.z = 0.0
-        pick_up_pose.pose.orientation.x = 0.0
-        pick_up_pose.pose.orientation.y = 0.0
-        pick_up_pose.pose.orientation.z = 0.0
-        pick_up_pose.pose.orientation.w = 1.0
-        self.move_base_simple_publisher.publish(pick_up_pose)
+        try:
+            # TODO: test if this works
+            target_frame = f'object/detected/{self.context.target.object_position}'
+            move_target_pose = calculate_move_target_pose(target_frame, self.buffer)
+
+            self.move_base_simple_publisher.publish(move_target_pose)
+        except LookupException:
+            # TODO: we lost the target if we ever get here
+            pass
+        
         if not self.is_running:
             self.is_running = True
             self.start()
@@ -163,6 +180,18 @@ class GoToPickUp(Leaf):
             self.context.can_pick_up = True
         return RUNNING
     
+
+# TODO: test this, might be problematic because of capitalization
+def category_name_to_type(category_name):
+    if category_name == 'Cube':
+        return 'cube'
+    elif category_name == 'Sphere':
+        return 'sphere'
+    elif category_name in ['Binky', 'Hugo', 'Slush', 'Muddles', 'Kiki', 'Oakie']:
+        return 'animal'
+    else:
+        raise ValueError(f'Unknown category name {category_name}')
+
 
 class PickUp(Leaf):
     def __init__(self):
@@ -176,7 +205,8 @@ class PickUp(Leaf):
             self.is_running = True
             goal = ArmGoal()
             goal.action = 'pick_up'
-            goal.type = self.context.target_type
+            goal.type = category_name_to_type(self.context.target.category_name)
+            # TODO: maybe get these from perception
             goal.x = -0.145
             goal.y = 0.0
             goal.z = -0.13
@@ -207,17 +237,16 @@ class GoToDropOff(Leaf):
 
     def run(self):
         rospy.loginfo('GoToDropOff')
-        # TODO: get drop off pose from detection
-        pick_up_pose = PoseStamped()
-        pick_up_pose.header.frame_id = 'map'
-        pick_up_pose.pose.position.x = 0.0
-        pick_up_pose.pose.position.y = 1.0
-        pick_up_pose.pose.position.z = 0.0
-        pick_up_pose.pose.orientation.x = 0.0
-        pick_up_pose.pose.orientation.y = 0.0
-        pick_up_pose.pose.orientation.z = 0.0
-        pick_up_pose.pose.orientation.w = 1.0
-        self.move_base_simple_publisher.publish(pick_up_pose)
+        try:
+            # TODO: test if this works, might be problematic if aruco pose is upside down or something
+            box_frame = 'aruco/detected3'
+            move_target_pose = calculate_move_target_pose(box_frame, self.buffer)
+
+            self.move_base_simple_publisher.publish(move_target_pose)
+        except LookupException:
+            # TODO: we lost the box if we ever get here
+            pass
+
         if not self.is_running:
             self.is_running = True
             self.start()
@@ -241,7 +270,8 @@ class DropOff(Leaf):
             self.is_running = True
             goal = ArmGoal()
             goal.action = 'drop_off'
-            goal.type = self.context.target_type
+            goal.type = category_name_to_type(self.context.target.category_name)
+            # TODO: maybe get these from perception
             goal.x = -0.145
             goal.y = 0.0
             goal.z = -0.13
