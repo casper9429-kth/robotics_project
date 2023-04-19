@@ -18,6 +18,8 @@ from detection.msg import ObjectInstanceArray
 
 No = Not = Inverter
 
+box_id = 2
+
 
 class BrainNode:
     def __init__(self):
@@ -87,7 +89,7 @@ class IsExplored(Leaf):
     def run(self):
         rospy.loginfo(f'IsExplored')
         try:
-            self.buffer.lookup_transform('map', 'aruco/detected3', rospy.Time(0))
+            self.buffer.lookup_transform('map', f'aruco/detected{box_id}', rospy.Time(0))
             return SUCCESS if self.context.target else FAILURE
         except:
             return FAILURE
@@ -129,17 +131,16 @@ class CanPickUp(Leaf):
         return SUCCESS if self.context.can_pick_up else FAILURE
 
 
-def calculate_move_target_pose(target_tf_frame, tf_buffer):
-    target = tf_buffer.lookup_transform('map', target_tf_frame, rospy.Time(0))
+def calculate_pick_up_target_pose(object_position, tf_buffer):
     base_link = tf_buffer.lookup_transform('map', 'base_link', rospy.Time(0))
     target_pose = PoseStamped()
     target_pose.header.frame_id = 'map'
-    target_pose.pose.position.x = target.transform.translation.x
-    target_pose.pose.position.y = target.transform.translation.y
-    target_pose.pose.position.z = target.transform.translation.z
+    target_pose.pose.position.x = object_position.x
+    target_pose.pose.position.y = object_position.y
+    target_pose.pose.position.z = object_position.z
     # get orientation from vector from base_link to target using quaternion_from_euler and math.atan2
-    x = target.transform.translation.x - base_link.transform.translation.x
-    y = target.transform.translation.y - base_link.transform.translation.y
+    x = object_position.x - base_link.transform.translation.x
+    y = object_position.y - base_link.transform.translation.y
     yaw = atan2(y, x)
     q = quaternion_from_euler(0, 0, yaw)
     target_pose.pose.orientation.x = q[0]
@@ -158,15 +159,12 @@ class GoToPickUp(Leaf):
         self.is_running = False
         # listen to tf frame object/detected/instance_name to get target pose
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
-        self.listener = TransformListener(Buffer())
+        self.listener = TransformListener(self.buffer)
 
     def run(self):
         rospy.loginfo('GoToPickUp')
         try:
-            # TODO: test if this works
-            target_frame = f'object/detected/{self.context.target.object_position}'
-            move_target_pose = calculate_move_target_pose(target_frame, self.buffer)
-
+            move_target_pose = calculate_pick_up_target_pose(self.context.target.object_position, self.buffer)
             self.move_base_simple_publisher.publish(move_target_pose)
         except LookupException:
             # TODO: we lost the target if we ever get here
@@ -208,9 +206,9 @@ class PickUp(Leaf):
             goal.type = category_name_to_type(self.context.target.category_name)
             # TODO: maybe get these from perception
             goal.x = -0.145
-            goal.y = 0.0
-            goal.z = -0.13
-            goal.yaw = 0.0
+            goal.y = -0.03
+            goal.z = -0.14 if goal.type == 'animal' else -0.13
+            goal.yaw = 1.57 if goal.type == 'animal' else 0.0
 
             self.action_client.send_goal(goal, done_cb=self._done_cb)
         return RUNNING
@@ -225,6 +223,26 @@ class CanDropOff(Leaf):
     def run(self):
         rospy.loginfo('CanDropOff')
         return SUCCESS if self.context.can_drop_off else FAILURE
+
+
+def calculate_drop_off_target_pose(target_tf_frame, tf_buffer):
+    target = tf_buffer.lookup_transform('map', target_tf_frame, rospy.Time(0))
+    base_link = tf_buffer.lookup_transform('map', 'base_link', rospy.Time(0))
+    target_pose = PoseStamped()
+    target_pose.header.frame_id = 'map'
+    target_pose.pose.position.x = target.transform.translation.x
+    target_pose.pose.position.y = target.transform.translation.y
+    target_pose.pose.position.z = target.transform.translation.z
+    # get orientation from vector from base_link to target using quaternion_from_euler and math.atan2
+    x = target.transform.translation.x - base_link.transform.translation.x
+    y = target.transform.translation.y - base_link.transform.translation.y
+    yaw = atan2(y, x)
+    q = quaternion_from_euler(0, 0, yaw)
+    target_pose.pose.orientation.x = q[0]
+    target_pose.pose.orientation.y = q[1]
+    target_pose.pose.orientation.z = q[2]
+    target_pose.pose.orientation.w = q[3]
+    return target_pose
     
 
 class GoToDropOff(Leaf):
@@ -234,13 +252,15 @@ class GoToDropOff(Leaf):
         self.start = ServiceProxy('/path_tracker/start', Trigger)
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
         self.is_running = False
+        self.buffer = Buffer(cache_time=rospy.Duration(60.0))
+        self.listener = TransformListener(self.buffer)
 
     def run(self):
         rospy.loginfo('GoToDropOff')
         try:
             # TODO: test if this works, might be problematic if aruco pose is upside down or something
-            box_frame = 'aruco/detected3'
-            move_target_pose = calculate_move_target_pose(box_frame, self.buffer)
+            box_frame = f'aruco/detected{box_id}'
+            move_target_pose = calculate_drop_off_target_pose(box_frame, self.buffer)
 
             self.move_base_simple_publisher.publish(move_target_pose)
         except LookupException:
