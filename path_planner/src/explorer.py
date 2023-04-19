@@ -31,7 +31,8 @@ class explorer():
         self.grid_map_sub = rospy.Subscriber("/map/GridMap", GridMapMsg, self.map_callback)
 
         # publishers
-        self.goal_pub = rospy.Publisher('/start_and_goal', PoseStamped, queue_size=10) # change to the topic to what the path_planner subscribes to
+        # self.goal_pub = rospy.Publisher('/start_and_goal', PoseStamped, queue_size=10) # change to the topic to what the path_planner subscribes to
+        self.goal_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10) # change to the topic to what the path_planner subscribes to
 
         # Parameters
         self.map_coords = []
