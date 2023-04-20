@@ -12,6 +12,7 @@ from visualization_msgs.msg import Marker, MarkerArray, InteractiveMarker, Inter
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose, Point 
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedback
 import tf
+import time
 
 class LineSegment():
     def __init__(self,x1,y1,x2,y2) -> None:
@@ -140,6 +141,9 @@ class PathTracker():
         self.deceleration_distance = 0.0
         self.in_goal_tolerance = 0.03
         self.orientaion_tolerance = 0.1
+        self.stop_time = 1 # change to affect how long you want to stop
+        self.duration = 2 # change to affect how long you want to drive before stopping
+        self.start_time = False # internal variable to keep track of time
 
         # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
         # self.aruco = Marker()
@@ -245,7 +249,6 @@ class PathTracker():
         
      # Calculate the direction the robot should go
     def math(self):
-        
         angle_to_goal =  1 * math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
         distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
         robot_theta = tf.transformations.euler_from_quaternion([self.pose.pose.orientation.x, self.pose.pose.orientation.y, self.pose.pose.orientation.z, self.pose.pose.orientation.w])[2] 
@@ -267,6 +270,7 @@ class PathTracker():
 
             else:
                 self.move.linear.x = self.velocity_controller(distance)
+
                 self.move.angular.z = 0.0
                 
         else:
@@ -288,12 +292,20 @@ class PathTracker():
 
         self.cmd_pub.publish(self.move)   
         
-
-
+    def check_elapsed_time(self):
+        stop = False
+        if self.start_time == False:
+            self.start_time = self.perf_counter()
+        if self.start_time - time.perf_counter() > self.duration:
+            stop = True
+            self.start_time = False
+        return stop 
+        
 
     # This function is used to control the velocity of the robot
     def velocity_controller(self,distance):
-        # This is the distance the robot needs to stop from current velocity
+        # This is the distance the robot needs to stop from current velocity'
+        stop = self.check_elapsed_time() # chekcs if it is time to stop
         self.deceleration_distance = 0.5 * self.move.linear.x**2 / self.acceleration
         
         if distance <= self.deceleration_distance:
@@ -306,6 +318,9 @@ class PathTracker():
             self.move.linear.x += self.acceleration
             self.move.linear.x  = min(self.move.linear.x ,self.max_speed) # max speed
             #print('Moving forward')
+        # if time to stop thjen no movement
+        if stop: 
+            self.linear.x = 0.0
         return self.move.linear.x
 
 
@@ -313,10 +328,12 @@ class PathTracker():
         if not self.goal_received:
             return
 
-        if self.check_if_in_fence(self.goal.pose): #
+        if self.check_if_in_fence(self.goal.pose): 
             #print('In fence')
             self.transforms()
             self.math()
+            if self.check_elapsed_time():
+                rospy.sleep(self.stop_time)
         else:
             print('Path tracker: Goal Pose not inside workspace')
             self.move.linear.x = 0.0
