@@ -135,7 +135,7 @@ class PathTracker():
         # To control the robots movement
         self.move = Twist()
         self.acceleration = 0.05
-        self.max_speed = 0.4
+        self.max_speed = 0.3
         self.max_angle = 0.1
         self.angle_speed = 0.2
         self.deceleration_distance = 0.0
@@ -169,7 +169,6 @@ class PathTracker():
         print('Path tracker: Subscribers initalized')
 
    
-        
 
    
     # To get the position of the goal
@@ -203,49 +202,6 @@ class PathTracker():
             print('Path tracker: No transform found')
                         
 
-    def pure_pursuit(self):
-            k = 0.4
-            L = 0.30 
-            z= 0.3
-            
-            angle_to_goal =  1 * math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
-            distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
-            robot_theta = tf.transformations.euler_from_quaternion([self.pose.pose.orientation.x, self.pose.pose.orientation.y, self.pose.pose.orientation.z, self.pose.pose.orientation.w])[2] 
-            goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
-            dtheta = goal_orientation - robot_theta
-            print(f'goal pos {self.goal_in_base_link.pose.position}')
-            v=k*distance
-            w=2*v*math.sin(angle_to_goal)/L
-            print(w)
-            self.move.linear.x = v
-            self.move.linear.x  = max(self.move.linear.x ,0.0)
-            self.move.linear.x  = min(self.move.linear.x ,self.max_speed) # max speed
-            
-            
-            self.move.angular.z = w
-            self.move.angular.z = max(self.move.angular.z ,0.0)
-            self.move.angular.z = min(self.move.angular.z ,self.max_angle) # max angular speed
-            
-            
-            
-            if distance<= self.in_goal_tolerance:
-                if abs(dtheta) >= self.orientaion_tolerance:
-                    self.move.linear.x = 0.0
-                    if dtheta >= 0:
-                        self.move.angular.z = self.angle_speed
-                        # print('rotating left')
-                    elif dtheta < 0:
-                        self.move.angular.z = -self.angle_speed
-                        # print('rotating right')
-                else:
-                    self.move.linear.x = 0.0
-                    self.move.angular.z = 0.0
-                    print('Goal orientation reached')
-                    
-                    
-            self.cmd_pub.publish(self.move)
-
-
         
      # Calculate the direction the robot should go
     def math(self):
@@ -254,36 +210,32 @@ class PathTracker():
         robot_theta = tf.transformations.euler_from_quaternion([self.pose.pose.orientation.x, self.pose.pose.orientation.y, self.pose.pose.orientation.z, self.pose.pose.orientation.w])[2] 
         goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
         dtheta = goal_orientation - robot_theta
-        #print(f'distance is {distance}')
+
 
         if distance > self.in_goal_tolerance:
 
             if angle_to_goal >= self.max_angle:
                 self.move.linear.x = 0.0
                 self.move.angular.z = self.angle_speed 
-                # print('turning left')
 
             elif angle_to_goal <= -self.max_angle:
                 self.move.linear.x = 0.0
                 self.move.angular.z = -self.angle_speed 
-                # print('turning right')
 
             else:
                 self.move.linear.x = self.velocity_controller(distance)
-
                 self.move.angular.z = 0.0
                 
         else:
-            #print('Goal reached')
-            #print(f'Theta {dtheta}')
+
             if abs(dtheta) >= self.orientaion_tolerance:
                 self.move.linear.x = 0.0
                 if dtheta >= 0:
                     self.move.angular.z = self.angle_speed 
-                    #print('rotating left')
+
                 elif dtheta < 0:
                     self.move.angular.z = -self.angle_speed
-                    #print('rotating right')
+
             else:
                 self.move.linear.x = 0.0
                 self.move.angular.z = 0.0
@@ -301,24 +253,43 @@ class PathTracker():
             self.start_time = False
         return stop 
         
+    # def velocity_controller(self, distance):
+    #     stop = self.check_elapsed_time() # checks if it is time to stop
+    #     self.deceleration_distance = 0.5 * self.move.linear.x**2 / self.acceleration
 
-    # This function is used to control the velocity of the robot
+    #     # Calculate the velocity using a triangular wave function
+    #     period = 4*self.duration
+    #     amplitude = self.max_speed
+    #     t = self.check_elapsed_time() % period
+    #     if t <= period/2:
+    #         velocity = 2*t*amplitude/period
+    #     else:
+    #         velocity = 2*(period-t)*amplitude/period
+
+    #     # Set the velocity and direction of the robot
+    #     self.move.linear.x = velocity
+    #     self.move.linear.x = max(min(self.move.linear.x, self.max_speed), 0.0)
+
+    #     # If it is time to stop, set the velocity to zero
+    #     if stop:
+    #         self.move.linear.x = 0.0
+
+    #     return self.move.linear.x
+    
     def velocity_controller(self,distance):
-        # This is the distance the robot needs to stop from current velocity'
         stop = self.check_elapsed_time() # chekcs if it is time to stop
         self.deceleration_distance = 0.5 * self.move.linear.x**2 / self.acceleration
         
         if distance <= self.deceleration_distance:
             self.move.linear.x -= self.acceleration
             self.move.linear.x  = max(self.move.linear.x ,0.0)
-            #print('Slowing down')
 
-        # Makes it so that the robot always want to accelerate to a max speed of 0.5
         else:
             self.move.linear.x += self.acceleration
-            self.move.linear.x  = min(self.move.linear.x ,self.max_speed) # max speed
-            #print('Moving forward')
-        # if time to stop thjen no movement
+            self.move.linear.x  = min(self.move.linear.x ,self.max_speed) 
+
+
+        # if time to stop then no movement
         if stop: 
             self.linear.x = 0.0
         return self.move.linear.x
