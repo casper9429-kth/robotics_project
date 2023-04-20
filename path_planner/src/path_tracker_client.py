@@ -19,20 +19,6 @@ class path_planner():
 
         self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
 
-        # self.goal = MoveBaseGoal()
-        # self.goal.target_pose.header.frame_id = "map"
-        # self.goal.target_pose.header.stamp = rospy.Time.now()
-        # self.goal.target_pose.pose.position.x = 1.0
-        # self.goal.target_pose.pose.position.y = 0.0
-        # self.goal.target_pose.pose.position.z = 0.0
-        # self.goal.target_pose.pose.orientation.x = 0.0
-        # self.goal.target_pose.pose.orientation.y = 0.0
-        # self.goal.target_pose.pose.orientation.z = 0.0
-        # self.goal.target_pose.pose.orientation.w = 1.0
-        # self.path_client.send_goal(self.goal)
-        # self.path_client.wait_for_result()
-        # print("Path tracker finished")
-
 
     def goal_callback(self, msg):
         
