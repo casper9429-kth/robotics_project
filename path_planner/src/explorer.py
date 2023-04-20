@@ -125,8 +125,6 @@ class explorer():
             self.rate.sleep()
 
 
-
-        print('Start published')
 if __name__ == '__main__':
     # Needs to be this way because otherwise the node will not be able to publish correctly
     explorer = explorer()
