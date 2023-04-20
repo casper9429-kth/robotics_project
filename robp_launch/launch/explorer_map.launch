@@ -21,6 +21,9 @@
 
 	
 	<!-- Include realsense2_camera -->
+	<node name="object_classifier" pkg="detection" type="object_classification.py" output='screen'/>
+	<node name="object_computations" pkg="detection" type="object_computations.py" output='screen'/>
+
 	<include file="$(find robp_launch)/launch/rs_camera.launch">
       <arg name="align_depth" value="true"/>
     </include>
@@ -68,10 +71,10 @@
 	<include file="$(find odometry)/include/odometry.launch" />
 
     <!-- run the explorer -->
-	<!-- <node name="explorer" pkg="path_planner" type="explorer.py" output='screen'/> -->
+	<node name="explorer" pkg="path_planner" type="explorer.py" output='screen'/>
 
     <!-- run the path tracker -->
-    <node name="path_tracker" pkg="path_planner" type="path_tracker_server.py" output='screen'/>
+    <!-- <node name="path_tracker" pkg="path_planner" type="path_tracker_server.py" output='screen'/> -->
     <!-- <node name="path_tracker_client" pkg="path_planner" type="path_tracker_client.py" output='screen'/>  -->
 
 

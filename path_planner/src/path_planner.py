@@ -85,7 +85,9 @@ class A_star():
         self.goal_reached.data = False
         # subscriber 
         self.sub_map = rospy.Subscriber("/map/GridMap", GridMapMsg, self.map_callback)
-        self.sub_goal_reached = rospy.Subscriber('/path_tracker/feedback', Bool, self.goal_reached_callback)
+        #self.sub_goal_reached = rospy.Subscriber('/path_tracker/feedback', Bool, self.goal_reached_callback)
+        self.goal_reached_pub = rospy.Subscriber('/goal_reached', Bool,self.goal_reached_callback)
+
         #self.sub_start_and_goal = rospy.Subscriber("/start_and_goal", PoseArray, self.start_and_goal_callback)
         
         # tf things
@@ -167,6 +169,7 @@ class A_star():
         pathlist.append(node) 
         path = [(node.x,node.y) for node in pathlist]
         path.reverse()
+        rospy.logerr(f'FOUND PATH')
         return path
     
 
@@ -336,8 +339,9 @@ class Path_Planner():
         #print('server found')
 
         #subscribers
-        self.sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
+        #self.sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
         self.start_and_goa_sub = rospy.Subscriber('/start_and_goal', PoseStamped, self.start_and_goal_callback)
+        self.goal_reached_sub = rospy.Subscriber('/goal_reached',Bool,self.goal_reached_callback)
 
         #publishers
         self.move_to_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
@@ -347,10 +351,11 @@ class Path_Planner():
         self.goal = PoseStamped()
         self.has_recived_goal = False
         
+        self.reached_goal = False
         
 
         # might need to change in the future
-        self.rate = rospy.Rate(0.5)
+        self.rate = rospy.Rate(0.1)
 
         self.path_planner = A_star()
         self.last_msg = PoseStamped()
@@ -365,6 +370,9 @@ class Path_Planner():
         self.goal = msg
         self.has_recived_goal = True
         #self.main()
+        
+    def goal_reached_callback(self,msg):
+        self.reached_goal = msg.data
 
     def goal_callback(self,goal):
         self.goal = goal
@@ -380,17 +388,14 @@ class Path_Planner():
         self.t_stamp = msg.header.stamp
         self.origo_index_i = msg.origo_index_i
         self.origo_index_j = msg.origo_index_j
-        self.path_planner.map = msg.data # TODO look at explorer find goal and see how to get the map
+        self.path_planner.map = msg.data 
         
 ############################################ Main ############################################
 
     
 
-    def tranform_path_to_posestamped(self,path):#fuzzy controller
+    def tranform_path_to_posestamped(self,path):
         path_list = []
-        """path_tosend = Path
-        path_tosend.header.frame_id = "map"
-        path_tosend.header.stamp = rospy.Time.now()"""
 
         for point in path:
             pose = PoseStamped()
@@ -415,26 +420,36 @@ class Path_Planner():
 
     def send_path(self,path): #TODO  fix to publish
         path_list = self.tranform_path_to_posestamped(path)
-        print('paths transformed')
-        #print(path_list)
+        #print(path_list)        
         
         if self.last_msg != path_list[0]:
+            print(f'Path planner: reached goal {self.reached_goal}')
+            if self.reached_goal == True:
+                print('enters loop')
+                print(f'Len before {len(path_list)}')
+                path_list.pop(0)
+                print(f'Len after {len(path_list)}')
+                
+                self.reached_goal = False
+            print(f'Path planner: Published point {path_list[0].pose.position.x,path_list[0].pose.position.y  }')
             self.move_to_pub.publish(path_list[0])
             
             self.last_msg = path_list[0]
-            print('published')
+            #print('published')
         
         path= Path()
         path.header.stamp = rospy.Time.now()
         path.header.frame_id = 'map'
         
+        
+            
         for point in path_list:
             path.poses.append(point)
         
         
         if path_list:
             
-            print(path)
+            #print(path)
             self.viz_path_pub.publish(path)
             
         
@@ -447,7 +462,6 @@ class Path_Planner():
         
 
     def main(self):
-        print('main')
         if self.path_planner.map_coords == None:
             rospy.logwarn('Path planner: No map yet')
             return
@@ -467,7 +481,7 @@ class Path_Planner():
     def spin(self):
         while not rospy.is_shutdown():
             self.main()
-            print('spinning like a cat')
+            #print('spinning like a cat')
             #rospy.sleep(0.5)
             self.rate.sleep()
 

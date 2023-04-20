@@ -71,7 +71,7 @@
 	<include file="$(find odometry)/include/odometry.launch" />
 
     <!-- run the explorer -->
-	<node name="explorer" pkg="path_planner" type="explorer.py" output='screen'/> 
+	<!-- <node name="explorer" pkg="path_planner" type="explorer.py" output='screen'/>  -->
 
     <!-- run the path tracker -->
     <node name="path_tracker" pkg="path_planner" type="path_tracker_server.py" output='screen'/>
