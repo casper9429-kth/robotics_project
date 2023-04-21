@@ -37,7 +37,7 @@ class Object_computations():
         self.id = 0
         
         self.reduce_categories = rospy.get_param('reduce_categories')
-        self.mapping_animals = ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie", "Cube", "Sphere"]
+        self.mapping_animals = ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie"]
         self.mapping_cubes = ["Red_cube", "Green_cube", "Blue_cube", "Wooden_cube"]
         self.mapping_spheres = ["Red_ball", "Green_ball", "Blue_ball"]
 

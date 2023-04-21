@@ -181,11 +181,11 @@ class GoToPickUp(Leaf):
 
 # TODO: test this, might be problematic because of capitalization
 def category_name_to_type(category_name):
-    if category_name == 'Cube':
+    if category_name in ["Red_cube", "Green_cube", "Blue_cube", "Wooden_cube"]:
         return 'cube'
-    elif category_name == 'Sphere':
+    elif category_name in ["Red_ball", "Green_ball", "Blue_ball"]:
         return 'sphere'
-    elif category_name in ['Binky', 'Hugo', 'Slush', 'Muddles', 'Kiki', 'Oakie']:
+    elif category_name in ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie"]:
         return 'animal'
     else:
         raise ValueError(f'Unknown category name {category_name}')
@@ -319,10 +319,9 @@ class ReturnToAnchor(Leaf):
         self.is_finished = False
 
     def run(self):
+        rospy.loginfo('ReturnToAnchor')
         if self.is_finished:
             return SUCCESS
-        rospy.loginfo('ReturnToAnchor')
-        # TODO: get drop off pose from detection
         pick_up_pose = PoseStamped()
         pick_up_pose.header.frame_id = 'map'
         pick_up_pose.pose.position.x = 0.0

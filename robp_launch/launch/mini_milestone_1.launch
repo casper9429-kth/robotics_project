@@ -49,6 +49,7 @@
 	</node>
 
 	<!-- Object Detection -->
+	<param name="reduce_categories" type="bool" value="False"/>
 	<node name="object_classifier" pkg="detection" type="object_classification.py" />
 	<node name="object_computations" pkg="detection" type="object_computations.py" />
 
