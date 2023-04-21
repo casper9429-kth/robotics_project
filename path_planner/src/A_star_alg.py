@@ -23,7 +23,7 @@ def main():
         map[x:x+width, y:y+height] = 1
 
 
-
+    """
     # Inflate the obstacles in the map by r_index
     r_index = 5
     
@@ -67,7 +67,7 @@ def main():
     obstacle_indices_inflated = obstacle_indices_inflated[(obstacle_indices_inflated[:,0] >= 0) & (obstacle_indices_inflated[:,0] < map.shape[0])]
     obstacle_indices_inflated = obstacle_indices_inflated[(obstacle_indices_inflated[:,1] >= 0) & (obstacle_indices_inflated[:,1] < map.shape[1])]
     map[obstacle_indices_inflated[:,0], obstacle_indices_inflated[:,1]] = 1
-
+    """
     for i in range(10):
         # Start and goal position of the robot randomly chosen in the map
         # Make sure that the start and goal position are not inside an obstacle
