@@ -186,7 +186,7 @@ class Object_classifier():
                 else:
                     bb_msg.category_name = self.mapping[bb["category"]]
                 
-                if bb_msg.category_name is not None and depth < 2 and bb["width"]*bb["width"] > 100:
+                if bb_msg.category_name is not None and depth > 0.15 and depth < 2 and bb["width"]*bb["width"] > 100:
                     
                     # visualize image with bb in Rviz
                     start_point = (x_bb, y_bb)
