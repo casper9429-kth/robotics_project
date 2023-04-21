@@ -48,7 +48,7 @@ class path_planner():
         self.goal.target_pose.pose.orientation.w = msg.pose.orientation.w
         self.path_client.send_goal(self.goal)
         self.path_client.wait_for_result()
-        print("Goal received")
+        rospy.loginfo("Goal received")
 
 
 if __name__ == '__main__':

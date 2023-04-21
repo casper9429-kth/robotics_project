@@ -37,7 +37,7 @@ class Object_computations():
         self.id = 0
         
         self.reduce_categories = rospy.get_param('reduce_categories')
-        self.mapping_animals = ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie", "Cube", "Sphere"]
+        self.mapping_animals = ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie"]
         self.mapping_cubes = ["Red_cube", "Green_cube", "Blue_cube", "Wooden_cube"]
         self.mapping_spheres = ["Red_ball", "Green_ball", "Blue_ball"]
 
@@ -96,9 +96,8 @@ class Object_computations():
                     #rospy.loginfo("cluster size: %s" % len(bb_cluster))
                     if len(bb_cluster) > self.threshold:
                         bbs_by_cluster.append(bb_cluster)
-
-                    #rospy.loginfo("cluster size: %s", nb_msgs)
-                    
+    
+                    rospy.loginfo("Number of clusters: %s", len(bb_cluster))
                 # take mean position and maximum category_name
                 instances_to_save = []
                 for cluster in bbs_by_cluster:

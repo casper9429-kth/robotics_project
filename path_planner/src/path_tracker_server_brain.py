@@ -9,6 +9,10 @@ from aruco_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedback
 import tf
+### NEW ###
+from std_srvs.srv import Trigger, TriggerResponse
+from path_planner.srv import Bool, BoolResponse
+###########
 
 class LineSegment():
     def __init__(self,x1,y1,x2,y2) -> None:
@@ -84,8 +88,8 @@ class Polygon():
 
 class PathTracker():
     def __init__(self):
-        rospy.init_node('path_tracker')
-        print('path_tracker node initalized')
+        rospy.init_node('path_tracker_server_brain')
+        print('path_tracker_server_brain node initalized')
         self.robot_frame = 'base_link'
         self.rate = rospy.Rate(10)
 
@@ -102,7 +106,13 @@ class PathTracker():
         self.pose.pose.orientation.z = 0.0
         self.pose.pose.orientation.w = 0.0
 
-
+        ### NEW ###
+        # Services
+        self.is_running = False
+        self.start_service = rospy.Service('/path_tracker/start', Trigger, self.start_callback)
+        self.cancel_service = rospy.Service('/path_tracker/cancel', Trigger, self.cancel_callback)
+        self.is_running_service = rospy.Service('/path_tracker/is_running', Bool, self.is_running_callback)
+        ###########
 
         # Goal position and orientation
         self.goal = PoseStamped()
@@ -151,8 +161,20 @@ class PathTracker():
 
         self.path_tracker_server = actionlib.SimpleActionServer('path_tracker', MoveBaseAction, execute_cb=self.execute_cb, auto_start=False)
         self.path_tracker_server.start()
-        print('Action server started')
-
+        rospy.logdebug('Action server started')
+        
+    ### NEW ###
+    def start_callback(self, req):
+        self.is_running = True
+        return TriggerResponse(success=True, message='Started')
+    
+    def cancel_callback(self, req):
+        self.is_running = False
+        return TriggerResponse(success=True, message='Cancelled')
+    
+    def is_running_callback(self, req):
+        return BoolResponse(self.is_running)
+    ###########
 
     def execute_cb(self, goal):
         self.goal = goal.target_pose            # target_pose is a PosedStamped
@@ -238,13 +260,16 @@ class PathTracker():
         
      # Calculate the direction the robot should go
     def math(self):
+        ### NEW ###
+        if not self.is_running:
+            return
+        ###########
         
         angle_to_goal =  1 * math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
         distance = 1 * math.hypot(self.goal_in_base_link.pose.position.x,self.goal_in_base_link.pose.position.y)
         robot_theta = tf.transformations.euler_from_quaternion([self.pose.pose.orientation.x, self.pose.pose.orientation.y, self.pose.pose.orientation.z, self.pose.pose.orientation.w])[2] 
         goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
         dtheta = goal_orientation - robot_theta
-        
 
         if distance > self.in_goal_tolerance:
 
@@ -275,9 +300,10 @@ class PathTracker():
             else:
                 self.move.linear.x = 0.0
                 self.move.angular.z = 0.0
+                ### NEW ###
+                self.is_running = False
+                ###########
                 # print('Goal orientation reached')
-
-
         
         self.cmd_pub.publish(self.move)   
         
@@ -305,7 +331,7 @@ class PathTracker():
     def spin(self):
         #print(self.goal.pose)
         #print(self.check_if_in_fence(self.goal.pose))
-        if self.check_if_in_fence(self.goal.pose): #
+        if True: # self.check_if_in_fence(self.goal.pose): # TODO: this contains a bug maybe
             rospy.loginfo('In fence')
             self.transforms()
             self.math()
