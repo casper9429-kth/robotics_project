@@ -141,7 +141,7 @@ class PathTracker():
         self.deceleration_distance = 0.0
         self.in_goal_tolerance = 0.03
         self.orientaion_tolerance = 0.1
-        self.stop_time = 1 # change to affect how long you want to stop
+        self.stop_time = 2 # change to affect how long you want to stop
         self.duration = 2 # change to affect how long you want to drive before stopping
         self.start_time = False # internal variable to keep track of time
 
@@ -295,10 +295,14 @@ class PathTracker():
     def check_elapsed_time(self):
         stop = False
         if self.start_time == False:
-            self.start_time = self.perf_counter()
-        if self.start_time - time.perf_counter() > self.duration:
+            self.start_time = time.perf_counter()
+            #print('Path tracker: Start counting time')
+        #print(f'Path tracker: Time diff is {time.perf_counter() - self.start_time}')
+        #print(f'Path Tracker: self.duration {self.duration}')
+        if time.perf_counter() - self.start_time > self.duration:
             stop = True
             self.start_time = False
+            #print('Path tracker: stopping')
         return stop 
         
 
@@ -306,6 +310,7 @@ class PathTracker():
     def velocity_controller(self,distance):
         # This is the distance the robot needs to stop from current velocity'
         stop = self.check_elapsed_time() # chekcs if it is time to stop
+
         self.deceleration_distance = 0.5 * self.move.linear.x**2 / self.acceleration
         
         if distance <= self.deceleration_distance:
@@ -320,7 +325,7 @@ class PathTracker():
             #print('Moving forward')
         # if time to stop thjen no movement
         if stop: 
-            self.linear.x = 0.0
+            self.move.linear.x = 0.0
         return self.move.linear.x
 
 

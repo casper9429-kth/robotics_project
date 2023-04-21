@@ -40,7 +40,7 @@
 	<node name="arm_camera" pkg="arm_camera" type="arm_camera.py" output='screen'/>
 
 	<!-- run rviz -->
-	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/odometry.rviz" />
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/path_planner.rviz" />
 
 	<!-- run aruco detection -->
 	<node name="display_markers" pkg="detection" type="display_markers.py" output='screen'/>
