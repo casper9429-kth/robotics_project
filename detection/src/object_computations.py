@@ -35,6 +35,11 @@ class Object_computations():
         self.bridge = CvBridge()
         self.threshold = 8
         self.id = 0
+        
+        self.reduce_categories = rospy.get_param('reduce_categories')
+        self.mapping_animals = ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie", "Cube", "Sphere"]
+        self.mapping_cubes = ["Red_cube", "Green_cube", "Blue_cube", "Wooden_cube"]
+        self.mapping_spheres = ["Red_ball", "Green_ball", "Blue_ball"]
 
         # Define rate
         self.update_rate = 1 # [Hz] Change this to the rate you want
@@ -119,7 +124,6 @@ class Object_computations():
                 self.save_instances(instances_to_save)
 
 
-    #def save_instances(self, new_instance, time, bb_info):
     def save_instances(self, list_instances):
 
         
@@ -128,6 +132,12 @@ class Object_computations():
         for instance in list_instances:
             
             new_instance = instance[0]
+            
+            if self.reduce_categories:
+                new_instance_name = self.reduce_category(new_instance[0])
+                new_instance = (new_instance_name, new_instance[1], new_instance[2], new_instance[3])
+                rospy.logdebug("Reduced category: %s", new_instance[0])
+            
             time = instance[1]
             bb_info = instance[2]
 
@@ -347,6 +357,14 @@ class Object_computations():
         except KeyError as e:
             rospy.logwarn(e)
 
+    def reduce_category(self, new_instance):
+        if new_instance in self.mapping_animals:
+            new_instance = "animal"
+        elif new_instance in self.mapping_cubes:
+            new_instance = "cube"
+        elif new_instance in self.mapping_spheres:
+            new_instance = "sphere"
+        return new_instance
 
     def main(self): # Do main stuff here    
         """
