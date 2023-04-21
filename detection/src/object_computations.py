@@ -7,7 +7,6 @@ from geometry_msgs.msg import TransformStamped, Point, Quaternion
 import message_filters 
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import pdist
-from matplotlib import pyplot as plt
 import numpy as np
 from collections import Counter
 import math
@@ -47,7 +46,7 @@ class Object_computations():
         #self.sub_topic = rospy.Subscriber("detection/bounding_boxes", BoundingBoxArray)
         self.sub = message_filters.Subscriber("detection/bounding_boxes", BoundingBoxArray)
         self.sub_image = message_filters.Subscriber("/camera/color/image_raw", Image) 
-        self.sub_remove_instance = rospy.Subscriber("/detection/remove_instance", ObjectInstance, self.remove_instance_callback)
+        self.sub_remove_instance = rospy.Subscriber("/detection/remove_instance", String, self.remove_instance_callback)
         self.cache = message_filters.Cache(self.sub, 100)
         self.cache_image = message_filters.Cache(self.sub_image, 100)
         
@@ -89,6 +88,7 @@ class Object_computations():
                     for index in a:
                         bb_cluster.append(bb_list[index])
                     
+                    #rospy.loginfo("cluster size: %s" % len(bb_cluster))
                     if len(bb_cluster) > self.threshold:
                         bbs_by_cluster.append(bb_cluster)
     
@@ -340,7 +340,7 @@ class Object_computations():
 
 
     def remove_instance_callback(self, msg):
-        instance_key = msg.instance_name
+        instance_key = msg.data
         # delete instance from dict
         try:
             del self.objects_dict[instance_key]

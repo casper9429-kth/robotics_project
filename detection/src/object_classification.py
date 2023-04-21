@@ -13,9 +13,8 @@ from cv_bridge import CvBridge, CvBridgeError
 import cv2
 from detection.msg import BoundingBox, BoundingBoxArray
 import time
-from open3d import open3d as o3d
-from open3d_ros_helper import open3d_ros_helper as o3drh
 import os
+import message_filters
 
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 torch.cuda.set_per_process_memory_fraction(0.6,0)
@@ -56,19 +55,33 @@ class Object_classifier():
         self.camera_info = [None, None, None, None]
         
         # Subscribers 
-        self.sub_image = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback) 
-        self.sub_depth= rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image, self.depth_image_callback)
+        # self.sub_image = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback) 
+        # self.sub_depth= rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image, self.depth_image_callback)
         self.sub_camera_info= rospy.Subscriber("/camera/color/camera_info", CameraInfo, self.camera_info_callback)
-       
+
+        image_sub = message_filters.Subscriber("/camera/color/image_raw", Image)
+        depth_sub = message_filters.Subscriber("/camera/aligned_depth_to_color/image_raw", Image)
+        ts = message_filters.TimeSynchronizer([image_sub, depth_sub], 2)
+        ts.registerCallback(self.combined_callback)
         
         # Publisher
         self.bb_pub = rospy.Publisher("/detection/bounding_boxes", BoundingBoxArray, queue_size=10)
         self.image_bb_pub = rospy.Publisher("/detection/image_with_bounding_boxes", Image, queue_size=10)
         
-
-
-
         
+    def combined_callback(self, image_msg, depth_msg): 
+        try:
+            t0 = time.time()
+            cv_image = self.bridge.imgmsg_to_cv2(image_msg, "rgb8")
+            depth_image = self.bridge.imgmsg_to_cv2(depth_msg, "16UC1")
+            np_arr = np.asarray(depth_image)
+            depth = np_arr
+            self.compute_bb(image_msg.header.stamp, image_msg.header.frame_id, depth, cv_image, t0) 
+
+        except CvBridgeError as e:
+            print(e)
+
+    
     def image_callback(self, msg): 
         """Callback function for the topic"""
         try:
@@ -173,7 +186,7 @@ class Object_classifier():
                 else:
                     bb_msg.category_name = self.mapping[bb["category"]]
                 
-                if bb_msg.category_name is not None and depth < 2 and bb["width"]*bb["width"] > 100:
+                if bb_msg.category_name is not None and depth > 0.15 and depth < 2 and bb["width"]*bb["width"] > 100:
                     
                     # visualize image with bb in Rviz
                     start_point = (x_bb, y_bb)
