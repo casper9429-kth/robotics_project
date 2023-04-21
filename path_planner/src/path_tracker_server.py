@@ -141,8 +141,8 @@ class PathTracker():
         self.deceleration_distance = 0.0
         self.in_goal_tolerance = 0.03
         self.orientaion_tolerance = 0.1
-        self.stop_time = 1 # change to affect how long you want to stop
-        self.duration = 2 # change to affect how long you want to drive before stopping
+        self.stop_time = 5 # change to affect how long you want to stop
+        self.duration = 1 # change to affect how long you want to drive before stopping
         self.start_time = False # internal variable to keep track of time
 
         # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
@@ -247,35 +247,12 @@ class PathTracker():
     def check_elapsed_time(self):
         stop = False
         if self.start_time == False:
-            self.start_time = self.perf_counter()
-        if self.start_time - time.perf_counter() > self.duration:
+            self.start_time = time.perf_counter()
+        if time.perf_counter() - self.start_time  > self.duration:
             stop = True
             self.start_time = False
         return stop 
         
-    # def velocity_controller(self, distance):
-    #     stop = self.check_elapsed_time() # checks if it is time to stop
-    #     self.deceleration_distance = 0.5 * self.move.linear.x**2 / self.acceleration
-
-    #     # Calculate the velocity using a triangular wave function
-    #     period = 4*self.duration
-    #     amplitude = self.max_speed
-    #     t = self.check_elapsed_time() % period
-    #     if t <= period/2:
-    #         velocity = 2*t*amplitude/period
-    #     else:
-    #         velocity = 2*(period-t)*amplitude/period
-
-    #     # Set the velocity and direction of the robot
-    #     self.move.linear.x = velocity
-    #     self.move.linear.x = max(min(self.move.linear.x, self.max_speed), 0.0)
-
-    #     # If it is time to stop, set the velocity to zero
-    #     if stop:
-    #         self.move.linear.x = 0.0
-
-    #     return self.move.linear.x
-    
     def velocity_controller(self,distance):
         stop = self.check_elapsed_time() # chekcs if it is time to stop
         self.deceleration_distance = 0.5 * self.move.linear.x**2 / self.acceleration
@@ -291,7 +268,8 @@ class PathTracker():
 
         # if time to stop then no movement
         if stop: 
-            self.linear.x = 0.0
+            self.move.linear.x = 0.0
+        print(self.move.linear.x)
         return self.move.linear.x
 
 
