@@ -250,3 +250,4 @@ robp_launch/config/odometry.rviz
 # ignore saved instances of detection
 /detection/src/saved_instances/*
 detection/src/dl_detection/wandb/*
+speak/src/recordings/*
