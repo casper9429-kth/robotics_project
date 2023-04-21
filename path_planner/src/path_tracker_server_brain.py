@@ -161,7 +161,7 @@ class PathTracker():
 
         self.path_tracker_server = actionlib.SimpleActionServer('path_tracker', MoveBaseAction, execute_cb=self.execute_cb, auto_start=False)
         self.path_tracker_server.start()
-        print('Action server started')
+        rospy.logdebug('Action server started')
         
     ### NEW ###
     def start_callback(self, req):
@@ -331,7 +331,7 @@ class PathTracker():
     def spin(self):
         #print(self.goal.pose)
         #print(self.check_if_in_fence(self.goal.pose))
-        if self.check_if_in_fence(self.goal.pose): #
+        if True: # self.check_if_in_fence(self.goal.pose): # TODO: this contains a bug maybe
             rospy.loginfo('In fence')
             self.transforms()
             self.math()
