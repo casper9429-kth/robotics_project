@@ -88,6 +88,7 @@ class Object_computations():
                     for index in a:
                         bb_cluster.append(bb_list[index])
                     
+                    #rospy.loginfo("cluster size: %s" % len(bb_cluster))
                     if len(bb_cluster) > self.threshold:
                         bbs_by_cluster.append(bb_cluster)
 
