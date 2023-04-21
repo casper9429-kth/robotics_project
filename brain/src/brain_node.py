@@ -18,7 +18,7 @@ from detection.msg import ObjectInstanceArray
 
 No = Not = Inverter
 
-box_id = 2
+box_id = 2 # TODO: Don't hardcode this in future milestones
 
 
 class BrainNode:
