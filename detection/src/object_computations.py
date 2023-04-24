@@ -171,6 +171,8 @@ class Object_computations():
                    
                     # publish tf
                     self.publish_tf(new_instance_key, point_map)
+                    # publish instances msg 
+                    self.publish_instances()
 
 
                 else:
@@ -206,6 +208,9 @@ class Object_computations():
 
                         # publish tf
                         self.publish_tf(new_instance_key, point_map)
+
+                        # publish instances msg 
+                        self.publish_instances()
                     
                         # delete other image
                         old_instance_path = self.directory+"/"+old_instance_key+".jpg"
@@ -229,6 +234,8 @@ class Object_computations():
                     
                     # publish tf
                     self.publish_tf(old_instance_key, point_map)
+                    # publish instances msg 
+                    self.publish_instances()
 
                 else:
                     # add instance to dict 
@@ -244,6 +251,8 @@ class Object_computations():
 
                     # publish tf
                     self.publish_tf(instance_key, point_map)
+                    # publish instances msg 
+                    self.publish_instances()
 
 
 
@@ -377,9 +386,6 @@ class Object_computations():
             if len(batch)>0:
                 self.filter(batch, rospy.Time.now()-rospy.Duration.from_sec(1))
 
-
-            # publish instances msg 
-            self.publish_instances()
         
 
     def run(self):
