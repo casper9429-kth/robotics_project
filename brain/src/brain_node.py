@@ -46,11 +46,11 @@ class BrainNode:
         def __init__(self):
             self.anchor_id = 500
             self.is_holding_object = False
-            self.objects_remaining = 1
             self.can_pick_up = False
             self.can_drop_off = False
             self.target = None
             self.detected_boxes = []
+            object_instances = []
 
     def run(self):
         rate = rospy.Rate(10)
@@ -82,17 +82,20 @@ class Localize(Leaf):
 class IsExplored(Leaf):
     def __init__(self):
         super().__init__()
+        self.has_had_target = False
 
     def run(self):
         rospy.loginfo(f'IsExplored')
-        return SUCCESS if self.context.target and len(self.context.detected_boxes) > 0 else FAILURE
+        if self.context.target:
+            self.has_had_target = True
+        return SUCCESS if self.has_had_target and len(self.context.detected_boxes) > 0 else FAILURE
 
 
 class Explore(Leaf):
     def __init__(self):
         super().__init__()
         self.explore = ServiceProxy('/explore', Trigger)
-        self.object_subscriber = Subscriber('/detection/object_instances', ObjectInstanceArray, self._object_instances_callback, queue_size=1)
+        self.object_subscriber = Subscriber('/detection/object_instances', ObjectInstanceArray, self.object_instances_callback, queue_size=1)
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
 
@@ -105,17 +108,17 @@ class Explore(Leaf):
                 
         return RUNNING
     
-    def _object_instances_callback(self, msg):
-        for object in msg.instances:
-            if object.id == 0: # we only care about the first found object
-                self.context.target = object
-                break
+    def object_instances_callback(self, msg):
+        self.context.object_instances = msg.instances
+        if not self.context.target and len(msg.instances) > 0:
+            self.context.target = msg.instances[-1]
 
 
 class ObjectsRemaining(Leaf):
     def run(self):
         rospy.loginfo('ObjectsRemaining')
-        return SUCCESS if self.context.objects_remaining > 0 else FAILURE
+        objects_remaining = len(self.context.object_instances)
+        return SUCCESS if objects_remaining > 0 else FAILURE
     
 
 class IsHoldingObject(Leaf):
@@ -170,6 +173,8 @@ class GoToPickUp(Leaf):
 
     def run(self):
         rospy.loginfo('GoToPickUp')
+        if not self.context.target:
+            return FAILURE
         try:
             if not self.is_running or distance_to_object(self.context.target.object_position, self.buffer) > self.update_distance_threshold:
                 move_target_pose = calculate_pick_up_target_pose(self.context.target.object_position, self.buffer)
@@ -213,6 +218,7 @@ class PickUp(Leaf):
         self.forward_service = ServiceProxy('/move/forward/pick_up', Trigger)
         self.has_moved_forward = False
         self.reverse_service = ServiceProxy('/move/reverse/pick_up', Trigger)
+        self.reverse_service_animal = ServiceProxy('/move/reverse/pick_up_animal', Trigger)
         self.has_reversed = False
         self.move_is_running = ServiceProxy('/move/is_running', BoolSrv)
 
@@ -222,7 +228,11 @@ class PickUp(Leaf):
             self.forward_service()
             self.has_moved_forward = True
         elif not self.has_reversed and not self.move_is_running().value:
-            self.reverse_service()
+            object_type = category_name_to_type(self.context.target.category_name)
+            if object_type == 'animal':
+                self.reverse_service_animal()
+            else:
+                self.reverse_service()
             self.has_reversed = True
         elif not self.arm_is_running and not self.move_is_running().value:
             self.arm_is_running = True
@@ -235,10 +245,10 @@ class PickUp(Leaf):
             goal.z = -0.14 if goal.type == 'animal' else -0.13
             goal.yaw = 1.57 if goal.type == 'animal' else 0.0
 
-            self.action_client.send_goal(goal, done_cb=self._done_cb)
+            self.action_client.send_goal(goal, done_cb=self.done_callback)
         return RUNNING
 
-    def _done_cb(self, state, result):
+    def done_callback(self, state, result):
         self.arm_is_running = False
         self.has_moved_forward = False
         self.has_reversed = False
@@ -311,6 +321,7 @@ class GoToDropOff(Leaf):
 class DropOff(Leaf):
     def __init__(self):
         super().__init__()
+        self.delete_instance_publisher = Publisher('/detection/remove_instance', String, queue_size=1)
         self.action_client = SimpleActionClient('arm_actions', ArmAction)
         self.is_running = False
         self.speak_publisher = Publisher('/speaker/speech', String, queue_size=1) 
@@ -331,21 +342,25 @@ class DropOff(Leaf):
             goal.z = -0.13
             goal.yaw = 0.0
 
-            self.action_client.send_goal(goal, done_cb=self._arm_done_cb)
+            self.action_client.send_goal(goal, done_cb=self.arm_done_callback)
         elif not self.reverse_is_running().value and self.has_reversed:
             self.done()
         return RUNNING
 
-    def _arm_done_cb(self, state, result):
+    def arm_done_callback(self, state, result):
         self.reverse_service()
         self.has_reversed = True
         
     def done(self):
+        self.delete_instance_publisher.publish(String(self.context.target.instance_name))
         self.is_running = False
         self.context.is_holding_object = False
         self.context.can_drop_off = False
         self.has_reversed = False
-        self.context.objects_remaining -= 1
+        if len(self.context.object_instances) > 0:
+            self.context.target = self.context.object_instances[-1]
+        else:
+            self.context.target = None
         self.speak_publisher.publish("Object is in the box")
     
 

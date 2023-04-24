@@ -10,13 +10,16 @@ class StaticMovementServicesNode:
         rospy.init_node('static_movement_services')
         
         self.reverse_pick_up_service = Service('move/reverse/pick_up', Trigger, self.handle_reverse_pick_up)
+        self.reverse_pick_up_service_animal = Service('move/reverse/pick_up_animal', Trigger, self.handle_reverse_pick_up_animal)
         self.forward_pick_up_service = Service('move/forward/pick_up', Trigger, self.handle_forward_pick_up)
         self.box_service = Service('move/reverse/box', Trigger, self.handle_box)
         self.cancel_service = Service('move/cancel', Trigger, self.handle_cancel)
         self.is_running = Service('move/is_running', Bool, self.handle_is_running)
         self.cmd_vel_publisher = Publisher('cmd_vel', Twist, queue_size=10)
         
-        self.pick_up_duration = .5 # [s]
+        self.forward_pick_up_duration = .75 # [s]
+        self.reverse_pick_up_duration = .5 # [s]
+        self.reverse_pick_up_duration_animal = .25 # [s]
         self.box_duration = 1.5 # [s]
         linear_x = .1
         self.forward_twist = Twist()
@@ -30,14 +33,21 @@ class StaticMovementServicesNode:
         if self.timer:
             return TriggerResponse(success=False, message='Timer already running')
         self.cmd_vel_publisher.publish(self.reverse_twist)
-        self.timer = Timer(rospy.Duration(self.pick_up_duration), self.timer_callback, oneshot=True)
+        self.timer = Timer(rospy.Duration(self.reverse_pick_up_duration), self.timer_callback, oneshot=True)
         return TriggerResponse(success=True, message='Backing away from object')
+    
+    def handle_reverse_pick_up_animal(self, _):
+        if self.timer:
+            return TriggerResponse(success=False, message='Timer already running')
+        self.cmd_vel_publisher.publish(self.reverse_twist)
+        self.timer = Timer(rospy.Duration(self.reverse_pick_up_duration_animal), self.timer_callback, oneshot=True)
+        return TriggerResponse(success=True, message='Backing away from animal')
     
     def handle_forward_pick_up(self, _):
         if self.timer:
             return TriggerResponse(success=False, message='Timer already running')
         self.cmd_vel_publisher.publish(self.forward_twist)
-        self.timer = Timer(rospy.Duration(self.pick_up_duration), self.timer_callback, oneshot=True)
+        self.timer = Timer(rospy.Duration(self.forward_pick_up_duration), self.timer_callback, oneshot=True)
         return TriggerResponse(success=True, message='Moving forward to object')
     
     def handle_box(self, _):
