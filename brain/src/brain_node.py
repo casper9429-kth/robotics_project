@@ -52,6 +52,7 @@ class BrainNode:
             self.can_pick_up = False
             self.can_drop_off = False
             self.target = None
+            self.detected_boxes = []
 
     def run(self):
         rate = rospy.Rate(10)
@@ -83,16 +84,10 @@ class Localize(Leaf):
 class IsExplored(Leaf):
     def __init__(self):
         super().__init__()
-        self.buffer = Buffer(cache_time=rospy.Duration(60.0))
-        self.listener = TransformListener(self.buffer)
 
     def run(self):
         rospy.loginfo(f'IsExplored')
-        try:
-            self.buffer.lookup_transform('map', f'aruco/detected{box_id}', rospy.Time(0))
-            return SUCCESS if self.context.target else FAILURE
-        except:
-            return FAILURE
+        return SUCCESS if self.context.target and len(self.context.detected_boxes) > 0 else FAILURE
 
 
 class Explore(Leaf):
@@ -100,10 +95,16 @@ class Explore(Leaf):
         super().__init__()
         self.explore = ServiceProxy('/explore', Trigger)
         self.object_subscriber = Subscriber('/detection/object_instances', ObjectInstanceArray, self._object_instances_callback, queue_size=1)
+        self.buffer = Buffer(cache_time=rospy.Duration(60.0))
+        self.listener = TransformListener(self.buffer)
 
     def run(self):
         rospy.loginfo('Explore')
         self.explore()
+        for box_id in range(1,4):
+            if self.buffer.can_transform('map', f'aruco/detected{box_id}', rospy.Time(0)) and box_id not in self.context.detected_boxes:
+                self.context.detected_boxes.append(box_id)
+                
         return RUNNING
     
     def _object_instances_callback(self, msg):
@@ -191,6 +192,13 @@ def category_name_to_type(category_name):
         raise ValueError(f'Unknown category name {category_name}')
 
 
+type_to_box_id = {
+    'cube': 1,
+    'sphere': 2,
+    'animal': 3
+}
+
+
 class PickUp(Leaf):
     def __init__(self):
         super().__init__()
@@ -272,6 +280,10 @@ class GoToDropOff(Leaf):
         rospy.loginfo('GoToDropOff')
         try:
             # TODO: test if this works, might be problematic if aruco pose is upside down or something
+            
+            object_type = self.category_name_to_type(self.context.target.category_name)
+            
+            
             box_frame = f'aruco/detected{box_id}'
             move_target_pose = calculate_drop_off_target_pose(box_frame, self.buffer)
 
