@@ -11,14 +11,12 @@ from actionlib import SimpleActionClient
 from tf2_ros import Buffer, TransformListener, LookupException
 from tf.transformations import quaternion_from_euler # using original tf is deprecated, but oh well
 
-from arm.msg import ArmAction, ArmGoal, ArmResult, ArmFeedback
+from arm.msg import ArmAction, ArmGoal
 from path_planner.srv import Bool as BoolSrv
 from behavior_tree.behavior_tree import BehaviorTree, Selector, Sequence, Inverter, Leaf, SUCCESS, FAILURE, RUNNING
 from detection.msg import ObjectInstanceArray
 
 No = Not = Inverter
-
-box_id = 2 # TODO: Don't hardcode this in future milestones
 
 
 class BrainNode:
@@ -151,6 +149,13 @@ def calculate_pick_up_target_pose(object_position, tf_buffer):
     return target_pose
 
 
+def distance_to_object(object_position, tf_buffer):
+    base_link = tf_buffer.lookup_transform('map', 'base_link', rospy.Time(0))
+    x = object_position.x - base_link.transform.translation.x
+    y = object_position.y - base_link.transform.translation.y
+    return (x**2 + y**2)**0.5
+
+
 class GoToPickUp(Leaf):
     def __init__(self):
         super().__init__()
@@ -161,12 +166,14 @@ class GoToPickUp(Leaf):
         # listen to tf frame object/detected/instance_name to get target pose
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
+        self.update_distance_threshold = 0.15 # [m]
 
     def run(self):
         rospy.loginfo('GoToPickUp')
         try:
-            move_target_pose = calculate_pick_up_target_pose(self.context.target.object_position, self.buffer)
-            self.move_base_simple_publisher.publish(move_target_pose)
+            if not self.is_running or distance_to_object(self.context.target.object_position, self.buffer) > self.update_distance_threshold:
+                move_target_pose = calculate_pick_up_target_pose(self.context.target.object_position, self.buffer)
+                self.move_base_simple_publisher.publish(move_target_pose)
         except LookupException:
             # TODO: we lost the target if we ever get here
             pass
@@ -180,7 +187,6 @@ class GoToPickUp(Leaf):
         return RUNNING
     
 
-# TODO: test this, might be problematic because of capitalization
 def category_name_to_type(category_name):
     if category_name in ["Red_cube", "Green_cube", "Blue_cube", "Wooden_cube"]:
         return 'cube'
@@ -266,6 +272,7 @@ def calculate_drop_off_target_pose(target_tf_frame, tf_buffer):
     return target_pose
     
 
+# TODO: box orientation is not accounted for, pathplanning problem.
 class GoToDropOff(Leaf):
     def __init__(self):
         super().__init__()
@@ -279,17 +286,16 @@ class GoToDropOff(Leaf):
     def run(self):
         rospy.loginfo('GoToDropOff')
         try:
-            # TODO: test if this works, might be problematic if aruco pose is upside down or something
-            
-            object_type = self.category_name_to_type(self.context.target.category_name)
-            
-            
-            box_frame = f'aruco/detected{box_id}'
+            box_frame = f'aruco/detected{self.context.detected_boxes[0]}'
+            object_type = category_name_to_type(self.context.target.category_name)
+            box_id = type_to_box_id[object_type]
+            if box_id in self.context.detected_boxes:
+                box_frame = f'aruco/detected{box_id}'
             move_target_pose = calculate_drop_off_target_pose(box_frame, self.buffer)
 
             self.move_base_simple_publisher.publish(move_target_pose)
         except LookupException:
-            # TODO: we lost the box if we ever get here
+            # TODO: we forgot the box if we ever get here
             pass
 
         if not self.is_running:

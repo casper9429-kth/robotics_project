@@ -53,6 +53,7 @@ class ArmServices():
         self.straight_service = Service('arm/steps/straight', ArmTrigger, self.straight_service_callback)
         self.default_service = Service('arm/steps/default', ArmTrigger, self.default_service_callback)
         self.observe_service = Service('arm/steps/observe', ArmTrigger, self.observe_service_callback)
+        self.drop_off_service = Service('arm/steps/drop_off', ArmTrigger, self.drop_off_service_callback)
         self.hover_target_service = Service('arm/steps/hover_target', ArmTrigger, self.hover_target_service_callback)
         self.on_target_service = Service('arm/steps/on_target', ArmTrigger, self.on_target_service_callback)
 
@@ -91,6 +92,7 @@ class ArmServices():
         self.joints_straight = Joints()
         self.joints_default = Joints(0, 0.52, -1.36, -1.76, 0)
         self.joints_observe = Joints(0, 0, -pi/2, -pi/2, 0)
+        self.joints_drop_off = Joints(0, 0, -1.1, -1.2, 0)
         self.joints_hover_target = None
         self.joints_on_target = None
 
@@ -150,6 +152,15 @@ class ArmServices():
             return ArmTriggerResponse(False, self.error_messages['missing joints'], 0)
         self.publish_joints(self.joints_observe, duration)
         return ArmTriggerResponse(True, 'Arm observing', duration)
+    
+    def drop_off_service_callback(self, _):
+        duration = None
+        try:
+            duration = self.calculate_duration(self.joints, self.joints_drop_off)
+        except MissingJointsError:
+            return ArmTriggerResponse(False, self.error_messages['missing joints'], 0)
+        self.publish_joints(self.joints_drop_off, duration)
+        return ArmTriggerResponse(True, 'Arm dropping off', duration)
 
     def hover_target_service_callback(self, _):
         if self.joints_hover_target is None:

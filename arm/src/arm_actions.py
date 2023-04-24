@@ -19,6 +19,8 @@ class ArmActions():
         self.default = ServiceProxy('arm/steps/default', ArmTrigger)
         rospy.wait_for_service('arm/steps/observe')
         self.observe = ServiceProxy('arm/steps/observe', ArmTrigger)
+        rospy.wait_for_service('arm/steps/drop_off')
+        self.drop_off = ServiceProxy('arm/steps/drop_off', ArmTrigger)
         rospy.wait_for_service('arm/steps/hover_target')
         self.hover_target = ServiceProxy('arm/steps/hover_target', ArmTrigger)
         rospy.wait_for_service('arm/steps/on_target')
@@ -50,7 +52,7 @@ class ArmActions():
             ],
             'drop_off': [
                 self.straight,
-                self.hover_target,
+                self.drop_off,
                 self.open_gripper,
                 self.straight
             ]
