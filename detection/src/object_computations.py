@@ -58,8 +58,6 @@ class Object_computations():
         # Publisher
         self.instances_pub = rospy.Publisher("/detection/object_instances", ObjectInstanceArray, queue_size=10)
         self.speaker_pub = rospy.Publisher("/speaker/speech", String, queue_size=10)
-        rospy.Rate(4).sleep()
-        
         
 
     def filter(self, batch, time):
@@ -363,6 +361,8 @@ class Object_computations():
         # delete instance from dict
         try:
             del self.objects_dict[instance_key]
+            # publish instances msg 
+            self.publish_instances()
         except KeyError as e:
             rospy.logwarn(e)
 

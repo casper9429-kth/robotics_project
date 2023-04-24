@@ -36,7 +36,7 @@ class Object_classifier():
         # Paramethers 
         self.device = "cuda"
         detector = Detector()
-        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-31_10-42-53-672891.pt" #for robot
+        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
         #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
         example_forward_input = torch.rand(8, 3, 640, 480)
         self.model = self.load_model(detector, model_path, self.device)

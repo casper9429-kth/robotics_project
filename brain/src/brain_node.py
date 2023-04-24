@@ -54,9 +54,18 @@ class BrainNode:
 
     def run(self):
         rate = rospy.Rate(10)
-        while not rospy.is_shutdown():
-            self.behavior_tree.run()
+        result = RUNNING
+        while not rospy.is_shutdown() and result != SUCCESS:
+            result = self.behavior_tree.run()
             rate.sleep()
+            
+            
+class Init(Leaf):
+    def run(self):
+        rospy.loginfo('Init')
+        # TODO: wait for camera to warm up
+        # TODO: wiggle to help see anchor
+        return SUCCESS
 
 
 class IsLocalized(Leaf):
@@ -110,8 +119,11 @@ class Explore(Leaf):
     
     def object_instances_callback(self, msg):
         self.context.object_instances = msg.instances
-        if not self.context.target and len(msg.instances) > 0:
-            self.context.target = msg.instances[-1]
+        if len(msg.instances) > 0:
+            if not self.context.target:
+                self.context.target = msg.instances[-1]
+            else:
+                self.context.target = [instance for instance in msg.instances if instance.id == self.context.target.id][0] # TODO: this can break if we forget old object
 
 
 class ObjectsRemaining(Leaf):
@@ -396,7 +408,7 @@ class ReturnToAnchor(Leaf):
             self.context.can_drop_off = True
             self.is_finished = True
             self.speak_publisher.publish("I am done! Sleepy is going to sleep now.")
-            return SUCCESS # TODO check for this in BehaviorTree.run so we know when to stop
+            return SUCCESS
                 
         return RUNNING
         
