@@ -64,6 +64,7 @@ class Init(Leaf):
     def run(self):
         rospy.loginfo('Init')
         # TODO: wait for camera to warm up
+        # TODO: test remove_old_instances for vision memory
         # TODO: wiggle to help see anchor
         return SUCCESS
 
