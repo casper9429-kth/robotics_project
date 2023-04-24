@@ -127,7 +127,7 @@ class PathTracker():
         self.angle_speed = 0.7
         self.deceleration_distance = 0.0
         self.in_goal_tolerance = 0.02
-        self.orientaion_tolerance = 0.05
+        self.orientaion_tolerance = 0.08
 
         # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
         self.aruco = Marker()
@@ -244,14 +244,14 @@ class PathTracker():
                     self.move.linear.x = 0.0
                     if dtheta >= 0:
                         self.move.angular.z = self.angle_speed
-                        # print('rotating left')
+                        rospy.loginfo('rotating left')
                     elif dtheta < 0:
                         self.move.angular.z = -self.angle_speed
-                        # print('rotating right')
+                        rospy.loginfo('rotating right')
                 else:
                     self.move.linear.x = 0.0
                     self.move.angular.z = 0.0
-                    print('Goal orientation reached')
+                    rospy.loginfo('Goal orientation reached')
                     
                     
             self.cmd_pub.publish(self.move)
@@ -276,34 +276,35 @@ class PathTracker():
             if angle_to_goal >= self.max_angle:
                 self.move.linear.x = 0.0
                 self.move.angular.z = self.angle_speed 
-                # print('turning left')
+                rospy.loginfo('turning left')
 
             elif angle_to_goal <= -self.max_angle:
                 self.move.linear.x = 0.0
                 self.move.angular.z = -self.angle_speed 
-                # print('turning right')
+                rospy.loginfo('turning right')
 
             else:
                 self.move.linear.x = self.velocity_controller(distance)
                 self.move.angular.z = 0.0
+                rospy.loginfo('moving forward')
                 
         else:
-            # print('Goal reached')
+            rospy.loginfo('goal reached')
             if abs(dtheta) >= self.orientaion_tolerance:
                 self.move.linear.x = 0.0
                 if dtheta >= 0:
                     self.move.angular.z = self.angle_speed 
-                    #print('rotating left')
+                    rospy.loginfo('rotating left 2')
                 elif dtheta < 0:
                     self.move.angular.z = -self.angle_speed
-                    #print('rotating right')
+                    rospy.loginfo('rotating right 2')
             else:
                 self.move.linear.x = 0.0
                 self.move.angular.z = 0.0
                 ### NEW ###
                 self.is_running = False
                 ###########
-                # print('Goal orientation reached')
+                rospy.loginfo('Goal orientation reached')
         
         self.cmd_pub.publish(self.move)   
         

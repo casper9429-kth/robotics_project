@@ -135,13 +135,13 @@ def calculate_pick_up_target_pose(object_position, tf_buffer):
     base_link = tf_buffer.lookup_transform('map', 'base_link', rospy.Time(0))
     target_pose = PoseStamped()
     target_pose.header.frame_id = 'map'
-    target_pose.pose.position.x = object_position.x
-    target_pose.pose.position.y = object_position.y
-    target_pose.pose.position.z = object_position.z
     # get orientation from vector from base_link to target using quaternion_from_euler and math.atan2
     x = object_position.x - base_link.transform.translation.x
     y = object_position.y - base_link.transform.translation.y
     yaw = atan2(y, x)
+    target_pose.pose.position.x = object_position.x
+    target_pose.pose.position.y = object_position.y
+    target_pose.pose.position.z = object_position.z
     q = quaternion_from_euler(0, 0, yaw)
     target_pose.pose.orientation.x = q[0]
     target_pose.pose.orientation.y = q[1]
@@ -195,18 +195,29 @@ class PickUp(Leaf):
     def __init__(self):
         super().__init__()
         self.action_client = SimpleActionClient('arm_actions', ArmAction)
-        self.is_running = False
+        self.arm_is_running = False
+        self.forward_service = ServiceProxy('/move/forward/pick_up', Trigger)
+        self.has_moved_forward = False
+        self.reverse_service = ServiceProxy('/move/reverse/pick_up', Trigger)
+        self.has_reversed = False
+        self.move_is_running = ServiceProxy('/move/is_running', BoolSrv)
 
     def run(self):
         rospy.loginfo('PickUp')
-        if not self.is_running:
-            self.is_running = True
+        if not self.has_moved_forward:
+            self.forward_service()
+            self.has_moved_forward = True
+        elif not self.has_reversed and not self.move_is_running().value:
+            self.reverse_service()
+            self.has_reversed = True
+        elif not self.arm_is_running and not self.move_is_running().value:
+            self.arm_is_running = True
             goal = ArmGoal()
             goal.action = 'pick_up'
             goal.type = category_name_to_type(self.context.target.category_name)
             # TODO: maybe get these from perception
             goal.x = -0.145
-            goal.y = -0.03
+            goal.y = -0.04
             goal.z = -0.14 if goal.type == 'animal' else -0.13
             goal.yaw = 1.57 if goal.type == 'animal' else 0.0
 
@@ -214,7 +225,9 @@ class PickUp(Leaf):
         return RUNNING
 
     def _done_cb(self, state, result):
-        self.is_running = False
+        self.arm_is_running = False
+        self.has_moved_forward = False
+        self.has_reversed = False
         self.context.is_holding_object = True
         self.context.can_pick_up = False
 
@@ -283,6 +296,9 @@ class DropOff(Leaf):
         self.action_client = SimpleActionClient('arm_actions', ArmAction)
         self.is_running = False
         self.speak_publisher = Publisher('/speaker/speech', String, queue_size=1) 
+        self.reverse_service = ServiceProxy('/move/reverse/box', Trigger)
+        self.reverse_is_running = ServiceProxy('/move/is_running', BoolSrv)
+        self.has_reversed = False
 
     def run(self):
         rospy.loginfo('DropOff')
@@ -297,13 +313,20 @@ class DropOff(Leaf):
             goal.z = -0.13
             goal.yaw = 0.0
 
-            self.action_client.send_goal(goal, done_cb=self._done_cb)
+            self.action_client.send_goal(goal, done_cb=self._arm_done_cb)
+        elif not self.reverse_is_running().value and self.has_reversed:
+            self.done()
         return RUNNING
 
-    def _done_cb(self, state, result):
+    def _arm_done_cb(self, state, result):
+        self.reverse_service()
+        self.has_reversed = True
+        
+    def done(self):
         self.is_running = False
         self.context.is_holding_object = False
         self.context.can_drop_off = False
+        self.has_reversed = False
         self.context.objects_remaining -= 1
         self.speak_publisher.publish("Object is in the box")
     
