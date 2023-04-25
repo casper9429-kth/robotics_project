@@ -204,7 +204,6 @@ class PathTracker():
         if distance <= self.deceleration_distance:
             self.move.linear.x -= self.acceleration
             self.triangular_mode = False
-            rospy.loginfo('hello')
             
         elif self.triangular_mode:
             # Calculates the current time since the last wave
@@ -240,18 +239,15 @@ class PathTracker():
                 self.last_wave_time = rospy.Time.now()
                 self.move.linear.x = 0.0
                 self.move.angular.z = self.angle_speed
-                rospy.loginfo('A')
 
             elif angle_to_goal <= -self.max_angle:
                 self.last_wave_time = rospy.Time.now()
                 self.move.linear.x = 0.0
                 self.move.angular.z = -self.angle_speed 
-                rospy.loginfo('B')
 
             else:
                 self.move.linear.x = self.velocity_controller(distance)
                 self.move.angular.z = 0.0
-                rospy.loginfo('C')
 
                 
         else:
@@ -261,11 +257,9 @@ class PathTracker():
                 self.move.linear.x = 0.0
                 if dtheta >= 0:
                     self.move.angular.z = self.angle_speed 
-                    rospy.loginfo('D')
 
                 elif dtheta < 0:
                     self.move.angular.z = -self.angle_speed
-                    rospy.loginfo('E')
 
             else:
                 self.move.linear.x = 0.0
@@ -273,7 +267,6 @@ class PathTracker():
                 self.is_running = False
                 rospy.loginfo('Goal orientation reached')
         
-        rospy.loginfo(f'publishing {self.move}')
         self.cmd_pub.publish(self.move)
 
     def spin(self):
