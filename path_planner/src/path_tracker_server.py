@@ -2,16 +2,13 @@
 import math
 import rospy
 import tf2_ros
-import actionlib
 import tf2_geometry_msgs
-from robp_msgs.msg import DutyCycles
-# from aruco_msgs.msg import MarkerArray, Marker
-from nav_msgs.msg import Path
 from std_msgs.msg import Bool
-from visualization_msgs.msg import Marker, MarkerArray, InteractiveMarker, InteractiveMarkerControl
-from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose, Point 
-from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedback
+from geometry_msgs.msg import PoseStamped, Twist, PoseArray, Pose
 import tf
+from std_srvs.srv import Trigger, TriggerResponse
+from path_planner.srv import Bool as BoolSrv, BoolResponse
+
 
 class LineSegment():
     def __init__(self,x1,y1,x2,y2) -> None:
@@ -103,7 +100,7 @@ class Polygon():
 
 class PathTracker():
     def __init__(self):
-        rospy.init_node('path_tracker')
+        rospy.init_node('path_tracker_server')
         print('path_tracker node initalized')
         self.robot_frame = 'base_link'
         self.rate = rospy.Rate(10)
@@ -121,10 +118,11 @@ class PathTracker():
         self.pose.pose.orientation.z = 0.0
         self.pose.pose.orientation.w = 0.0
         
-        
         # Flag that a goal has been received
-        self.goal_received = False
-
+        self.is_running = False
+        self.start_service = rospy.Service('/path_tracker/start', Trigger, self.start_callback)
+        self.cancel_service = rospy.Service('/path_tracker/cancel', Trigger, self.cancel_callback)
+        self.is_running_service = rospy.Service('/path_tracker/is_running', Bool, self.is_running_callback)
 
         # Goal position and orientation
         self.goal = PoseStamped()
@@ -141,18 +139,15 @@ class PathTracker():
         self.in_goal_tolerance = 0.03
         self.orientaion_tolerance = 0.1
         self.wave_frequency = 0.1
-        self.velocity_mode = False
+        self.triangular_mode = True
         self.last_wave_time = rospy.Time.now()
-
-        # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
-        # self.aruco = Marker()
 
         # tf stuff
         self.br = tf2_ros.TransformBroadcaster()
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
-        rospy.sleep(2)
-        print('Path Tracker: Tf2 stuff initialized')
+        rospy.sleep(0.5)
+        rospy.loginfo('Path Tracker: Tf2 stuff initialized')
 
         self.polygon = None
 
@@ -160,25 +155,30 @@ class PathTracker():
         self.cmd_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         self.goal_reached_pub = rospy.Publisher('/goal_reached', Bool, queue_size=10)
 
-
         # subscribers
         self.fence_sub = rospy.Subscriber('/workspace_poses/pose_array', PoseArray, self.fence_callback)
         self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  
-        # self.aruco_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  
-        print('Path tracker: Subscribers initalized')
+        rospy.loginfo('Path tracker: Subscribers initalized')
 
-   
-   
+    def start_callback(self, req):
+        self.is_running = True
+        return TriggerResponse(success=True, message='Started')
+    
+    def cancel_callback(self, req):
+        self.is_running = False
+        return TriggerResponse(success=True, message='Cancelled')
+    
+    def is_running_callback(self, req):
+        return BoolResponse(self.is_running)
+
     # To get the position of the goal
     def goal_callback(self, msg:PoseStamped):
         self.goal.pose.position = msg.pose.position                 # 2D Nav goal in rviz is in odom frame
         self.goal.pose.orientation = msg.pose.orientation
-        self.goal_received = True
         rospy.loginfo('Tracker: recived goal')
 
     def fence_callback(self, msg:PoseArray):
         self.polygon = Polygon(msg.poses)
-
 
     def check_if_in_fence(self, pose: Pose):
         # Transform pose to map frame
@@ -188,7 +188,6 @@ class PathTracker():
             #raise Exception('No fence set')
             return None
 
-    
     def transforms(self):   
         stamp = self.pose.header.stamp  
         try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
@@ -197,8 +196,6 @@ class PathTracker():
         except:
             print('Path tracker: No transform found')
                         
-
-        
      # Calculate the direction the robot should go
     def math(self):
         angle_to_goal =  1 * math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
@@ -206,7 +203,6 @@ class PathTracker():
         robot_theta = tf.transformations.euler_from_quaternion([self.pose.pose.orientation.x, self.pose.pose.orientation.y, self.pose.pose.orientation.z, self.pose.pose.orientation.w])[2] 
         goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
         dtheta = goal_orientation - robot_theta
-
 
         if distance > self.in_goal_tolerance:
 
@@ -224,7 +220,7 @@ class PathTracker():
                 self.move.angular.z = 0.0
                 
         else:
-            self.velocity_mode = False
+            self.triangular_mode = True
             self.last_wave_time = rospy.Time.now()
             if abs(dtheta) >= self.orientaion_tolerance:
                 self.move.linear.x = 0.0
@@ -236,22 +232,20 @@ class PathTracker():
             else:
                 self.move.linear.x = 0.0
                 self.move.angular.z = 0.0
-                self.goal_reached_pub.publish(True)
-                print('Goal orientation reached')
+                self.is_running = False
+                rospy.loginfo('Goal orientation reached')
         
         self.cmd_pub.publish(self.move)   
         
-
-
     def velocity_controller(self, distance):
         self.deceleration_distance = self.move.linear.x**2 / (2*self.acceleration) 
         
         if distance <= self.deceleration_distance:
             self.move.linear.x -= self.acceleration
             self.move.linear.x = max(self.move.linear.x, 0.05)
-            self.velocity_mode = True
+            self.triangular_mode = False
             
-        elif self.velocity_mode == False:
+        elif self.triangular_mode:
             # Calculates the current time since the last wave
             current_time = (rospy.Time.now() - self.last_wave_time).to_sec()
             # Calculates the current position in the triangular wave cycle
@@ -267,15 +261,12 @@ class PathTracker():
             if current_position < 0.1 / self.wave_frequency or current_position >= (0.9 / self.wave_frequency):
                 self.move.linear.x = 0.0
 
-        else:
-            self.move.linear.x = self.move.linear.x
+        # else keep the velocity constant
 
-        print(self.move.linear.x)
         return self.move.linear.x
 
-
     def spin(self):
-        if not self.goal_received:
+        if not self.is_running:
             return
 
         if self.check_if_in_fence(self.goal.pose): 
@@ -288,7 +279,6 @@ class PathTracker():
             self.move.linear.x = 0.0
             self.move.angular.z = 0.0
             self.cmd_pub.publish(self.move)
-
                 
     def main(self):
         try:
@@ -297,7 +287,6 @@ class PathTracker():
                 self.rate.sleep()
         except rospy.ROSInterruptException:
             pass
-
 
 
 if __name__ == '__main__':

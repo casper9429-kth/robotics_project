@@ -57,7 +57,7 @@
 	<node name="speaker" pkg="speak" type="speaker.py"/>
 
     <!-- Pathing -->
-    <node name="path_tracker_server_brain" pkg="path_planner" type="path_tracker_server_brain.py" />
+    <node name="path_tracker_server" pkg="path_planner" type="path_tracker_server.py" />
     <node name="workspace_manager" pkg="localization" type="workspace_manager.py" />
     <node name="path_tracker_client" pkg="path_planner" type="path_tracker_client.py" />
     <node name="static_movement_services" pkg="path_planner" type="static_movement_services.py" />
