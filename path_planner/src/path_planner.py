@@ -44,10 +44,14 @@ class Node:
             self.g = 0
         else:
             parent_pos =[pos for pos in self.parent.position()]
-            self.g = self.parent.g + math.dist([self.x,self.y],parent_pos)
+            #self.g = self.parent.g + math.dist([self.x,self.y],parent_pos)
+            self.g = self.parent.g +self.manhattan(parent_pos,(self.x,self.y))
         self.h = self.dist_to_goal(self.goal)
         self.f = self.g + self.h
 
+    def manhattan(self,a, b):
+        return sum(abs(val1-val2) for val1, val2 in zip(a,b))
+    
     def __lt__(self,other):
         return self.f < other.f
     """def __eq__(self, other):
