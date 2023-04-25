@@ -83,7 +83,7 @@ class A_star():
         self.origo_index_i = None
         self.origo_index_j = None
 
-        self.iterations = 10
+        self.iterations = 1000
         self.goal_reached = Bool()
         self.goal_reached.data = False
         # subscriber 
@@ -146,9 +146,19 @@ class A_star():
         # if out of bounds, return 1
 
         if i < 0 or i > int((self.bbmaxx-self.bbminx)/self.map_resolution) or j < 0 or j > int((self.bbmaxy-self.bbminy)/self.map_resolution):
+            rospy.loginfo('Failed, now printing 1 ')
             return 1
         
         return self.map_coords[i].data[j]
+    def get_pos_of_index(self,i,j):
+        """Return position of index in map grid, if not given geofence, return None"""
+        """if not self.given_geofence:
+            rospy.logwarn("No geofence given, but trying to get map grid")
+            return None"""
+        x = round(self.bbminx + i*self.map_resolution,4)
+        y = round(self.bbminy + j*self.map_resolution,4)
+        
+        return x, y
     
     def get_value_of_pos(self,x,y):
         """Return value of position in map grid, if not given geofence, return None"""
@@ -199,8 +209,8 @@ class A_star():
                 neighbour = Node(new_x, new_y, parent = node, goal= node.goal)
                 if self.is_in_bounds(neighbour):
                     #rospy.loginfo(f'Path planner: neighbour is in bounds {neighbour.position()}')
-              
-                    if self.get_value_of_pos(new_x,new_y)>=0.8: # will always work due to checking inbounds
+                    #TODO: check if this fucks up the explorer
+                    if self.get_value_of_pos(new_x,new_y)>=abs(0.8): # will always work due to checking inbounds
                         neighbour.g = np.inf
                         neighbour.f = neighbour.g + neighbour.h
                     
@@ -211,11 +221,21 @@ class A_star():
     def get_robot_pose_in_map(self):
         try:                                   
             transform_base_link_2_map = self.tfBuffer.lookup_transform('map','base_link', self.t_stamp,rospy.Duration(0.5)) # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
-            self.pose_in_map = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_2_map)
-            return self.pose_in_map
+            self.robot_pose = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_2_map)
+            return self.robot_pose
         except:
             print('Path planner: No transform found')
             return None
+        
+        
+    def get_start_in_map(self):
+        robot_pose = self.get_robot_pose_in_map()
+        i,j = self.get_index_of_pos(robot_pose.pose.position.x,robot_pose.pose.position.y)
+        x,y = self.get_pos_of_index(i,j)
+        
+        return (x,y)
+    
+
         
     ############################## Main Function #################################
     
@@ -231,6 +251,8 @@ class A_star():
             start = (start.pose.position.x,start.pose.position.y)
         goal = (goal.pose.position.x,goal.pose.position.y)
         #start = (start.pose.position.x,start.pose.position.y)
+        start = self.get_start_in_map()
+        print(f'Path planner: start {start}')
         heap = []
         heapq.heapify(heap)
         openset = {}
@@ -238,7 +260,7 @@ class A_star():
         #heapify(openset)
         #best_path = None
         start_node = Node(x=start[0],y=start[1],goal=goal)
-        print(f'start node is {start_node.position()}')
+        #print(f'start node is {start_node.position()}')
         openset[start_node.position()] = start_node
         heapq.heappush(heap,(start_node.f,start_node))
 
