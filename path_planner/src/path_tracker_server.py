@@ -12,7 +12,6 @@ from visualization_msgs.msg import Marker, MarkerArray, InteractiveMarker, Inter
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose, Point 
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedback
 import tf
-import time
 
 class LineSegment():
     def __init__(self,x1,y1,x2,y2) -> None:
@@ -134,16 +133,16 @@ class PathTracker():
         
         # To control the robots movement
         self.move = Twist()
-        self.acceleration = 0.05
+        self.acceleration = 0.08
         self.max_speed = 0.3
         self.max_angle = 0.1
         self.angle_speed = 0.2
         self.deceleration_distance = 0.0
         self.in_goal_tolerance = 0.03
         self.orientaion_tolerance = 0.1
-        self.stop_time = 5 # change to affect how long you want to stop
-        self.duration = 1 # change to affect how long you want to drive before stopping
-        self.start_time = False # internal variable to keep track of time
+        self.wave_frequency = 0.1
+        self.velocity_mode = False
+        self.last_wave_time = rospy.Time.now()
 
         # Used when you want the robot to follow an aruco marker    (not fully implemented yet)
         # self.aruco = Marker()
@@ -169,7 +168,6 @@ class PathTracker():
         print('Path tracker: Subscribers initalized')
 
    
-
    
     # To get the position of the goal
     def goal_callback(self, msg:PoseStamped):
@@ -190,10 +188,8 @@ class PathTracker():
             #raise Exception('No fence set')
             return None
 
-
     
     def transforms(self):   
-        
         stamp = self.pose.header.stamp  
         try:                                    # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
             transform_map_2_base_link = self.tfBuffer.lookup_transform('base_link','map', stamp,rospy.Duration(0.5))     # give goal in base link frame
@@ -215,24 +211,25 @@ class PathTracker():
         if distance > self.in_goal_tolerance:
 
             if angle_to_goal >= self.max_angle:
+                self.last_wave_time = rospy.Time.now()
                 self.move.linear.x = 0.0
                 self.move.angular.z = self.angle_speed 
 
             elif angle_to_goal <= -self.max_angle:
+                self.last_wave_time = rospy.Time.now()
                 self.move.linear.x = 0.0
                 self.move.angular.z = -self.angle_speed 
-
             else:
                 self.move.linear.x = self.velocity_controller(distance)
                 self.move.angular.z = 0.0
                 
         else:
-
+            self.velocity_mode = False
+            self.last_wave_time = rospy.Time.now()
             if abs(dtheta) >= self.orientaion_tolerance:
                 self.move.linear.x = 0.0
                 if dtheta >= 0:
                     self.move.angular.z = self.angle_speed 
-
                 elif dtheta < 0:
                     self.move.angular.z = -self.angle_speed
 
@@ -241,34 +238,38 @@ class PathTracker():
                 self.move.angular.z = 0.0
                 self.goal_reached_pub.publish(True)
                 print('Goal orientation reached')
-
+        
         self.cmd_pub.publish(self.move)   
         
-    def check_elapsed_time(self):
-        stop = False
-        if self.start_time == False:
-            self.start_time = time.perf_counter()
-        if time.perf_counter() - self.start_time  > self.duration:
-            stop = True
-            self.start_time = False
-        return stop 
-        
-    def velocity_controller(self,distance):
-        stop = self.check_elapsed_time() # chekcs if it is time to stop
-        self.deceleration_distance = 0.5 * self.move.linear.x**2 / self.acceleration
+
+
+    def velocity_controller(self, distance):
+        self.deceleration_distance = self.move.linear.x**2 / (2*self.acceleration) 
         
         if distance <= self.deceleration_distance:
             self.move.linear.x -= self.acceleration
-            self.move.linear.x  = max(self.move.linear.x ,0.0)
+            self.move.linear.x = max(self.move.linear.x, 0.05)
+            self.velocity_mode = True
+            
+        elif self.velocity_mode == False:
+            # Calculates the current time since the last wave
+            current_time = (rospy.Time.now() - self.last_wave_time).to_sec()
+            # Calculates the current position in the triangular wave cycle
+            current_position = current_time % (1.0 / self.wave_frequency)
+
+            # Calculates the current velocity based on the current position in the triangular wave cycle
+            if current_position < 0.5 / self.wave_frequency:
+                self.move.linear.x = (2 * current_position * self.wave_frequency) * self.max_speed
+            else:
+                self.move.linear.x = ((2 - 2 * current_position * self.wave_frequency) * self.max_speed)
+
+            # Sets the velocity to zero for 2 seconds between each wave
+            if current_position < 0.1 / self.wave_frequency or current_position >= (0.9 / self.wave_frequency):
+                self.move.linear.x = 0.0
 
         else:
-            self.move.linear.x += self.acceleration
-            self.move.linear.x  = min(self.move.linear.x ,self.max_speed) 
+            self.move.linear.x = self.move.linear.x
 
-
-        # if time to stop then no movement
-        if stop: 
-            self.move.linear.x = 0.0
         print(self.move.linear.x)
         return self.move.linear.x
 
@@ -281,8 +282,7 @@ class PathTracker():
             #print('In fence')
             self.transforms()
             self.math()
-            if self.check_elapsed_time():
-                rospy.sleep(self.stop_time)
+
         else:
             print('Path tracker: Goal Pose not inside workspace')
             self.move.linear.x = 0.0
