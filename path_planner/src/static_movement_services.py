@@ -20,7 +20,7 @@ class StaticMovementServicesNode:
         self.forward_pick_up_duration = .75 # [s]
         self.reverse_pick_up_duration = .5 # [s]
         self.reverse_pick_up_duration_animal = .25 # [s]
-        self.box_duration = 1.5 # [s]
+        self.box_duration = 2.6 # [s]
         linear_x = .1
         self.forward_twist = Twist()
         self.forward_twist.linear.x = linear_x # TODO: might be different when using battery
