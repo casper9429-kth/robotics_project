@@ -18,7 +18,7 @@
     <node name="path_tracker_client" pkg="path_planner" type="path_tracker_client.py" output='screen'/> 
 	
 	<!-- run workspace manager -->
-	<node name="workspace_manager" pkg="localization" type="workspace_manager.py" output='screen'/>
+	<node name="workspace_manager" pkg="mapping" type="workspace_manager.py" output='screen'/>
 	<!-- Include teleop_twist_joy -->
     <!-- <include file="$(find teleop_twist_joy)/launch/teleop.launch" /> -->
 

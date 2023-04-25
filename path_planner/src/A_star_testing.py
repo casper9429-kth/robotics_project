@@ -5,7 +5,6 @@ from functools import total_ordering
 import numpy as np
 import math
 import actionlib
-import move_base_msgs.msg
 
 from dataclasses import dataclass,field
 from occupancy_grid import Occupancy_grid
@@ -13,9 +12,9 @@ import cProfile
 import pstats
 from numba import jit
 from typing import Dict,Tuple
-import Cython
 from scipy.interpolate import CubicSpline
 from queue import PriorityQueue
+import matplotlib.pyplot as plt
 
 #map = Occupancy_grid(20,20)
 currentlist = [] # List for debugging can be removed
@@ -105,8 +104,8 @@ class A_star_prototype():
         neighbourlist = {}
         buffer = 0.5
         walllist = []
-        dx = 1
-        dy = 1
+        dx = 0.05
+        dy = 0.05
         #dx = map.dx
         #dy = map.dy
         min_pos = None
@@ -238,7 +237,7 @@ class A_star():
     def __init__(self):
         #self.client = actionlib.SimpleActionClient('path_tracker', move_base_msgs.msg.MoveBaseAction)
 
-        self.map = Occupancy_grid(2000,2000)
+        self.map = None
 
     def distance(self,node1: Node,node2:Node):
         return math.dist(node1.position(),node2.position())
@@ -376,24 +375,6 @@ class A_star():
         #print(f'openset length = {len(openset)}')
         return False, self.reconstruct_path(current)
 
-
-    def path_smoothing_cubline_split(self,path):
-        x_path = [path[i][0] for i in range(len(path))]
-        y_path = [path[i][1] for i in range(len(path))]
-        cubic_spline = CubicSpline(x_path,y_path)
-        x = np.linspace(path[0][0],path[0][-1],1000)
-        y = cubic_spline(x)
-        return np.array([x,y]).T
-
-    # straight line split path smoothing
-    def path_smoothing_straightline_split(self,path):
-        x_path = [path[i][0] for i in range(len(path))]
-        y_path = [path[i][1] for i in range(len(path))]
-        x = np.linspace(path[0][0],path[0][-1],1000)
-        y = np.interp(x,x_path,y_path)
-        return np.array([x,y]).T
-
-
     def path_smoothing(self,path):
         # check 3 points at a time
         # if the change in dx and dy is the same, remove the middle point
@@ -418,7 +399,17 @@ class A_star():
         #print(f'smoothened path = {path}')
         return path
         
+    def plot_path(self,path):
+        x = [x for x in range(-self.map.x,self.map.x,self.map.dx)]
+        y = [y for y in range(-self.map.y,self.map.y,self.map.dy)]
+        np.
+        print(x.shape)
 
+        plt.imshow(x)
+        #plt.plot(x,y)
+        plt.show()
+
+        
 """Bezier Curve Smoothing:
 def path_smoothing_bezier(path):
     x_path = [path[i][0] for i in range(len(path))]
@@ -430,15 +421,19 @@ def path_smoothing_bezier(path):
 
 
 def main():
-    goalvar = 1
+    path_planner = A_star()
+    goalvar = 2
     if goalvar == 1:
+        path_planner.map = Occupancy_grid(2000,2000)
         start = (-1682.0,-1682.0)
         goal = (1682.0,1682.0)
     elif goalvar == 2:
+        path_planner.map = Occupancy_grid(20,20)
+        
         start = (0.0,0.0)
         goal = (10.0,10.0)
     #print(f'goal = {goal[0]}')
-    path_planner = A_star()
+    
     #path_planner = A_star()
     
     # Obstacle manegment
@@ -468,6 +463,7 @@ def main():
         #smooth_path = path_smoothing(path)
         if goalvar == 2:
             path_planner.map.print_grid(smooth_path)
+        path_planner.plot_path(path)
 
     # Gives stats for the algorithm
     def return_stats():
@@ -479,6 +475,7 @@ def main():
         stats.print_stats()
     #test_A_star()
     return_stats()
+    #path_planner.plot_path(path)
 
 
 if __name__ == '__main__':
