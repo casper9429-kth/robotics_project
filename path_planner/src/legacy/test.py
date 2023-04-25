@@ -3,7 +3,7 @@ import math
 import heapq
 import sys
 
-
-x = 0.1234567890
-
-print(round(x,4))
+for longditude in range(-1,2,1):
+            for latitude in range(-1,2,1):
+                
+                print(longditude,latitude)

@@ -44,13 +44,15 @@ class Node:
             self.g = 0
         else:
             parent_pos =[pos for pos in self.parent.position()]
-            #self.g = self.parent.g + math.dist([self.x,self.y],parent_pos)
-            self.g = self.parent.g +self.manhattan(parent_pos,(self.x,self.y))
-        self.h = self.dist_to_goal(self.goal)
+            self.g = self.parent.g + math.dist([self.x,self.y],parent_pos)
+            #self.g = self.parent.g +self.manhattan(parent_pos,(self.x,self.y))
+        #self.h = self.dist_to_goal(self.goal)
+        self.h = self.manhattan(self.goal,(self.x,self.y))
         self.f = self.g + self.h
 
     def manhattan(self,a, b):
-        return sum(abs(val1-val2) for val1, val2 in zip(a,b))
+        D=2
+        return D*sum(abs(val1-val2) for val1, val2 in zip(a,b))
     
     def __lt__(self,other):
         return self.f < other.f
@@ -87,7 +89,7 @@ class A_star():
         self.origo_index_i = None
         self.origo_index_j = None
 
-        self.iterations = 1000
+        self.iterations = 20
         self.goal_reached = Bool()
         self.goal_reached.data = False
         # subscriber 
@@ -197,6 +199,7 @@ class A_star():
             if self.bbminx < node.x < self.bbmaxx:
                 return True
         else:
+            print('Path planner: node is out of bounds')
             return False
         #self.map.is_point_in_polygon(new_x,new_y,self.map.geofence_list):
 
@@ -214,7 +217,7 @@ class A_star():
                 if self.is_in_bounds(neighbour):
                     #rospy.loginfo(f'Path planner: neighbour is in bounds {neighbour.position()}')
                     #TODO: check if this fucks up the explorer
-                    if self.get_value_of_pos(new_x,new_y)>=abs(0.8): # will always work due to checking inbounds
+                    if self.get_value_of_pos(new_x,new_y)>=(0.8): # will always work due to checking inbounds
                         neighbour.g = np.inf
                         neighbour.f = neighbour.g + neighbour.h
                     
@@ -272,6 +275,7 @@ class A_star():
         #maxiter = 15000
         currentlist = []
         iter = 0
+        goal_tolerance = 0.1
         
         while heapq and iter < self.iterations:
             current_pos = min(openset, key=lambda cordinates: openset[cordinates].f)
@@ -287,20 +291,27 @@ class A_star():
             #print(f'current {current}')
             #print(f'current g,h,f {current.g, current.h,current.f}\n')
             #print(f'current test {current.f}')
-            print(current.f)
+            #print(current.f)
             print(openset[current_pos])
             openset.pop(current_pos)
             
             #print('\n')
             
             currentlist.append(current.position())
-            if (current.x,current.y) == goal:
+            if abs(current.x-current.goal[0]) <= goal_tolerance and abs(current.y-current.goal[1]) <= goal_tolerance:
+                print(f'diff x {current.x-current.goal[0]},\n diffy {current.y-current.goal[1]}')
+                #print(f'Path planner: found path {current.position()}')
+                #print(f'Path planner: found path {currentlist}')
+                return True,self.reconstruct_path(current)
+                
+            #if (current.x,current.y) == goal:
                 return True,self.reconstruct_path(current)
             
             closedset[start_node.position()] = start_node
             
             neighbours = self.generate_neighbours(current)
-            #rospy.loginfo(f'Path planner:neighbours = {neighbours}')
+            rospy.loginfo(f'Path planner:neighbours = {neighbours}')
+            
             for neighbour in neighbours:
                 neighbournode= neighbours[neighbour]
 

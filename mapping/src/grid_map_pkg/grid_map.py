@@ -158,7 +158,7 @@ class GridMap():
         self.geofence_list = [[pose.position.x, pose.position.y] for pose in msg.poses] 
 
 
-
+        print("Grid map: Got into the geofence loop")
         # Find bounding box of geofence 
         self.bounding_box = [self.geofence_list[0][0], self.geofence_list[0][0], self.geofence_list[0][1], self.geofence_list[0][1]]
 
