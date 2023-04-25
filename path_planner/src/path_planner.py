@@ -89,7 +89,7 @@ class A_star():
         self.origo_index_i = None
         self.origo_index_j = None
 
-        self.iterations = 20
+        self.iterations = 1000
         self.goal_reached = Bool()
         self.goal_reached.data = False
         # subscriber 
@@ -292,14 +292,14 @@ class A_star():
             #print(f'current g,h,f {current.g, current.h,current.f}\n')
             #print(f'current test {current.f}')
             #print(current.f)
-            print(openset[current_pos])
+            #print(openset[current_pos])
             openset.pop(current_pos)
             
             #print('\n')
             
             currentlist.append(current.position())
             if abs(current.x-current.goal[0]) <= goal_tolerance and abs(current.y-current.goal[1]) <= goal_tolerance:
-                print(f'diff x {current.x-current.goal[0]},\n diffy {current.y-current.goal[1]}')
+                print(f'diff x {current.x-current.goal[0]}, diffy {current.y-current.goal[1]}')
                 #print(f'Path planner: found path {current.position()}')
                 #print(f'Path planner: found path {currentlist}')
                 return True,self.reconstruct_path(current)
@@ -310,7 +310,7 @@ class A_star():
             closedset[start_node.position()] = start_node
             
             neighbours = self.generate_neighbours(current)
-            rospy.loginfo(f'Path planner:neighbours = {neighbours}')
+            #rospy.loginfo(f'\nPath planner:neighbours = {neighbours}')
             
             for neighbour in neighbours:
                 neighbournode= neighbours[neighbour]
@@ -369,6 +369,9 @@ class A_star():
         path.pop(0) # remove the first starting point 
         return path
 
+
+##################################################    MAIN CLASS   ##########################################
+
 class Path_Planner():
     def __init__(self) -> None:
         rospy.init_node('path_planner')
@@ -395,7 +398,7 @@ class Path_Planner():
         self.reached_goal = False
 
         # might need to change in the future
-        self.rate = rospy.Rate(0.1)
+        self.rate = rospy.Rate(1)
 
         self.path_planner = A_star()
         self.last_msg = PoseStamped()
@@ -437,15 +440,16 @@ class Path_Planner():
     def tranform_path_to_posestamped(self,path):
         path_list = []
 
-        for point in path:
+        for i,point in enumerate(path):
             pose = PoseStamped()
             pose.pose.position.x = point[0]
             pose.pose.position.y = point[1]
             pose.pose.position.z = 0
+            
             pose.pose.orientation.x = 0
             pose.pose.orientation.y = 0
             pose.pose.orientation.z = 0
-            pose.pose.orientation.w = 1
+            pose.pose.orientation.w = 1 
             pose.header.frame_id = "map"
             pose.header.stamp = rospy.Time.now()
             path_list.append(pose)
@@ -461,7 +465,8 @@ class Path_Planner():
     def send_path(self,path): #TODO  fix to publish
         path_list = self.tranform_path_to_posestamped(path)
         #print(path_list)        
-        
+        path_list.pop(0)
+        print('Path planner: goal reched {self.reached_goal}}')
         if self.last_msg != path_list[0]:
             print(f'Path planner: reached goal {self.reached_goal}')
             if self.reached_goal == True:

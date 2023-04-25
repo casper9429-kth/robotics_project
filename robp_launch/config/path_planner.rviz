@@ -56,6 +56,10 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
+        aruco/detected/box1:
+          Value: true
+        aruco/detected1:
+          Value: true
         aruco/detected500:
           Value: true
         base_link:
@@ -90,9 +94,15 @@ Visualization Manager:
           Value: true
         camera_link:
           Value: true
+        des_base_link:
+          Value: true
+        des_odom:
+          Value: true
         imu_link:
           Value: true
         map:
+          Value: true
+        marker_belief_1:
           Value: true
         marker_belief_500:
           Value: true
@@ -106,7 +116,16 @@ Visualization Manager:
       Show Names: true
       Tree:
         map:
+          aruco/detected/box1:
+            {}
+          aruco/detected1:
+            {}
           aruco/detected500:
+            {}
+          des_base_link:
+            des_odom:
+              {}
+          marker_belief_1:
             {}
           marker_belief_500:
             {}
@@ -206,6 +225,22 @@ Visualization Manager:
       Normalize Range: true
       Queue Size: 2
       Transport Hint: raw
+      Unreliable: false
+      Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Queue Size: 10
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Arrow
+      Topic: /start_and_goal
       Unreliable: false
       Value: true
   Enabled: true

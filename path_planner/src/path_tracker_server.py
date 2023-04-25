@@ -138,7 +138,7 @@ class PathTracker():
         self.max_angle = 0.1
         self.angle_speed = 0.2
         self.deceleration_distance = 0.0
-        self.in_goal_tolerance = 0.03
+        self.in_goal_tolerance = 0.3
         self.orientaion_tolerance = 0.1
         self.wave_frequency = 0.1
         self.velocity_mode = False
@@ -207,7 +207,7 @@ class PathTracker():
         goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
         dtheta = goal_orientation - robot_theta
 
-
+        print('Path tracker: distance: ', distance)
         if distance > self.in_goal_tolerance:
 
             if angle_to_goal >= self.max_angle:
@@ -226,6 +226,8 @@ class PathTracker():
         else:
             self.velocity_mode = False
             self.last_wave_time = rospy.Time.now()
+            print(f'Path tracker: got stuck here {abs(dtheta)}')
+            
             if abs(dtheta) >= self.orientaion_tolerance:
                 self.move.linear.x = 0.0
                 if dtheta >= 0:
@@ -270,7 +272,7 @@ class PathTracker():
         else:
             self.move.linear.x = self.move.linear.x
 
-        print(self.move.linear.x)
+        #print(self.move.linear.x)
         return self.move.linear.x
 
 
