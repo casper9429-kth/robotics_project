@@ -57,9 +57,8 @@
 	<node name="speaker" pkg="speak" type="speaker.py"/>
 
     <!-- Pathing -->
-    <node name="path_tracker_server" pkg="path_planner" type="path_tracker_server.py" />
-    <node name="workspace_manager" pkg="localization" type="workspace_manager.py" />
-    <node name="path_tracker_client" pkg="path_planner" type="path_tracker_client.py" />
+    <node name="path_tracker_server" pkg="path_planner" type="path_tracker_server.py" output="screen" />
+    <node name="workspace_manager" pkg="mapping" type="workspace_manager.py" />
     <node name="static_movement_services" pkg="path_planner" type="static_movement_services.py" />
 
 	<!-- Exploration -->
@@ -70,5 +69,5 @@
 	<node name="arm_actions" pkg="arm" type="arm_actions.py" />
 
 	<!-- Brain -->
-	<node name="brain_node" pkg="brain" type="brain_node.py" output="screen" />
+	<node name="brain_node" pkg="brain" type="brain_node.py" />
 </launch>

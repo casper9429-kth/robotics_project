@@ -66,6 +66,7 @@ class Init(Leaf):
         # TODO: wait for camera to warm up
         # TODO: test remove_old_instances for vision memory
         # TODO: wiggle to help see anchor
+        # TODO: raise arm
         return SUCCESS
 
 
