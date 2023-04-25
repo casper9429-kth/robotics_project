@@ -129,11 +129,11 @@ class PathTracker:
         self.broadcaster = tf2_ros.TransformBroadcaster()
         self.buffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.buffer)
-        rospy.sleep(0.5)
+        rospy.sleep(0.5) # TODO: Check if this is necessary
         
         # Services
         self.start_service = Service('/path_tracker/start', Trigger, self.start_callback)
-        self.cancel_service = Service('/path_tracker/cancel', Trigger, self.cancel_callback)
+        self.stop_service = Service('/path_tracker/stop', Trigger, self.stop_callback)
         self.is_running_service = Service('/path_tracker/is_running', Bool, self.is_running_callback)
         
         # Publishers
@@ -147,9 +147,9 @@ class PathTracker:
         self.start()
         return TriggerResponse(success=True, message='Started')
     
-    def cancel_callback(self, req):
+    def stop_callback(self, req):
         self.stop()
-        return TriggerResponse(success=True, message='Cancelled')
+        return TriggerResponse(success=True, message='Stopped')
     
     def is_running_callback(self, req):
         return BoolResponse(self.is_running)
