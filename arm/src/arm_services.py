@@ -86,7 +86,7 @@ class ArmServices():
 
         # gripper
         self.gripper_open = -1.8
-        self.gripper_close = { 'cube': 0, 'sphere': -0.45, 'animal': 0 }
+        self.gripper_close = { 'cube': 0, 'ball': -0.45, 'animal': 0 }
 
         # Joints
         self.joints_straight = Joints()
@@ -102,13 +102,13 @@ class ArmServices():
 
         # Target type
         self.target_type = None
-        self.allowed_target_types = ['cube', 'sphere', 'animal']
+        self.allowed_target_types = ['cube', 'ball', 'animal']
 
         # Error messages
         self.error_messages = {
             'missing joints': 'No joint states received. Is anyone publishing to /joint_states?',
             'missing target': 'No target received.',
-            'bad target type': '''Bad target type. Legal values are 'cube', 'sphere' and 'animal'.''',
+            'bad target type': '''Bad target type. Legal values are 'cube', 'ball' and 'animal'.''',
             'target out of reach': 'Target out of reach',
         }
 

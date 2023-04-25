@@ -1,6 +1,6 @@
 # goal definition
 string action # 'pick_up', 'drop_off'
-string type # 'cube', 'sphere', 'animal'
+string type # 'cube', 'ball', 'animal'
 float64 x
 float64 y
 float64 z

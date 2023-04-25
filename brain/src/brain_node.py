@@ -210,7 +210,7 @@ def category_name_to_type(category_name):
     if category_name in ["Red_cube", "Green_cube", "Blue_cube", "Wooden_cube"]:
         return 'cube'
     elif category_name in ["Red_ball", "Green_ball", "Blue_ball"]:
-        return 'sphere'
+        return 'ball'
     elif category_name in ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie"]:
         return 'animal'
     else:
@@ -219,7 +219,7 @@ def category_name_to_type(category_name):
 
 type_to_box_id = {
     'cube': 1,
-    'sphere': 2,
+    'ball': 2,
     'animal': 3
 }
 
