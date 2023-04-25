@@ -56,7 +56,7 @@ class Occupancy_grid():
         x_list = [self.grid[i] for i in range(len(self.grid))]
         for i in range(len(x_list)):
             newlist = [cell[i].position() for cell in x_list]
-            print(newlist)
+            #print(newlist)
         #print(newlist)
 
     #TODO check spelling

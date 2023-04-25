@@ -43,8 +43,8 @@ class Node:
         if self.parent == None:
             self.g = 0
         else:
-            par_pos =[pos for pos in self.parent.position()]
-            self.g = self.parent.g + math.dist([self.x,self.y],par_pos)
+            parent_pos =[pos for pos in self.parent.position()]
+            self.g = self.parent.g + math.dist([self.x,self.y],parent_pos)
         self.h = self.dist_to_goal(self.goal)
         self.f = self.g + self.h
 
@@ -64,6 +64,9 @@ class Node:
     
     def as_array(self):
         return np.array([self.x, self.y, self.goal[0], self.goal[1], self.g, self.h, self.f])
+    
+    def __repr__(self) -> str:
+        return f'x = {self.x}, y = {self.y}, goal = {self.goal}, g = {self.g}, h = {self.h}, f = {self.f}'
 
 
 class A_star():
@@ -80,7 +83,7 @@ class A_star():
         self.origo_index_i = None
         self.origo_index_j = None
 
-        self.iterations = 500
+        self.iterations = 10
         self.goal_reached = Bool()
         self.goal_reached.data = False
         # subscriber 
@@ -187,7 +190,6 @@ class A_star():
     def generate_neighbours(self,node):
         neighbourlist = {}
         buffer = 0.1
-        #walllist = []
         dx = self.map_resolution # 5 cm
         dy = self.map_resolution
         for longditude in range(-1,2,1):
@@ -197,21 +199,13 @@ class A_star():
                 neighbour = Node(new_x, new_y, parent = node, goal= node.goal)
                 if self.is_in_bounds(neighbour):
                     #rospy.loginfo(f'Path planner: neighbour is in bounds {neighbour.position()}')
-                    #print(f'send in coord {new_x,new_y}')
-                    #index_x,index_y = self.map.get_index_of_pos(new_x,new_y)
-                    #print(f'cell value {cell.value}, {cell.position()}')
+              
                     if self.get_value_of_pos(new_x,new_y)>=0.8: # will always work due to checking inbounds
-                        #walllist.append((neighbour.position()))
                         neighbour.g = np.inf
                         neighbour.f = neighbour.g + neighbour.h
                     
                     neighbourlist[neighbour.position()] = neighbour
-                    
 
-        """for wall in walllist:
-            print(f'wall is {wall}')"""
-                    
-                
         return neighbourlist
 
     def get_robot_pose_in_map(self):
@@ -222,10 +216,12 @@ class A_star():
         except:
             print('Path planner: No transform found')
             return None
-
+        
+    ############################## Main Function #################################
+    
     def path(self,goal):
         # usually min heap
-        rospy.loginfo("A* path planning started")
+        rospy.loginfo("A* path planning started")   
         start = self.get_robot_pose_in_map()
         rospy.loginfo(f'Path planner: start {start.pose.position.x} {start.pose.position.y}')
         rospy.loginfo(f'Path:planner: goal {goal.pose.position.x,goal.pose.position.y}')
@@ -242,16 +238,17 @@ class A_star():
         #heapify(openset)
         #best_path = None
         start_node = Node(x=start[0],y=start[1],goal=goal)
-        #print(f'start node is {start_node.position()}')
+        print(f'start node is {start_node.position()}')
         openset[start_node.position()] = start_node
         heapq.heappush(heap,(start_node.f,start_node))
 
         # Controls the amount of max iterations before cancel
         #maxiter = 15000
+        currentlist = []
         iter = 0
         
         while heapq and iter < self.iterations:
-            #current = min(openset, key=lambda cordinates: openset[cordinates].f)
+            current_pos = min(openset, key=lambda cordinates: openset[cordinates].f)
             try:
                 current = heapq.heappop(heap)
             except IndexError:
@@ -261,10 +258,16 @@ class A_star():
             #print(f'Path planner: iter {iter}')
             #print(openset)
             #print(current.position())
-            #print(current.g)
+            #print(f'current {current}')
+            #print(f'current g,h,f {current.g, current.h,current.f}\n')
+            #print(f'current test {current.f}')
+            print(current.f)
+            print(openset[current_pos])
+            openset.pop(current_pos)
+            
             #print('\n')
-            #print(current)
-            #currentlist.append(current.position())
+            
+            currentlist.append(current.position())
             if (current.x,current.y) == goal:
                 return True,self.reconstruct_path(current)
             
@@ -272,7 +275,6 @@ class A_star():
             
             neighbours = self.generate_neighbours(current)
             #rospy.loginfo(f'Path planner:neighbours = {neighbours}')
-            
             for neighbour in neighbours:
                 neighbournode= neighbours[neighbour]
 
@@ -301,7 +303,8 @@ class A_star():
         #print('no path found')
         #print(f'iter = {iter}')
         #print(f'openset length = {len(openset)}')
-        print('Path planner: at the end')
+        print('Path planner: Maxed iterations')
+        #print(currentlist)
         return False, self.reconstruct_path(current)
     
     def path_smoothing(self,path):
@@ -326,6 +329,7 @@ class A_star():
         for point in points_to_remove:
             path.pop(point)
         #print(f'smoothened path = {path}')
+        path.pop(0) # remove the first starting point 
         return path
 
 class Path_Planner():
@@ -352,7 +356,6 @@ class Path_Planner():
         self.has_recived_goal = False
         
         self.reached_goal = False
-        
 
         # might need to change in the future
         self.rate = rospy.Rate(0.1)
@@ -468,10 +471,17 @@ class Path_Planner():
         if self.has_recived_goal == False:
             rospy.logwarn('Path planner: No goal yet')
             return
+        
         status,path = self.path_planner.path(self.goal)
+        
+        
+        
         if not status and not path:
             rospy.logwarn('Path planner: Failed to find path')
             return
+        
+        print(f'Path planner: status {status}')
+        #print(f'Path planner: Goal {self.goal.pose}')
         path = self.path_planner.path_smoothing(path)
         print(path)
         self.send_path(path)
