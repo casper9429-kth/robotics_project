@@ -32,7 +32,7 @@ class Explorer():
         # Parameters
         self.map_coords = []
         self.nearest_goal = None
-        self.is_running = True#False
+        self.is_running = False
         self.timer = rospy.Time.now() 
 
         # Position and orientation of the robot
@@ -91,11 +91,12 @@ class Explorer():
             for j, data_j in enumerate(data_i.data):
                 if int(data_j) == -1:
                     self.cells.append([i,j])
-
-        self.cells = np.array(self.cells)
-        distances = self.cells - self.position_in_gridmap
-        min_distance_index = np.argmin(np.linalg.norm(distances, axis=1))
-        self.nearest_goal = self.cells[min_distance_index]
+                    
+        if len(self.cells) > 0:
+            self.cells = np.array(self.cells)
+            distances = self.cells - self.position_in_gridmap
+            min_distance_index = np.argmin(np.linalg.norm(distances, axis=1))
+            self.nearest_goal = self.cells[min_distance_index]
 
     def publish_goal(self):      
         goal = PoseStamped()

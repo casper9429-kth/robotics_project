@@ -165,9 +165,9 @@ class PathTracker:
     def calculate_cmd_twist(self):
         goal_in_base_link = None
         try:
-            goal_in_base_link = self.buffer.transform(self.goal, 'base_link')
+            goal_in_base_link = self.buffer.transform(self.goal, 'base_link', rospy.Duration(0.5))
         except: # TODO: catch only relevant exceptions
-            print(self.buffer.can_transform('base_link', 'map', rospy.Time(0)))
+            #print(self.buffer.can_transform('base_link', 'map', rospy.Time(0)))
             return Twist()
         
         angle_to_goal = atan2(goal_in_base_link.pose.position.y, goal_in_base_link.pose.position.x)
