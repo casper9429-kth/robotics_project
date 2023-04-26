@@ -26,6 +26,8 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.signal import argrelextrema
 from grid_map_pkg.grid_map import GridMap
 from mapping.msg import GridMapMsg
+from sklearn.neighbors import NearestNeighbors
+
 # Mapping node
 
 ## Gridmap
@@ -181,9 +183,11 @@ class Mapping():
         a = 0.00
         b = 1.00
         c = 0.01
-        d = -0.07
+        d = -0.075
 
-
+        # Remove statistical outliers 
+        #cloud, ind = cloud.remove_statistical_outlier(nb_neighbors=5, std_ratio=2.0)
+        #cloud = cloud.voxel_down_sample(voxel_size=self.resolution/7)
 
 
         # Segment ground plane using RANSAC
@@ -197,6 +201,8 @@ class Mapping():
         #ground_indices = np.where(distances<0)[0]
         #points = cloud.select_by_index(ground_indices)
 
+        # Remove statistical outliers 
+        
 
         try:
             map_base_link = self.tf_buffer.lookup_transform('map', 'base_link', msg.header.stamp) # TransformStamped
@@ -211,8 +217,25 @@ class Mapping():
         new_points[:,0] = points[:,2]
         new_points[:,1] = -points[:,0]
         points = new_points
+        if len(points) == 0:
+            return
 
-        self.grid_map.import_point_cloud_rays_inf_v2(points,1.3,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2],True)
+        # Create a nearest neighbors object
+        nbrs = NearestNeighbors(n_neighbors=3).fit(points)
+
+        # Get the distances and indices of the nearest neighbors
+        distances, indices = nbrs.kneighbors(points)
+
+        # Count the number of neighbors for each point
+        num_neighbors = np.count_nonzero(distances < 0.2, axis=1)
+
+        # Remove points with fewer than two neighbors
+        points = points[num_neighbors >= 2]
+
+        # Peform statical outlier removal on points and remove points that have few neighbours
+        
+
+        self.grid_map.import_point_cloud_rays_inf_v2(points,1.3,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2],False)
         
         return
 

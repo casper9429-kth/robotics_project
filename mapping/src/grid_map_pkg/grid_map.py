@@ -685,6 +685,7 @@ class GridMap():
         return
 
 
+
     def get_OccupancyGrid(self):
         """
         Return OccupancyGrid message of map grid, if not given geofence, return None
