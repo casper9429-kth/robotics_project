@@ -11,6 +11,9 @@ class ArmCameraServices:
 
         rgb_detection = RGBDetection()
 
+        # State
+        self.is_running = False
+
         # Services
         self.start_service = Service('arm_camera_services/start', Trigger, self.callback)
         self.stop_service = Service('arm_camera_services/stop', Trigger, self.callback)

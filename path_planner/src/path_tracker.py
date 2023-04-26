@@ -58,6 +58,7 @@ class Polygon:
     def __init__(self, pose_array: PoseArray):
         self.segments = self.generate_line_segments(pose_array)
         self.point_array = [(point.position.x, point.position.y) for point in pose_array] 
+    
     def contains(self, point):
         """
         Returns True if the point is inside the polygon, False otherwise.
@@ -67,25 +68,24 @@ class Polygon:
         # intersects the polygon an odd number of times.
         return self.is_point_in_polygon(point.x, point.y, self.point_array)
 
-
     def is_point_in_polygon(self,x,y,poly):
         """Check if point is in polygon"""
         n = len(poly)
-        inside =False
+        is_inside = False
 
         p1x,p1y = poly[0]
         for i in range(n+1):
-            p2x,p2y = poly[i % n]
+            p2x, p2y = poly[i % n]
             if y > min(p1y,p2y):
                 if y <= max(p1y,p2y):
                     if x <= max(p1x,p2x):
                         if p1y != p2y:
                             xints = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
                         if p1x == p2x or x <= xints:
-                            inside = not inside
+                            is_inside = not is_inside
             p1x,p1y = p2x,p2y
 
-        return inside
+        return is_inside
 
     def generate_line_segments(self, point_array):
         segments = []
