@@ -74,7 +74,6 @@
     <node name="static_movement_services" pkg="path_planner" type="static_movement_services.py" />
 
 	<!-- Exploration -->
-	<node name="explorer_turn" pkg="path_planner" type="explorer_turn.py" />
 	<node name="explorer" pkg="path_planner" type="explorer.py" />
 
 	<!-- Mapping -->

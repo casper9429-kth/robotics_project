@@ -230,7 +230,7 @@ class PathTracker:
     
     def run(self):
         while not rospy.is_shutdown():
-            if self.is_running: # and self.goal_in_workspace(): TODO: workspace is buggy
+            if self.is_running and self.goal_in_workspace(): #TODO: workspace is buggy
                 cmd_twist = Twist() if self.is_observing else self.calculate_cmd_twist()
                 self.cmd_vel_publisher.publish(cmd_twist)
             self.rate.sleep()
