@@ -65,7 +65,7 @@
 
 		<param name="fast_linear_speed" type="double" value="0.23" />
 		<param name="slow_linear_speed" type="double" value="0.13" />
-		<param name="angular_speed" type="double" value="0.8" />
+		<param name="angular_speed" type="double" value="0.6" />
 
 		<param name="move_duration" type="double" value="2" />
 		<param name="observation_duration" type="double" value="0.5" />
@@ -74,12 +74,15 @@
     <node name="static_movement_services" pkg="path_planner" type="static_movement_services.py" />
 
 	<!-- Exploration -->
-	<node name="explorer_turn" pkg="path_planner" type="explorer_turn.py" />
+	<node name="explorer" pkg="path_planner" type="explorer.py" />
+
+	<!-- Mapping -->
+	<node name="mapping" pkg="mapping" type="mapping_node.py"/>
 
 	<!-- Arm -->
 	<node name="arm_services" pkg="arm" type="arm_services.py" />
 	<node name="arm_actions" pkg="arm" type="arm_actions.py" />
 
 	<!-- Brain -->
-	<node name="brain_node" pkg="brain" type="brain_node.py" />
+	<node name="brain_node" pkg="brain" type="brain_node.py"  output="screen" />
 </launch>
