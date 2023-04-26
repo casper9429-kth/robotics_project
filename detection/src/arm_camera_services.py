@@ -3,7 +3,7 @@ import rospy
 from rospy import Service
 
 from std_srvs.srv import Trigger, TriggerResponse
-from rgb_detection import RGBDetection
+from rgb_detection.rgb_detection import RGBDetection
 
 class ArmCameraServices:
     def __init__(self):
