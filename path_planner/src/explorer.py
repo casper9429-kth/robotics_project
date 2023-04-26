@@ -39,7 +39,7 @@ class Explorer():
         self.is_running = False
         self.timer = rospy.Time.now() 
 
-        # Services
+        Services
         self.start_service = rospy.Service('/explorer/start', Trigger, self.start_callback)
         self.stop_service = rospy.Service('/explorer/stop', Trigger, self.stop_callback)
 
@@ -85,7 +85,7 @@ class Explorer():
     def transforms(self):   
         stamp = self.pose.header.stamp  
         try:                                   
-            transform_base_link_2_map = self.tfBuffer.lookup_transform('map','base_link', self.t_stamp,rospy.Duration(0.5)) # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
+            transform_base_link_2_map = self.tfBuffer.lookup_transform('map','base_link', self.t_stamp,rospy.Duration(0.5)) 
             self.pose_in_map = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_2_map)
             
             # calculates in what cell the robot is   
