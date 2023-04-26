@@ -130,7 +130,7 @@ class A_star():
         self.origo_index_i = msg.origo_index_i
         self.origo_index_j = msg.origo_index_j
         #print('Path planner: minx = ', self.bbminx, 'miny = ', self.bbminy, 'maxx = ', self.bbmaxx, 'maxy = ', self.bbmaxy)
-        self.map_coords = msg.data # TODO look at explorer find goal and see how to get the map
+        self.map_coords = msg.data 
 
     def get_index_of_pos(self,x,y):
         """Return index of position in map grid, if not given geofence, return None"""
@@ -182,7 +182,6 @@ class A_star():
     def reconstruct_path(self,node: Node):
         pathlist = []
         while node.parent is not None:  # found target
-            #print('got in while')
             pathlist.append(node)
             node = node.parent
         pathlist.append(node) 
@@ -203,7 +202,6 @@ class A_star():
             return False
         #self.map.is_point_in_polygon(new_x,new_y,self.map.geofence_list):
 
-    #TODO implement dx,dy 
     def generate_neighbours(self,node):
         neighbourlist = {}
         buffer = 0.1
@@ -247,7 +245,6 @@ class A_star():
     ############################## Main Function #################################
     
     def path(self,goal):
-        # usually min heap
         rospy.loginfo("A* path planning started")   
         start = self.get_robot_pose_in_map()
         rospy.loginfo(f'Path planner: start {start.pose.position.x} {start.pose.position.y}')
@@ -421,21 +418,17 @@ class Path_Planner():
         self.goal = goal
         #self.main() # this might be bad programming
 
-    def map_callback(self,msg):
-        self.map_resolution = msg.resolution
-        self.bbminx = msg.bbminx
-        self.bbminy = msg.bbminy
-        
-        self.bbmaxx = msg.bbmaxx
-        self.bbmaxy = msg.bbmaxy
-        self.t_stamp = msg.header.stamp
-        self.origo_index_i = msg.origo_index_i
-        self.origo_index_j = msg.origo_index_j
-        self.path_planner.map = msg.data 
         
 ############################################ Main ############################################
 
-    
+    def calc_orentation_for_point(self,path):
+        path_length = len(path)
+        for point in range( 1, path_length):
+            dx = (path[point][0] - path[point-1][0])
+            dy = (path[point][1] - path[point-1][1])
+            yaw = math.atan2(dy,dx)
+            path[point].append(yaw)
+        return path
 
     def tranform_path_to_posestamped(self,path):
         path_list = []
