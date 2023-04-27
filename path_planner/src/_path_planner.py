@@ -45,9 +45,15 @@ class Node:
         else:
             parent_pos =[pos for pos in self.parent.position()]
             self.g = self.parent.g + math.dist([self.x,self.y],parent_pos)
-        self.h = self.dist_to_goal(self.goal)
+            #self.g = self.parent.g +self.manhattan(parent_pos,(self.x,self.y))
+        #self.h = self.dist_to_goal(self.goal)
+        self.h = self.manhattan(self.goal,(self.x,self.y))
         self.f = self.g + self.h
 
+    def manhattan(self,a, b):
+        D=2
+        return D*sum(abs(val1-val2) for val1, val2 in zip(a,b))
+    
     def __lt__(self,other):
         return self.f < other.f
     """def __eq__(self, other):
@@ -83,7 +89,7 @@ class A_star():
         self.origo_index_i = None
         self.origo_index_j = None
 
-        self.iterations = 10
+        self.iterations = 1000
         self.goal_reached = Bool()
         self.goal_reached.data = False
         # subscriber 
@@ -146,9 +152,19 @@ class A_star():
         # if out of bounds, return 1
 
         if i < 0 or i > int((self.bbmaxx-self.bbminx)/self.map_resolution) or j < 0 or j > int((self.bbmaxy-self.bbminy)/self.map_resolution):
+            rospy.loginfo('Failed, now printing 1 ')
             return 1
         
         return self.map_coords[i].data[j]
+    def get_pos_of_index(self,i,j):
+        """Return position of index in map grid, if not given geofence, return None"""
+        """if not self.given_geofence:
+            rospy.logwarn("No geofence given, but trying to get map grid")
+            return None"""
+        x = round(self.bbminx + i*self.map_resolution,4)
+        y = round(self.bbminy + j*self.map_resolution,4)
+        
+        return x, y
     
     def get_value_of_pos(self,x,y):
         """Return value of position in map grid, if not given geofence, return None"""
@@ -183,6 +199,7 @@ class A_star():
             if self.bbminx < node.x < self.bbmaxx:
                 return True
         else:
+            print('Path planner: node is out of bounds')
             return False
         #self.map.is_point_in_polygon(new_x,new_y,self.map.geofence_list):
 
@@ -199,8 +216,8 @@ class A_star():
                 neighbour = Node(new_x, new_y, parent = node, goal= node.goal)
                 if self.is_in_bounds(neighbour):
                     #rospy.loginfo(f'Path planner: neighbour is in bounds {neighbour.position()}')
-              
-                    if self.get_value_of_pos(new_x,new_y)>=0.8: # will always work due to checking inbounds
+                    #TODO: check if this fucks up the explorer
+                    if self.get_value_of_pos(new_x,new_y)>=(0.8): # will always work due to checking inbounds
                         neighbour.g = np.inf
                         neighbour.f = neighbour.g + neighbour.h
                     
@@ -211,11 +228,21 @@ class A_star():
     def get_robot_pose_in_map(self):
         try:                                   
             transform_base_link_2_map = self.tfBuffer.lookup_transform('map','base_link', self.t_stamp,rospy.Duration(0.5)) # lookup_transform('target frame','source frame', time.stamp, rospy.Duration(0.5))
-            self.pose_in_map = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_2_map)
-            return self.pose_in_map
+            self.robot_pose = tf2_geometry_msgs.do_transform_pose(self.pose, transform_base_link_2_map)
+            return self.robot_pose
         except:
             print('Path planner: No transform found')
             return None
+        
+        
+    def get_start_in_map(self):
+        robot_pose = self.get_robot_pose_in_map()
+        i,j = self.get_index_of_pos(robot_pose.pose.position.x,robot_pose.pose.position.y)
+        x,y = self.get_pos_of_index(i,j)
+        
+        return (x,y)
+    
+
         
     ############################## Main Function #################################
     
@@ -231,6 +258,8 @@ class A_star():
             start = (start.pose.position.x,start.pose.position.y)
         goal = (goal.pose.position.x,goal.pose.position.y)
         #start = (start.pose.position.x,start.pose.position.y)
+        start = self.get_start_in_map()
+        print(f'Path planner: start {start}')
         heap = []
         heapq.heapify(heap)
         openset = {}
@@ -238,7 +267,7 @@ class A_star():
         #heapify(openset)
         #best_path = None
         start_node = Node(x=start[0],y=start[1],goal=goal)
-        print(f'start node is {start_node.position()}')
+        #print(f'start node is {start_node.position()}')
         openset[start_node.position()] = start_node
         heapq.heappush(heap,(start_node.f,start_node))
 
@@ -246,6 +275,7 @@ class A_star():
         #maxiter = 15000
         currentlist = []
         iter = 0
+        goal_tolerance = 0.1
         
         while heapq and iter < self.iterations:
             current_pos = min(openset, key=lambda cordinates: openset[cordinates].f)
@@ -261,20 +291,27 @@ class A_star():
             #print(f'current {current}')
             #print(f'current g,h,f {current.g, current.h,current.f}\n')
             #print(f'current test {current.f}')
-            print(current.f)
-            print(openset[current_pos])
+            #print(current.f)
+            #print(openset[current_pos])
             openset.pop(current_pos)
             
             #print('\n')
             
             currentlist.append(current.position())
-            if (current.x,current.y) == goal:
+            if abs(current.x-current.goal[0]) <= goal_tolerance and abs(current.y-current.goal[1]) <= goal_tolerance:
+                print(f'diff x {current.x-current.goal[0]}, diffy {current.y-current.goal[1]}')
+                #print(f'Path planner: found path {current.position()}')
+                #print(f'Path planner: found path {currentlist}')
+                return True,self.reconstruct_path(current)
+                
+            #if (current.x,current.y) == goal:
                 return True,self.reconstruct_path(current)
             
             closedset[start_node.position()] = start_node
             
             neighbours = self.generate_neighbours(current)
-            #rospy.loginfo(f'Path planner:neighbours = {neighbours}')
+            #rospy.loginfo(f'\nPath planner:neighbours = {neighbours}')
+            
             for neighbour in neighbours:
                 neighbournode= neighbours[neighbour]
 
@@ -332,6 +369,9 @@ class A_star():
         path.pop(0) # remove the first starting point 
         return path
 
+
+##################################################    MAIN CLASS   ##########################################
+
 class Path_Planner():
     def __init__(self) -> None:
         rospy.init_node('path_planner')
@@ -358,7 +398,7 @@ class Path_Planner():
         self.reached_goal = False
 
         # might need to change in the future
-        self.rate = rospy.Rate(0.1)
+        self.rate = rospy.Rate(1)
 
         self.path_planner = A_star()
         self.last_msg = PoseStamped()
@@ -400,15 +440,16 @@ class Path_Planner():
     def tranform_path_to_posestamped(self,path):
         path_list = []
 
-        for point in path:
+        for i,point in enumerate(path):
             pose = PoseStamped()
             pose.pose.position.x = point[0]
             pose.pose.position.y = point[1]
             pose.pose.position.z = 0
+            
             pose.pose.orientation.x = 0
             pose.pose.orientation.y = 0
             pose.pose.orientation.z = 0
-            pose.pose.orientation.w = 1
+            pose.pose.orientation.w = 1 
             pose.header.frame_id = "map"
             pose.header.stamp = rospy.Time.now()
             path_list.append(pose)
@@ -424,7 +465,8 @@ class Path_Planner():
     def send_path(self,path): #TODO  fix to publish
         path_list = self.tranform_path_to_posestamped(path)
         #print(path_list)        
-        
+        path_list.pop(0)
+        print('Path planner: goal reched {self.reached_goal}}')
         if self.last_msg != path_list[0]:
             print(f'Path planner: reached goal {self.reached_goal}')
             if self.reached_goal == True:

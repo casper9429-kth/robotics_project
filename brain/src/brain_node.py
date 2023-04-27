@@ -50,7 +50,6 @@ class BrainNode:
             self.can_drop_off = False
             self.target = None
             self.detected_boxes = []
-            object_instances = []
 
     def run(self):
         rate = rospy.Rate(10)
@@ -94,25 +93,41 @@ class IsExplored(Leaf):
     def __init__(self):
         super().__init__()
         self.has_had_target = False
+        self.stop_explore = ServiceProxy("explorer/stop", Trigger)
 
     def run(self):
         rospy.loginfo(f'IsExplored')
         if self.context.target:
             self.has_had_target = True
-        return SUCCESS if self.has_had_target and len(self.context.detected_boxes) > 0 else FAILURE
+
+        if self.has_had_target and len(self.context.detected_boxes) > 0:
+            self.stop_explore()
+            return SUCCESS 
+        else: 
+            return FAILURE
 
 
 class Explore(Leaf):
     def __init__(self):
         super().__init__()
-        self.explore = ServiceProxy('/explore', Trigger)
+        self.start_explore = ServiceProxy("explorer/start", Trigger)
+        
+        self.start_path_tracker = ServiceProxy('/path_tracker/start', Trigger)
+        self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
+        
         self.object_subscriber = Subscriber('/detection/object_instances', ObjectInstanceArray, self.object_instances_callback, queue_size=1)
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
+        
+       
 
     def run(self):
         rospy.loginfo('Explore')
-        self.explore()
+        if not self.path_tracker_is_running().value:
+            self.start_path_tracker()
+
+        self.start_explore() 
+       
         for box_id in range(1,4):
             if self.buffer.can_transform('map', f'aruco/detected{box_id}', rospy.Time(0)) and box_id not in self.context.detected_boxes:
                 self.context.detected_boxes.append(box_id)
