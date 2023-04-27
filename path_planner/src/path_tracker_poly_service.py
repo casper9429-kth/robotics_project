@@ -30,7 +30,8 @@ class PathTracker:
         # State
         self.rate = rospy.Rate(10)
         self.goal = None
-        self.is_running = False
+        self.polygon_response = None
+        self.is_running = True#False
         self.is_observing = False
         self.move_timer = None
         self.observation_timer = None
@@ -45,13 +46,16 @@ class PathTracker:
         self.start_service = Service('/path_tracker/start', Trigger, self.start_callback)
         self.stop_service = Service('/path_tracker/stop', Trigger, self.stop_callback)
         self.is_running_service = Service('/path_tracker/is_running', Bool, self.is_running_callback)
-        
+        rospy.wait_for_service("/inside/workspace")
+        self.polygon_proxy = rospy.ServiceProxy("/inside/workspace", CheckPolygon)
+
         # Publishers
         self.cmd_vel_publisher = Publisher('/cmd_vel', Twist, queue_size=1)
         
         # Subscribers
-        self.workspace_subscriber = Subscriber('/workspace_poses/pose_array', PoseArray, self.workspace_callback)
         self.goal_subscriber = Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
+        self.workspace_subscriber = Subscriber('/workspace_poses/pose_array', PoseArray, self.workspace_callback)
+        
 
     def start_callback(self, req):
         self.start()
@@ -68,18 +72,23 @@ class PathTracker:
         self.goal = msg
         self.goal.header.frame_id = 'map'
 
-    def workspace_callback(self, msg: PoseArray):
-        rospy.wait_for_service("/inside/workspace")
-        self.polygon_proxy = rospy.ServiceProxy("/inside/workspace", CheckPolygon)
-        self.polygon_request = CheckPolygonRequest(msg.poses)
-        self.polygon_response = self.polygon_proxy(self.polygon_request) # self.workspace
+    def workspace_callback(self, msg):
+        x_coords = []
+        y_coords = []
+        for pose in msg.poses:
+            x_coords.append(pose.position.x)
+            y_coords.append(pose.position.y)
+        self.polygon_request = CheckPolygonRequest(x_coords, y_coords)
+        self.polygon_response = self.polygon_proxy(self.polygon_request)
+        self.polygon_response = self.polygon_response.inside
+
 
     def calculate_cmd_twist(self):
         goal_in_base_link = None
         try:
             goal_in_base_link = self.buffer.transform(self.goal, 'base_link')
         except: # TODO: catch only relevant exceptions
-            print(self.buffer.can_transform('base_link', 'map', rospy.Time(0)))
+            # print(self.buffer.can_transform('base_link', 'map', rospy.Time(0)))
             return Twist()
         
         angle_to_goal = atan2(goal_in_base_link.pose.position.y, goal_in_base_link.pose.position.x)

@@ -29,8 +29,16 @@ class Polygon:
 
     def is_in_workspace_callback(self, req):
         self.segments = self.generate_line_segments(req)
-        self.point_array = [(point.position.x, point.position.y) for point in req]
-        return self.contains(self.goal.pose.position) 
+        self.point_array = []
+        for i in range(len(req.x)):
+            self.point_array.append((req.x[i], req.y[i]))
+        
+        if self.goal is None:
+            # print("No goal")
+            return False
+        self.inbound = self.contains(self.goal.pose.position)
+        # print(self.inbound)
+        return self.inbound
 
     def contains(self, point):
         return self.is_point_in_polygon(point.x, point.y, self.point_array)
@@ -54,14 +62,13 @@ class Polygon:
 
         return inside
 
-    def generate_line_segments(self, point_array):
+    def generate_line_segments(self, coords):
         segments = []
-        point_array.append(point_array[0])
-        for i in range(len(point_array)-1):
-            x1 = point_array[i].position.x
-            y1 = point_array[i].position.y
-            x2 = point_array[i+1].position.x
-            y2 = point_array[i+1].position.y
+        for i in range(len(coords.x)-1):
+            x1 = coords.x[i]
+            y1 = coords.y[i]
+            x2 = coords.x[i+1]
+            y2 = coords.y[i+1]
             segments.append(LineSegment(x1,y1,x2,y2))
         return segments
 
@@ -108,12 +115,10 @@ class LineSegment:
             x_to_the_left = ray_start.x < self.get_x_intercept(ray_start.y)
             return is_between_y and x_to_the_left
         
-    def run(self):
-        while not rospy.is_shutdown():
-            self.rate.sleep()
-        
+
 
 if __name__ == "__main__":
     polygon = Polygon()
-    polygon.run()
+    rospy.spin()
+
 
