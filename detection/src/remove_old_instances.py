@@ -14,7 +14,7 @@ class RemoveOldInstances():
         # Publisher
         self.delete_instance_pub = rospy.Publisher("/detection/remove_instance", String, queue_size=10)
 
-        self.expiration_time = rospy.get_param('expiration_time')
+        self.expiration_time = rospy.get_param('~expiration_time')
         self.instance_list = None
 
 

@@ -195,7 +195,7 @@ class Object_computations():
                     if self.objects_dict[old_instance_key][4] <= self.temp_dict[new_instance_key][4]:
                         old_id = self.objects_dict[old_instance_key][5]
                         del self.objects_dict[old_instance_key]
-                        self.objects_dict[new_instance_key] = (self.temp_dict[new_instance_key][0], self.temp_dict[new_instance_key][1],self.temp_dict[new_instance_key][2], self.temp_dict[new_instance_key][3], self.temp_dict[new_instance_key][4], old_id)
+                        self.objects_dict[new_instance_key] = (self.temp_dict[new_instance_key][0], self.temp_dict[new_instance_key][1],self.temp_dict[new_instance_key][2], self.temp_dict[new_instance_key][3], self.temp_dict[new_instance_key][4], old_id,rospy.Time.now())
                         del self.temp_dict[new_instance_key]
 
                         # notify if new object detected
