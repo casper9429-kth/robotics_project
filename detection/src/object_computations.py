@@ -159,7 +159,7 @@ class Object_computations():
 
                 if not found_close:
                     # add instance to dict 
-                    self.objects_dict[new_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1, self.id)  
+                    self.objects_dict[new_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1, self.id,rospy.Time.now())  
                     self.id += 1 
                     # notify if new object detected
                     rospy.loginfo("New object detected: %s. Position in map: %s", new_instance_key,point_map.point)
@@ -195,7 +195,7 @@ class Object_computations():
                     if self.objects_dict[old_instance_key][4] <= self.temp_dict[new_instance_key][4]:
                         old_id = self.objects_dict[old_instance_key][5]
                         del self.objects_dict[old_instance_key]
-                        self.objects_dict[new_instance_key] = (self.temp_dict[new_instance_key][0], self.temp_dict[new_instance_key][1],self.temp_dict[new_instance_key][2], self.temp_dict[new_instance_key][3], self.temp_dict[new_instance_key][4], old_id)
+                        self.objects_dict[new_instance_key] = (self.temp_dict[new_instance_key][0], self.temp_dict[new_instance_key][1],self.temp_dict[new_instance_key][2], self.temp_dict[new_instance_key][3], self.temp_dict[new_instance_key][4], old_id,rospy.Time.now())
                         del self.temp_dict[new_instance_key]
 
                         # notify if new object detected
@@ -228,7 +228,7 @@ class Object_computations():
                     point_map.point.x = (point_map.point.x +float(instance[1]))/2
                     point_map.point.y = (point_map.point.y +float(instance[2]))/2
                     point_map.point.z = (point_map.point.z +float(instance[3]))/2
-                    self.objects_dict[old_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, int(instance[4])+1, instance[5])  
+                    self.objects_dict[old_instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, int(instance[4])+1, instance[5],rospy.Time.now())  
                     
                     # publish tf
                     self.publish_tf(old_instance_key, point_map)
@@ -238,7 +238,7 @@ class Object_computations():
                 else:
                     # add instance to dict 
                     instance_key = new_instance[0]+str(nb_instances+1)
-                    self.objects_dict[instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1, self.id)  
+                    self.objects_dict[instance_key] = (new_instance[0], point_map.point.x, point_map.point.y, point_map.point.z, 1, self.id,rospy.Time.now())  
                     self.id += 1
 
                     # notify if new object detected
@@ -312,7 +312,7 @@ class Object_computations():
             point.y = float(instance[2])
             point.z = float(instance[3])
             instance_msg.object_position = point
-            instance_msg.latest_stamp = stamp
+            instance_msg.latest_stamp = instance[6]
             instance_msg.nb_detections = int(instance[4])
             instance_msg.id = instance[5]
             instances_list_msg.instances.append(instance_msg)

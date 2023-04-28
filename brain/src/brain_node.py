@@ -137,11 +137,11 @@ class Explore(Leaf):
     def object_instances_callback(self, msg):
         self.context.object_instances = msg.instances
         if len(msg.instances) > 0:
-            if not self.context.target:
+            if not self.context.target or len([instance for instance in msg.instances if instance.id == self.context.target.id]) == 0:
                 self.context.target = msg.instances[-1]
             else:
                 self.context.target = [instance for instance in msg.instances if instance.id == self.context.target.id][0] # TODO: this can break if we forget old object
-
+                
 
 class ObjectsRemaining(Leaf):
     def run(self):
