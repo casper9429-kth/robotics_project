@@ -50,8 +50,11 @@
 
 	<!-- Object Detection -->
 	<param name="reduce_categories" type="bool" value="False"/>
+	<param name="expiration_time" value="60"/>
+
 	<node name="object_classifier" pkg="detection" type="object_classification.py" />
 	<node name="object_computations" pkg="detection" type="object_computations.py" />
+	<node name="remove_old_instances" pkg="detection" type="remove_old_instances.py" />
 
 	<!-- Speaker -->
 	<node name="speaker" pkg="speak" type="speaker.py"/>
@@ -84,5 +87,5 @@
 	<node name="arm_actions" pkg="arm" type="arm_actions.py" />
 
 	<!-- Brain -->
-	<node name="brain_node" pkg="brain" type="brain_node.py"  output="screen" />
+	<node name="brain_node" pkg="brain" type="brain_node.py" output="screen"/>
 </launch>
