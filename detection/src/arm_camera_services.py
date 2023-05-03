@@ -38,7 +38,7 @@ class ArmCameraServices:
         """
         # Take picture from the camera
         camera_device = "/dev/video0" # run "v4l2-ctl --list-devices" to find the camera device
-        image = self.take_picture()
+        image = self.take_picture(camera_device)
 
         # Find object using morphological operations
         if method == "morph":
