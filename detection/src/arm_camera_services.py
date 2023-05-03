@@ -28,6 +28,33 @@ class ArmCameraServices:
     def run(self):
         rospy.spin()
 
+    def get_ellipse(self,method = "morph"):
+        """
+        Get the ellipse of the object in the image
+        If no object is found, return None
+        method = "morph" : find object using morphological operations
+        method = "rembg" : find object using rembg u2net deep learning model
+        method = "derivatives" : find object using derivatives
+        """
+        # Take picture from the camera
+        camera_device = "/dev/video0" # run "v4l2-ctl --list-devices" to find the camera device
+        image = self.take_picture()
+
+        # Find object using morphological operations
+        if method == "morph":
+            ellipse = find_object_morph(image)
+        # Find object using rembg u2net deep learning mode
+        elif method == "rembg":
+            ellipse = find_object_rembg(image)
+        # Find object using derivatives
+        elif method == "derivatives":
+            ellipse = find_object_derivatives(image)
+        else:
+            ellipse = None
+
+        return ellipse
+
+
     def take_picture(camera_device="/dev/video0",debug=False):
         """
         Take picture from the camera
@@ -45,6 +72,7 @@ class ArmCameraServices:
             cv2.imwrite("image.png", frame)
         return frame
 
+    
 
 
 
