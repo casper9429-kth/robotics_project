@@ -51,6 +51,7 @@ class BrainNode:
             self.can_drop_off = False
             self.target = None
             self.detected_boxes = []
+            self.object_instances = []
 
     def run(self):
         rate = rospy.Rate(10)
@@ -93,15 +94,11 @@ class Localize(Leaf):
 class IsExplored(Leaf):
     def __init__(self):
         super().__init__()
-        self.has_had_target = False
         self.stop_explore = ServiceProxy("explorer/stop", Trigger)
         self.is_explored = ServiceProxy("explorer/is_explored", Trigger)
 
     def run(self):
         rospy.loginfo(f'IsExplored')
-        # if self.context.target:
-        #     self.has_had_target = True
-
         
         if self.context.target is not None and len(self.context.detected_boxes) > 0:
             self.stop_explore()

@@ -36,6 +36,7 @@ class Explorer():
         self.timer = rospy.Time.now() 
         self.is_explored = False
         self.unexplored_cells = None
+        self.explorer_percent = rospy.get_param('~percent', 0.01)
 
         # Position and orientation of the robot
         self.pose = PoseStamped()
@@ -104,11 +105,10 @@ class Explorer():
                 if int(data_j) == -1:
                     self.cells.append([i,j])
                     
-
-        if float(len(self.cells))/self.grid_size < 0.1:
+        if float(len(self.cells))/self.grid_size < self.explorer_percent:
             self.is_explored = True
         
-        elif len(self.cells) > 0:
+        if len(self.cells) > 0:
             self.cells = np.array(self.cells)
             distances = self.cells - self.position_in_gridmap
             min_distance_index = np.argmin(np.linalg.norm(distances, axis=1))
