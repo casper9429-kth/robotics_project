@@ -95,6 +95,7 @@ class IsExplored(Leaf):
         super().__init__()
         self.has_had_target = False
         self.stop_explore = ServiceProxy("explorer/stop", Trigger)
+        self.is_explored = ServiceProxy("explorer/is_explored", Trigger)
 
     def run(self):
         rospy.loginfo(f'IsExplored')
@@ -105,10 +106,9 @@ class IsExplored(Leaf):
         if self.context.target is not None and len(self.context.detected_boxes) > 0:
             self.stop_explore()
             return SUCCESS 
-        #TODO:
-        # elif there is no more space to explore:
-        #     self.stop_explore()
-        #     return SUCCESS
+        elif self.is_explored().success:
+            self.stop_explore()
+            return SUCCESS
         else: 
             return FAILURE
 

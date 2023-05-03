@@ -34,6 +34,8 @@ class Explorer():
         self.nearest_goal = None
         self.is_running = False
         self.timer = rospy.Time.now() 
+        self.is_explored = False
+        self.unexplored_cells = None
 
         # Position and orientation of the robot
         self.pose = PoseStamped()
@@ -43,6 +45,8 @@ class Explorer():
         # Services
         self.start_service = rospy.Service('/explorer/start', Trigger, self.start_callback)
         self.stop_service = rospy.Service('/explorer/stop', Trigger, self.stop_callback)
+        self.is_explored_service = rospy.Service('/explorer/is_explored', Trigger, self.is_explored_callback)
+        
 
     def start_callback(self, req):
         self.is_running = True
@@ -51,6 +55,12 @@ class Explorer():
     def stop_callback(self, req):
         self.is_running = False
         return TriggerResponse(success=True, message='Stopped')
+    
+    def is_explored_callback(self, req):
+        if not self.is_explored:
+            return TriggerResponse(success=False, message='Not explored yet')
+        else:
+            return TriggerResponse(success=True, message='Exploration done')
 
     def map_callback(self, msg: GridMapMsg):
         self.map_coords = msg.data
@@ -62,6 +72,8 @@ class Explorer():
         self.t_stamp = msg.header.stamp
         self.origo_index_i = msg.origo_index_i
         self.origo_index_j = msg.origo_index_j
+        self.grid_size = (self.bbmaxx-self.bbminx)/self.map_resolution * (self.bbmaxy-self.bbminy)/self.map_resolution
+
         if rospy.Time.now() - self.timer > rospy.Duration(0.5):
             self.timer = rospy.Time.now()
             self.transforms()
@@ -92,7 +104,11 @@ class Explorer():
                 if int(data_j) == -1:
                     self.cells.append([i,j])
                     
-        if len(self.cells) > 0:
+
+        if float(len(self.cells))/self.grid_size < 0.1:
+            self.is_explored = True
+        
+        elif len(self.cells) > 0:
             self.cells = np.array(self.cells)
             distances = self.cells - self.position_in_gridmap
             min_distance_index = np.argmin(np.linalg.norm(distances, axis=1))
