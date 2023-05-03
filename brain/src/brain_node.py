@@ -15,6 +15,7 @@ from arm.msg import ArmAction, ArmGoal
 from path_planner.srv import Bool as BoolSrv
 from behavior_tree.behavior_tree import BehaviorTree, Selector, Sequence, Inverter, Leaf, SUCCESS, FAILURE, RUNNING
 from detection.msg import ObjectInstanceArray
+from mapping.srv import CheckPolygon
 
 No = Not = Inverter
 
@@ -97,12 +98,17 @@ class IsExplored(Leaf):
 
     def run(self):
         rospy.loginfo(f'IsExplored')
-        if self.context.target:
-            self.has_had_target = True
+        # if self.context.target:
+        #     self.has_had_target = True
 
-        if self.has_had_target and len(self.context.detected_boxes) > 0:
+        
+        if self.context.target is not None and len(self.context.detected_boxes) > 0:
             self.stop_explore()
             return SUCCESS 
+        #TODO:
+        # elif there is no more space to explore:
+        #     self.stop_explore()
+        #     return SUCCESS
         else: 
             return FAILURE
 
@@ -140,7 +146,7 @@ class Explore(Leaf):
             if not self.context.target or len([instance for instance in msg.instances if instance.id == self.context.target.id]) == 0:
                 self.context.target = msg.instances[-1]
             else:
-                self.context.target = [instance for instance in msg.instances if instance.id == self.context.target.id][0] # TODO: this can break if we forget old object
+                self.context.target = [instance for instance in msg.instances if instance.id == self.context.target.id][0] 
                 
 
 class ObjectsRemaining(Leaf):
@@ -194,6 +200,8 @@ class GoToPickUp(Leaf):
         self.move_base_simple_publisher = Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
         self.start = ServiceProxy('/path_tracker/start', Trigger)
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
+        self.is_inside_workspace = ServiceProxy("/workspace/is_inside", CheckPolygon)
+        self.delete_instance_publisher = Publisher('/detection/remove_instance', String, queue_size=1)
         self.is_running = False
         # listen to tf frame object/detected/instance_name to get target pose
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
@@ -205,8 +213,21 @@ class GoToPickUp(Leaf):
         if not self.context.target:
             return FAILURE
         try:
+            # TODO: is it normal that we send a goal if path tracker not running?
             if not self.is_running or distance_to_object(self.context.target.object_position, self.buffer) > self.update_distance_threshold:
                 move_target_pose = calculate_pick_up_target_pose(self.context.target.object_position, self.buffer)
+                
+                #check if object is in the workspace, if not remove it from the list
+                object_pos = CheckPolygon()
+                object_pos.x = move_target_pose.pose.position.x
+                object_pos.y = move_target_pose.pose.position.y
+
+                if not self.is_inside_workspace(object_pos.x, object_pos.y).success:
+                    rospy.loginfo("Object is not in the workspace, removing it from the list")
+                    self.delete_instance_publisher.publish(String(self.context.target.instance_name))
+                    self.context.target = None
+                    return FAILURE
+                
                 self.move_base_simple_publisher.publish(move_target_pose)
         except LookupException:
             # TODO: we lost the target if we ever get here
@@ -392,6 +413,8 @@ class DropOff(Leaf):
             self.context.target = None
         self.speak_publisher.publish("Object is in the box")
     
+#TODO: we want to go to the anchor only if not explored
+
 
 class ReturnToAnchor(Leaf):
     def __init__(self):

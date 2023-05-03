@@ -220,17 +220,18 @@ class Mapping():
         if len(points) == 0:
             return
 
+        # TODO : noise filtering crashes 
         # Create a nearest neighbors object
-        nbrs = NearestNeighbors(n_neighbors=3).fit(points)
+        #nbrs = NearestNeighbors(n_neighbors=3).fit(points)
 
         # Get the distances and indices of the nearest neighbors
-        distances, indices = nbrs.kneighbors(points)
+        #distances, indices = nbrs.kneighbors(points)
 
         # Count the number of neighbors for each point
-        num_neighbors = np.count_nonzero(distances < 0.2, axis=1)
+        #num_neighbors = np.count_nonzero(distances < 0.2, axis=1)
 
         # Remove points with fewer than two neighbors
-        points = points[num_neighbors >= 2]
+        #points = points[num_neighbors >= 2]
 
         # Peform statical outlier removal on points and remove points that have few neighbours
         

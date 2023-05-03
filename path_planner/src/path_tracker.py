@@ -141,7 +141,7 @@ class PathTracker:
             
             if self.goal and self.is_running:
                 goal_point = self.goal.pose.position.x, self.goal.pose.position.y
-                if self.is_inside_workspace(*goal_point):
+                if self.is_inside_workspace(*goal_point).success:
                     cmd_twist = Twist() if self.is_observing else self.calculate_cmd_twist()
                     self.cmd_vel_publisher.publish(cmd_twist)
             self.rate.sleep()
