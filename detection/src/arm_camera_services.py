@@ -72,8 +72,22 @@ class ArmCameraServices:
             cv2.imwrite("image.png", frame)
         return frame
 
-    
+    def transform_point(self,point):
+        """
+        Transform the point to camera frame
+        """
+        # Camera matrix
+        camera_matrix = [[517.03632655, 0.0, 312.03052029], [0.0, 516.70216219, 252.01727667], [0.0, 0.0, 1.0]]
 
+        # Distortion coefficients
+        dist_coeffs = [0.0, 0.0, 0.0, 0.0, 0.0]
+
+        # Transform the point to camera frame
+        point = np.array(point).reshape(1, 1, 2)
+        point = cv2.undistortPoints(point, camera_matrix, dist_coeffs)
+        point = point[0][0]
+        return point
+        
 
 
 if __name__ == "__main__":
