@@ -29,7 +29,10 @@ def find_object_morph(image):
 
     # Find contours in image 
     contours, hierarchy = cv2.findContours(blob, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    
+
+    if len(contours) == 0:
+        return None
+        
     # sort contours by area
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
@@ -62,10 +65,13 @@ def find_object_morph(image):
     
     # Find contours in new image
     contours, hierarchy = cv2.findContours(new_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    
+
+
     # Remove contours with area bigger than half of the image
     contours = [contour for contour in contours if cv2.contourArea(contour) < img.shape[0]*img.shape[1]/3]
-        
+    if len(contours) == 0:
+        return None
+
     # Sort contours by area
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
@@ -108,6 +114,9 @@ def find_object_rembg(image):
     
     # Find contours in image
     contours, hierarchy = cv2.findContours(grey, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if len(contours) == 0:
+        return None
+
     # sort contours by area
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
     contour = contours[0]
@@ -174,6 +183,9 @@ def find_object_derivatives(image):
     # find contours
     contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     
+    if len(contours) == 0:
+        return None
+
     new_img = np.ones_like(img)*255
     
     # sort contours by area
@@ -203,10 +215,13 @@ def find_object_derivatives(image):
     
     # Find contours in new image
     contours, hierarchy = cv2.findContours(new_img, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    
+
     # Remove contours with area bigger than half of the image
     contours = [contour for contour in contours if cv2.contourArea(contour) < img.shape[0]*img.shape[1]/3]
-        
+    
+    if len(contours) == 0:
+        return None
+
     # Sort contours by area
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
