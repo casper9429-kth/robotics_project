@@ -89,8 +89,10 @@ class PathTracker:
                                                   goal_in_base_link.pose.orientation.w])[2]
 
         cmd_twist = Twist()
-        
+
+        #         
         if distance_to_goal > self.in_goal_threshold:
+        
             if angle_to_goal > self.angular_threshold:
                 cmd_twist.angular.z = self.angular_speed
             elif angle_to_goal < -self.angular_threshold:
@@ -99,6 +101,10 @@ class PathTracker:
                 cmd_twist.linear.x = self.fast_linear_speed
             else:
                 cmd_twist.linear.x = self.slow_linear_speed
+        
+        
+        
+        
         else:
             if goal_orientation > self.orientation_threshold:
                 cmd_twist.angular.z = self.angular_speed

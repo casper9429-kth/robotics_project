@@ -36,7 +36,7 @@ class Explorer():
         self.timer = rospy.Time.now() 
         self.is_explored = False
         self.unexplored_cells = None
-        self.explorer_percent = rospy.get_param('~percent', 0.01)
+        self.explorer_percent = rospy.get_param('~percent', 0.001)
 
         # Position and orientation of the robot
         self.pose = PoseStamped()

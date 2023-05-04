@@ -45,6 +45,10 @@ class ekf_slam():
         self.wheel_r = 0.04921
         self.base = 0.3 
 
+        # Turn off slam
+        self.slam_turn_off = True
+
+
         # Slam parameters
         # extend to flag as service TODO
         self.latest_time = rospy.Time.now()
@@ -122,6 +126,11 @@ class ekf_slam():
 
         for marker in msg.markers:
             
+            # Turn off slam
+            if self.slam_turn_off:
+                if marker.id != self.anchor_id:
+                    continue
+                
             # if anchor is seen as the same time as other markers, don't run slam on the other ones
             if self.anchor_id in [marker.id for marker in msg.markers] and marker.id != self.anchor_id:
                 continue

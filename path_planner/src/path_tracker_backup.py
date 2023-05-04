@@ -18,14 +18,14 @@ class PathTracker:
         # Parameters
         self.close_to_goal_threshold = rospy.get_param('~close_to_goal_threshold', 0.3)
         self.in_goal_threshold = rospy.get_param('~in_goal_threshold', 0.03)
-        self.angular_threshold = rospy.get_param('~angular_threshold', 0.1)
+        self.angular_threshold = rospy.get_param('~angular_threshold', 0.16)
         self.orientation_threshold = rospy.get_param('~orientation_threshold', 0.1)
 
         self.fast_linear_speed = rospy.get_param('~fast_linear_speed', 0.2)
         self.slow_linear_speed = rospy.get_param('~slow_linear_speed', 0.1)
         self.angular_speed = rospy.get_param('~angular_speed', 0.7)
 
-        self.move_duration = rospy.get_param('~move_duration', 0.5)
+        self.move_duration = rospy.get_param('~move_duration', 1.5)
         self.observation_duration = rospy.get_param('~observation_duration', 0.5)
         
         # State
@@ -89,8 +89,10 @@ class PathTracker:
                                                   goal_in_base_link.pose.orientation.w])[2]
 
         cmd_twist = Twist()
-        
+
+        #         
         if distance_to_goal > self.in_goal_threshold:
+        
             if angle_to_goal > self.angular_threshold:
                 cmd_twist.angular.z = self.angular_speed
             elif angle_to_goal < -self.angular_threshold:
@@ -99,6 +101,10 @@ class PathTracker:
                 cmd_twist.linear.x = self.fast_linear_speed
             else:
                 cmd_twist.linear.x = self.slow_linear_speed
+        
+        
+        
+        
         else:
             if goal_orientation > self.orientation_threshold:
                 cmd_twist.angular.z = self.angular_speed
@@ -122,7 +128,7 @@ class PathTracker:
             self.move_timer.shutdown()
         if self.observation_timer:
             self.observation_timer.shutdown()
-        self.cmd_vel_publisher.publish(Twist())
+        #self.cmd_vel_publisher.publish(Twist())
     
     def move_timer_callback(self, event):
         self.is_observing = True

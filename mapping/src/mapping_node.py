@@ -222,21 +222,26 @@ class Mapping():
 
         # TODO : noise filtering crashes 
         # Create a nearest neighbors object
-        #nbrs = NearestNeighbors(n_neighbors=3).fit(points)
+
+        if len(points) < 3:
+            return        
+        
+        nbrs = NearestNeighbors(n_neighbors=3).fit(points)
 
         # Get the distances and indices of the nearest neighbors
-        #distances, indices = nbrs.kneighbors(points)
+        distances, indices = nbrs.kneighbors(points)
 
         # Count the number of neighbors for each point
-        #num_neighbors = np.count_nonzero(distances < 0.2, axis=1)
+        num_neighbors = np.count_nonzero(distances < 0.2, axis=1)
+        
 
         # Remove points with fewer than two neighbors
-        #points = points[num_neighbors >= 2]
+        points = points[num_neighbors >= 2]
 
         # Peform statical outlier removal on points and remove points that have few neighbours
         
 
-        self.grid_map.import_point_cloud_rays_inf_v2(points,1.3,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2],False)
+        self.grid_map.import_point_cloud_rays_inf_v2(points,1.3,self.robot_pose[0],self.robot_pose[1],self.robot_pose[2],True)
         
         return
 

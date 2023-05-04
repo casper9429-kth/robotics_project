@@ -62,7 +62,7 @@
 	<node name="speaker" pkg="speak" type="speaker.py"/>
 
     <!-- Pathing -->
-    <node name="path_tracker" pkg="path_planner" type="path_tracker.py" >
+    <node name="path_tracker" pkg="path_planner" type="path_tracker.py" output="screen" >
 		<param name="in_goal_threshold" type="double" value="0.03" />
 		<param name="close_to_goal_threshold" type="double" value="0.3" />
 		<param name="angular_threshold" type="double" value="0.1" />
