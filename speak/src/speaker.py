@@ -12,12 +12,10 @@ class Speaker():
         # Subscribers 
         self.sub_topic = rospy.Subscriber("/speaker/speech", String, self.speaker_callback)
 
-     
-        
+
     def speaker_callback(self, msg): 
         
         rospy.logwarn("I will speak")
-        
         text = msg.data
         # Language in which you want to convert
         language = 'en'
@@ -31,6 +29,12 @@ class Speaker():
         play = "mpg123 " + path
         # Playing the converted file
         os.system(play)
+            #del myobj
+            # Kill gTTS process to avoid memory leak
+        if rospy.is_shutdown():            
+            os.system("killall mpg123")
+            
+
 
 
 if __name__ == "__main__":
