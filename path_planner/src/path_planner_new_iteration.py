@@ -5,7 +5,6 @@ from functools import total_ordering
 import numpy as np
 import math
 import actionlib
-import move_base_msgs.msg as mb
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -20,6 +19,7 @@ from geometry_msgs.msg import PoseStamped, PoseArray,Quarternion
 from nav_msgs.msg import Path
 from visualization_msgs.msg import Marker
 import tf2_ros
+import tf
 import tf2_geometry_msgs
 from mapping.msg import GridMapMsg
 # from mapping.grid_map.grid_map import GridMap
@@ -91,7 +91,7 @@ class A_star():
 
         # Algorithm variables
         self.iterations = 1000
-        self.goal_tolerance = 0.1
+        self.goal_tolerance = 0.05
         
         self.goal_reached = Bool()
         self.goal_reached.data = False
@@ -180,6 +180,9 @@ class A_star():
 
         return self.get_value_of_index(i, j)
 
+
+#################################### A* functions ##################################################
+
     def distance(self, node1: Node, node2: Node):
         return math.dist(node1.position(), node2.position())
 
@@ -263,6 +266,8 @@ class A_star():
         # start = (start.pose.position.x,start.pose.position.y)
         start = self.get_start_in_map()
         print(f'Path planner: start {start}')
+        print(f'Path planner: goal {goal}')
+        
         heap = []
         heapq.heapify(heap)
         openset = {}
@@ -404,6 +409,7 @@ class Path_Planner():
         # checks to avoid oscillations
         self.previous_path = []
         self.prev_previous_path = []
+        self.path = []
 
         # might need to change in the future
         self.rate = rospy.Rate(1)
@@ -440,7 +446,7 @@ class Path_Planner():
             dy = (path[point][1] - path[point-1][1])
             yaw = math.atan2(dy, dx)
             # TODO needs to be checked if even correct, cannot do from home computer
-            q = tf2.transformations.quaternion_from_euler(0, 0, yaw)
+            q = tf.transformations.quaternion_from_euler(0, 0, yaw)
             point_orientation.append(q)
         return point_orientation
 
@@ -464,10 +470,11 @@ class Path_Planner():
             pose.header.stamp = rospy.Time.now()
             path_list.append(pose)
 
-        end = path_list[-1]
-        end.pose.orientation = self.goal.pose.orientation
-        path_list[-1] = end
-            
+        #end = path_list[-1]
+        #end.pose.orientation = self.goal.pose.orientation
+        #path_list[-1] = end
+        path_list.append(self.goal)   
+        print(f'Path planner: last point {path_list[-1].pose.position.x,path_list[-1].pose.position.y}')
         # path_tosend.poses = path_list
 
         return path_list
@@ -480,6 +487,7 @@ class Path_Planner():
         path_list = self.tranform_path_to_posestamped(path)
         path_list.pop(0) # so it doenst go to the start point
         #esures that the paths are saved
+        self.path = path_list
         if self.previous_path:
                 self.prev_previous_path = self.previous_path
                 self.previous_path = path_list
@@ -498,7 +506,7 @@ class Path_Planner():
         path.header.stamp = rospy.Time.now()
         path.header.frame_id = 'map'
 
-        for point in path_list:
+        for point in self.path:
             path.poses.append(point)
 
         if path_list:

@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /Next point1
       Splitter Ratio: 0.5
     Tree Height: 355
   - Class: rviz/Selection
@@ -53,13 +54,11 @@ Visualization Manager:
       Value: true
     - Class: rviz/TF
       Enabled: true
+      Filter (blacklist): ""
+      Filter (whitelist): ""
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        aruco/detected/box1:
-          Value: true
-        aruco/detected1:
-          Value: true
         aruco/detected500:
           Value: true
         base_link:
@@ -94,15 +93,9 @@ Visualization Manager:
           Value: true
         camera_link:
           Value: true
-        des_base_link:
-          Value: true
-        des_odom:
-          Value: true
         imu_link:
           Value: true
         map:
-          Value: true
-        marker_belief_1:
           Value: true
         marker_belief_500:
           Value: true
@@ -116,16 +109,7 @@ Visualization Manager:
       Show Names: true
       Tree:
         map:
-          aruco/detected/box1:
-            {}
-          aruco/detected1:
-            {}
           aruco/detected500:
-            {}
-          des_base_link:
-            des_odom:
-              {}
-          marker_belief_1:
             {}
           marker_belief_500:
             {}
@@ -207,7 +191,7 @@ Visualization Manager:
       Enabled: true
       Head Length: 0.30000001192092896
       Head Radius: 0.10000000149011612
-      Name: Pose
+      Name: Next point
       Queue Size: 10
       Shaft Length: 1
       Shaft Radius: 0.05000000074505806
@@ -235,12 +219,12 @@ Visualization Manager:
       Enabled: true
       Head Length: 0.30000001192092896
       Head Radius: 0.10000000149011612
-      Name: Pose
+      Name: Goal
       Queue Size: 10
       Shaft Length: 1
       Shaft Radius: 0.05000000074505806
       Shape: Arrow
-      Topic: /start_and_goal
+      Topic: /move_base_simple/goal
       Unreliable: false
       Value: true
   Enabled: true

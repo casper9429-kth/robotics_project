@@ -10,7 +10,7 @@ from nav_msgs.msg import Path
 from std_msgs.msg import Bool
 from visualization_msgs.msg import Marker, MarkerArray, InteractiveMarker, InteractiveMarkerControl
 from geometry_msgs.msg import PoseStamped, TransformStamped, Twist, PoseArray, Pose, Point 
-from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedback
+#from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal, MoveBaseActionFeedback
 import tf
 
 class LineSegment():
@@ -124,7 +124,9 @@ class PathTracker():
         
         # Flag that a goal has been received
         self.goal_received = False
-
+        
+        # Test path
+        self.path = Path()
 
         # Goal position and orientation
         self.goal = PoseStamped()
@@ -138,7 +140,7 @@ class PathTracker():
         self.max_angle = 0.1
         self.angle_speed = 0.2
         self.deceleration_distance = 0.0
-        self.in_goal_tolerance = 0.3
+        self.in_goal_tolerance = 0.1
         self.orientaion_tolerance = 0.1
         self.wave_frequency = 0.1
         self.velocity_mode = False
@@ -163,7 +165,8 @@ class PathTracker():
 
         # subscribers
         self.fence_sub = rospy.Subscriber('/workspace_poses/pose_array', PoseArray, self.fence_callback)
-        self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  
+        #self.goal_sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)  
+        self.path_sub = rospy.Subscriber('/path',Path,self.path_callback)
         # self.aruco_sub = rospy.Subscriber('/aruco/markers/transformed_pose', Marker, self.aruco_callback)  
         print('Path tracker: Subscribers initalized')
 
@@ -179,6 +182,13 @@ class PathTracker():
     def fence_callback(self, msg:PoseArray):
         self.polygon = Polygon(msg.poses)
 
+    def path_callback(self,msg:Path):
+        self.path = msg
+        self.goal.pose.position = self.path.poses[0].pose.position                 # 2D Nav goal in rviz is in odom frame
+        self.goal.pose.orientation = self.path.poses[0].pose.orientation
+        self.goal_received = True
+        rospy.loginfo('Tracker: recived goal')
+        
 
     def check_if_in_fence(self, pose: Pose):
         # Transform pose to map frame
@@ -198,7 +208,18 @@ class PathTracker():
             print('Path tracker: No transform found')
                         
 
+    def set_next_goal(self):
+        #print(f'Path tracker: poses = {len(self.path.poses)}')
         
+        if self.path.poses:
+            #print(self.path.poses)
+            
+        
+            self.goal = self.path.poses.pop(0)
+            print('Path tracker: next goal recived')
+        else:
+            print('Path tracker: No more poses in list')
+            
      # Calculate the direction the robot should go
     def math(self):
         angle_to_goal =  1 * math.atan2(self.goal_in_base_link.pose.position.y,self.goal_in_base_link.pose.position.x)
@@ -206,8 +227,8 @@ class PathTracker():
         robot_theta = tf.transformations.euler_from_quaternion([self.pose.pose.orientation.x, self.pose.pose.orientation.y, self.pose.pose.orientation.z, self.pose.pose.orientation.w])[2] 
         goal_orientation = tf.transformations.euler_from_quaternion([self.goal_in_base_link.pose.orientation.x, self.goal_in_base_link.pose.orientation.y, self.goal_in_base_link.pose.orientation.z, self.goal_in_base_link.pose.orientation.w])[2]       
         dtheta = goal_orientation - robot_theta
-
-        print('Path tracker: distance: ', distance)
+        #print(f'Path tracker: goal {self.goal.pose.positions}')
+        #print('Path tracker: distance: ', distance)
         if distance > self.in_goal_tolerance:
 
             if angle_to_goal >= self.max_angle:
@@ -226,7 +247,7 @@ class PathTracker():
         else:
             self.velocity_mode = False
             self.last_wave_time = rospy.Time.now()
-            print(f'Path tracker: got stuck here {abs(dtheta)}')
+           # print(f'Path tracker: got stuck here {abs(dtheta)}')
             
             if abs(dtheta) >= self.orientaion_tolerance:
                 self.move.linear.x = 0.0
@@ -239,7 +260,9 @@ class PathTracker():
                 self.move.linear.x = 0.0
                 self.move.angular.z = 0.0
                 self.goal_reached_pub.publish(True)
-                print('Goal orientation reached')
+                #print('Goal orientation reached')
+                self.set_next_goal()
+                #print(f'Path tracker: Goal = {self.goal.pose}')
         
         self.cmd_pub.publish(self.move)   
         

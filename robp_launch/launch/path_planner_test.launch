@@ -40,7 +40,7 @@
 	<node name="arm_camera" pkg="arm_camera" type="arm_camera.py" output='screen'/>
 
 	<!-- run rviz -->
-	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/path_planner.rviz" />
+	<!--node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/path_planner.rviz" -->
 
 	<!-- run aruco detection -->
 	<node name="display_markers" pkg="detection" type="display_markers.py" output='screen'/>
@@ -78,6 +78,6 @@
     <!-- <node name="path_tracker_client" pkg="path_planner" type="path_tracker_client.py" output='screen'/>  -->
 
 	<!-- Path planner -->
-	<node name="path_planner" pkg="path_planner" type="path_planner.py" output='screen'/>
+	<node name="path_planner" pkg="path_planner" type="path_planner_global_local.py" output='screen'/>
 
 </launch>

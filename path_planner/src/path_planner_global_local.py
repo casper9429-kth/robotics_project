@@ -93,12 +93,16 @@ class A_star():
         self.iterations = 1000
         self.goal_reached = Bool()
         self.goal_reached.data = False
+        
         # subscriber 
         self.sub_map = rospy.Subscriber("/map/GridMap", GridMapMsg, self.map_callback)
         #self.sub_goal_reached = rospy.Subscriber('/path_tracker/feedback', Bool, self.goal_reached_callback)
         self.goal_reached_pub = rospy.Subscriber('/goal_reached', Bool,self.goal_reached_callback)
 
         #self.sub_start_and_goal = rospy.Subscriber("/start_and_goal", PoseArray, self.start_and_goal_callback)
+        
+        self.complete_path = None
+        
         
         # tf things
         self.tfBuffer = tf2_ros.Buffer()
@@ -116,7 +120,7 @@ class A_star():
         self.pose.pose.orientation.w = 1.0
         self.t_stamp = None
         
-        
+    ####################################  CALLBACK  #######################
 
     def goal_reached_callback(self,msg): # TODO figure it out
         self.goal_reached = msg.data
@@ -133,6 +137,10 @@ class A_star():
         #print('Path planner: minx = ', self.bbminx, 'miny = ', self.bbminy, 'maxx = ', self.bbmaxx, 'maxy = ', self.bbmaxy)
         self.map_coords = msg.data 
 
+    
+    #####################################  MAP STUFF ##########################################
+    
+    
     def get_index_of_pos(self,x,y):
         """Return index of position in map grid, if not given geofence, return None"""
         """if not self.given_geofence:
@@ -177,6 +185,31 @@ class A_star():
         
         return self.get_value_of_index(i,j)
         
+    # Name TBD 
+    def obstacle_on_calc_path(self,path_smooth: list,path_rough: list):
+        # scan current path if it does not collide with object
+        start = self.get_start_in_map()
+        check = all(point in path_smooth for point in path_rough)
+        if check:
+            start_index = 0 
+            # checks if the currently calculated path has a new obstacle
+            for point in path_smooth:
+                index = path_rough.index(point)
+
+                for point in path_rough[start_index:index]:
+                    if self.get_value_of_pos(point[0],point[1])> 0.8:
+                        return True
+                start_index = index
+            return False
+        # in case of error just return True for recalculation
+        rospy.logwarn('Path Planner: not all points match')    
+        return True
+            
+
+        
+
+    ################################## A STAR ###################################################
+    
     def distance(self,node1: Node,node2:Node):
         return math.dist(node1.position(),node2.position())
 
@@ -382,9 +415,8 @@ class Path_Planner():
 
         #subscribers
         self.sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
-        self.goal_sub = rospy.Subscriber('/goal', PoseStamped, self.start_and_goal_callback)
-        self.goal_reached_sub = rospy.Subscriber('/goal_reached',Bool,self.goal_reached_callback)
-        #self.test_goal = rospy.Subscriber('/move_base_simple/goal', PoseStamped,self.goal_test_cb)
+        #self.goal_sub = rospy.Subscriber('/goal', PoseStamped, self.start_and_goal_callback)
+        #self.goal_reached_sub = rospy.Subscriber('/goal_reached',Bool,self.goal_reached_callback)
         
         #publishers
         #self.move_to_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
@@ -393,6 +425,7 @@ class Path_Planner():
 
         self.start = PoseStamped()
         self.goal = PoseStamped()
+        self.goal_local = PoseStamped()
         self.has_recived_goal = False
         
         self.reached_goal = False
@@ -400,7 +433,9 @@ class Path_Planner():
         # checks to avoid oscillations
         self.previous_path = []
         self.prev_previous_path = []
-
+        self.path = None
+        self.path_smooth = None
+        
         # might need to change in the future
         self.rate = rospy.Rate(1)
 
@@ -421,17 +456,33 @@ class Path_Planner():
     def goal_reached_callback(self,msg):
         self.reached_goal = msg.data
 
+    # does the initial calculation 
     def goal_callback(self,goal):
         self.goal = goal
         self.has_recived_goal = True
-        
-        #self.main() # this might be bad programming
-    def goal_test_cb(self,msg:PoseStamped):
-        self.goal = msg
-        self.has_recived_goal = True
+        self.status,self.path = self.path_planner.path(self.goal)
+        if not self.status:
+            rospy.logerr('Path planner: Could not find path, check submitted goal') 
+        self.path_smooth = self.path_planner.path_smoothing(self.path)
+        print(self.path_smooth )
+        self.send_path2(self.path_smooth )
 
         
 ############################################ Main ############################################
+    
+    def local_planner(self):
+        # needs to check if new information
+        
+        # if new info affects path, 
+        # recalculates path around object to start at next point from global path planner
+        if self.path_planner.obstacle_on_calc_path(self.path,self.path_smooth):
+            self.status,self.path = self.path_planner.path(self.goal)
+            if not self.status:
+                rospy.logerr('Path planner: Could not find path, check submitted goal') 
+            self.path_smooth = self.path_planner.path_smoothing(self.path)
+            print(self.path_smooth )
+            self.send_path2(self.path_smooth)
+        
 
     def calc_orentation_for_points(self, path):
         path_length = len(path)
@@ -478,7 +529,8 @@ class Path_Planner():
         #end.pose.orientation = self.goal.pose.orientation
         #path_list[-1] = end
         #path_tosend.poses = path_list
-
+        path_list.append(self.goal)
+        
         return path_list
 
 
@@ -569,17 +621,15 @@ class Path_Planner():
             rospy.logwarn('Path planner: No goal yet')
             return
         
-        status,path = self.path_planner.path(self.goal)
+        #status,self.path = self.path_planner.path(self.goal)
         
-        if not status and not path:
+        if not self.status and not self.path:
             rospy.logwarn('Path planner: Failed to find path')
             return
-        
-        print(f'Path planner: status {status}')
+        self.local_planner()
+        print(f'Path planner: status {self.status}')
         #print(f'Path planner: Goal {self.goal.pose}')
-        path = self.path_planner.path_smoothing(path)
-        print(path)
-        self.send_path2(path)
+        
         #print('path sent')
 
 
