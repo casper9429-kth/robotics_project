@@ -162,6 +162,7 @@ include_directories(
 catkin_install_python(PROGRAMS
   src/static_movement_services.py
   src/path_tracker.py
+  src/path_planner_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
