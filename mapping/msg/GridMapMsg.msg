@@ -5,5 +5,7 @@ float32 bbminx
 float32 bbminy
 float32 bbmaxx
 float32 bbmaxy
+float32 inflation_r_index
+float32 inflation_r
 float32 origo_index_i
 float32 origo_index_j
