@@ -5,6 +5,7 @@ import tf2_geometry_msgs  # this import is needed for tf2_ros.transform to work
 import tf2_ros
 from rospy import Service, Publisher, Subscriber, ServiceProxy
 from geometry_msgs.msg import Twist, PoseStamped, PoseArray
+from nav_msgs.msg import Path 
 from std_srvs.srv import Trigger, TriggerResponse
 from path_planner.srv import Bool, BoolResponse
 from mapping.srv import CheckPolygon, CheckPolygonRequest
@@ -36,6 +37,7 @@ class PathTracker:
         self.is_observing = False
         self.move_timer = None
         self.observation_timer = None
+        self.path = Path()
         
         # TF2
         self.broadcaster = tf2_ros.TransformBroadcaster()
@@ -56,7 +58,7 @@ class PathTracker:
         self.cmd_vel_publisher = Publisher('/cmd_vel', Twist, queue_size=1)
         
         # Subscribers
-        self.goal_subscriber = Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
+        self.path_sub = rospy.Subscriber('/path',Path,self.path_callback)
 
     def start_callback(self, req):
         self.start()
@@ -69,9 +71,17 @@ class PathTracker:
     def is_running_callback(self, req):
         return BoolResponse(self.is_running)
 
-    def goal_callback(self, msg: PoseStamped):
-        self.goal = msg
+    def path_callback(self,msg:Path):
+        self.path = msg
+        self.goal.pose.position = self.path.poses[0].pose.position                 # 2D Nav goal in rviz is in odom frame
+        self.goal.pose.orientation = self.path.poses[0].pose.orientation
+        # TODO check if needed
         self.goal.header.frame_id = 'map'
+    
+    
+    def set_next_goal(self):
+        if self.path.poses:
+            self.goal = self.path.poses.pop(0)
 
     def calculate_cmd_twist(self):
         goal_in_base_link = None
@@ -111,7 +121,9 @@ class PathTracker:
             elif goal_orientation < -self.orientation_threshold:
                 cmd_twist.angular.z = -self.angular_speed
             else:
-                self.stop()
+                self.set_next_goal()
+                if len(self.path.poses) == 0:
+                    self.stop()
                 # TODO: publish a message that the goal has been reached
         
         return cmd_twist
@@ -128,7 +140,7 @@ class PathTracker:
             self.move_timer.shutdown()
         if self.observation_timer:
             self.observation_timer.shutdown()
-        #self.cmd_vel_publisher.publish(Twist())
+        self.cmd_vel_publisher.publish(Twist())
     
     def move_timer_callback(self, event):
         self.is_observing = True
