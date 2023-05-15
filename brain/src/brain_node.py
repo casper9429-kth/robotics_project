@@ -90,15 +90,12 @@ class Init(Leaf):
                     self.speak_publisher.publish("Good morning! I am ready to go!")
                     self.arm_straight = True
                     self.straight()
-                    rospy.loginfo('Straight')
                 elif self.arm_straight and not self.has_wiggled_1 and not self.move_is_running().value:
                     self.wiggle_service_1()
                     self.has_wiggled_1 = True
-                    rospy.loginfo('Wiggled 1')
                 elif self.has_wiggled_1 and not self.has_wiggled_2 and not self.move_is_running().value:
                     self.wiggle_service_2()
                     self.has_wiggled_2 = True
-                    rospy.loginfo('Wiggled 2')
                 
         return RUNNING
 
