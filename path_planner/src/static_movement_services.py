@@ -13,6 +13,8 @@ class StaticMovementServicesNode:
         self.reverse_pick_up_service_animal = Service('move/reverse/pick_up_animal', Trigger, self.handle_reverse_pick_up_animal)
         self.forward_pick_up_service = Service('move/forward/pick_up', Trigger, self.handle_forward_pick_up)
         self.box_service = Service('move/reverse/box', Trigger, self.handle_box)
+        self.wiggle_service_1 = Service('move/wiggle_1', Trigger, self.handle_wiggle_1)
+        self.wiggle_service_2 = Service('move/wiggle_2', Trigger, self.handle_wiggle_2)
         self.cancel_service = Service('move/cancel', Trigger, self.handle_cancel)
         self.is_running = Service('move/is_running', Bool, self.handle_is_running)
         self.cmd_vel_publisher = Publisher('cmd_vel', Twist, queue_size=10)
@@ -21,12 +23,16 @@ class StaticMovementServicesNode:
         self.reverse_pick_up_duration = .5 # [s]
         self.reverse_pick_up_duration_animal = .25 # [s]
         self.box_duration = 2.6 # [s]
+        self.wiggle_duration = 0.5 # [s]
         linear_x = .1
         self.forward_twist = Twist()
         self.forward_twist.linear.x = linear_x # TODO: might be different when using battery
         self.reverse_twist = Twist()
         self.reverse_twist.linear.x = -linear_x # TODO: might be different when using battery
-        
+        self.wiggle_twist_1 = Twist()
+        self.wiggle_twist_1.angular.z = 0.75 # TODO: might be different when using battery
+        self.wiggle_twist_2 = Twist()
+        self.wiggle_twist_2.angular.z = -0.75 # TODO: might be different when using battery
         self.timer = None
 
     def handle_reverse_pick_up(self, _):
@@ -57,6 +63,21 @@ class StaticMovementServicesNode:
         self.timer = Timer(rospy.Duration(self.box_duration), self.timer_callback, oneshot=True)
         return TriggerResponse(success=True, message='Backing away from box')
     
+    def handle_wiggle_1(self, _):
+        if self.timer:
+            return TriggerResponse(success=False, message='Timer already running')
+        self.cmd_vel_publisher.publish(self.wiggle_twist_1)
+        self.timer = Timer(rospy.Duration(self.wiggle_duration), self.timer_callback, oneshot=True)
+        return TriggerResponse(success=True, message='Wiggling')
+    
+    def handle_wiggle_2(self, _):
+        if self.timer:
+            return TriggerResponse(success=False, message='Timer already running')
+        self.cmd_vel_publisher.publish(self.wiggle_twist_2)
+        self.timer = Timer(rospy.Duration(self.wiggle_duration), self.timer_callback, oneshot=True)
+        return TriggerResponse(success=True, message='Wiggling')
+    
+        
     def handle_cancel(self, _):
         self.timer.shutdown()
         self.timer_callback(None)
