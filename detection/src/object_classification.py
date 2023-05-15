@@ -26,25 +26,6 @@ class Object_classifier():
         """ Put the node name here, and description of the node"""
         rospy.init_node('object_classifier')
 
-       
-        # Define rate
-        # self.update_rate = 10 # [Hz] Change this to the rate you want
-        # self.update_dt = 1.0/self.update_rate # [s]
-        # self.rate = rospy.Rate(self.update_rate) 
-        #rospy.loginfo(torch.__version__)
-        
-        # Paramethers 
-        self.device = "cuda"
-        detector = Detector()
-        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
-        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
-        example_forward_input = torch.rand(8, 3, 640, 480)
-        self.model = self.load_model(detector, model_path, self.device)
-        self.model_opt = torch.jit.trace(self.model, example_forward_input).to(self.device)
-        self.model_opt.eval()
-        
-
-
         self.bridge = CvBridge()
 
         self.mapping = ["Binky", "Hugo", "Slush", "Muddles", "Kiki", "Oakie", "Cube", "Sphere"]
@@ -54,6 +35,20 @@ class Object_classifier():
         
         self.camera_info = [None, None, None, None]
         
+        # Paramethers 
+        self.device = "cuda"
+        #detector = Detector()
+        model_path = "/home/robot/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for robot
+        #model_path = "/home/sleepy/dd2419_ws/src/detection/src/dl_detection/det_2023-03-15_14-32-40-347854.pt" #for computer
+        #example_forward_input = torch.rand(8, 3, 640, 480)
+        #self.model_opt = torch.jit.trace(self.model, example_forward_input).to(self.device)
+        #self.model_opt.eval()
+    
+        detector = Detector().to(self.device)
+        self.model= self.load_model(detector, model_path, self.device)
+        self.model.eval()
+    
+       
         # Subscribers 
         # self.sub_image = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback) 
         # self.sub_depth= rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image, self.depth_image_callback)
@@ -67,6 +62,10 @@ class Object_classifier():
         # Publisher
         self.bb_pub = rospy.Publisher("/detection/bounding_boxes", BoundingBoxArray, queue_size=10)
         self.image_bb_pub = rospy.Publisher("/detection/image_with_bounding_boxes", Image, queue_size=10)
+        
+        rospy.sleep(5)
+        
+        
         
         
     def combined_callback(self, image_msg, depth_msg): 
@@ -156,7 +155,8 @@ class Object_classifier():
         
         with torch.no_grad():
    
-            out = self.model_opt(test_image).cpu()
+            out = self.model(test_image).to(self.device)
+            #out = self.model_opt(test_image).cpu()
             bbs = self.model.decode_output(out, 0.85)
 
             
@@ -186,7 +186,7 @@ class Object_classifier():
                 else:
                     bb_msg.category_name = self.mapping[bb["category"]]
                 
-                if bb_msg.category_name is not None and depth > 0.15 and depth < 2 and bb["width"]*bb["width"] > 100:
+                if bb_msg.category_name is not None and depth > 0.15 and depth < 1.5 and bb["width"]*bb["width"] > 100:
                     
                     # visualize image with bb in Rviz
                     start_point = (x_bb, y_bb)
@@ -264,27 +264,12 @@ class Object_classifier():
         #rospy.loginfo("%s, %s, %s, %s",mean_red, mean_green, mean_blue, metric)
         return category_name
 
-        
-           
 
-
-                
-    def run(self):
-        """
-        Run the node. 
-        Don't change anything here, change main instead.
-        """
-        
-        # Run as long as node is not shutdown
-        while not rospy.is_shutdown():
-            self.main()
-            self.rate.sleep()
 
 
 if __name__ == "__main__":
 
     classifier = Object_classifier()
-    #classifier.run()
     rospy.spin()
 
 

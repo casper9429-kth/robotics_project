@@ -59,6 +59,7 @@ class Object_computations():
         self.instances_pub = rospy.Publisher("/detection/object_instances", ObjectInstanceArray, queue_size=10)
         self.speaker_pub = rospy.Publisher("/speaker/speech", String, queue_size=10)
         
+        
 
     def filter(self, batch, time):
 

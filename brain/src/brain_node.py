@@ -12,6 +12,7 @@ from tf2_ros import Buffer, TransformListener, LookupException
 from tf.transformations import quaternion_from_euler # using original tf is deprecated, but oh well
 
 from arm.msg import ArmAction, ArmGoal
+from arm.srv import ArmTrigger
 from path_planner.srv import Bool as BoolSrv
 from behavior_tree.behavior_tree import BehaviorTree, Selector, Sequence, Inverter, Leaf, SUCCESS, FAILURE, RUNNING
 from detection.msg import ObjectInstanceArray
@@ -27,6 +28,7 @@ class BrainNode:
         self.behavior_tree = self._create_behavior_tree()
     
     def _create_behavior_tree(self):
+        init = Init()
         localize = Selector([IsLocalized(), Localize()])
         explore = Selector([IsExplored(), Explore()])
         pick_up = Selector([No(ObjectsRemaining()),
@@ -39,7 +41,7 @@ class BrainNode:
                                                  GoToDropOff()]),
                                        DropOff()])])
         return_to_anchor = ReturnToAnchor()
-        root = Sequence([localize, explore, pick_up, drop_off, return_to_anchor])
+        root = Sequence([init, localize, explore, pick_up, drop_off, return_to_anchor])
         behavior_tree = BehaviorTree(root, context=self.Context())
         return behavior_tree
     
@@ -62,14 +64,43 @@ class BrainNode:
             
             
 class Init(Leaf):
+    def __init__(self):
+        super().__init__()
+        self.init_time = rospy.Time.now()
+        self.straight = ServiceProxy('arm/steps/straight', ArmTrigger)
+        
+        self.arm_straight = False
+        self.has_wiggled_1 = False
+        self.has_wiggled_2 = False
+        
+        self.wiggle_service_1 = ServiceProxy('move/wiggle_1', Trigger)
+        self.wiggle_service_2 = ServiceProxy('move/wiggle_2', Trigger)
+        self.move_is_running = ServiceProxy('/move/is_running', BoolSrv)
+        self.speak_publisher = Publisher('/speaker/speech', String, queue_size=1) 
+
+        
     def run(self):
         rospy.loginfo('Init')
-        # TODO: wait for camera to warm up
-        # TODO: test remove_old_instances for vision memory
-        # TODO: wiggle to help see anchor
-        # TODO: raise arm
-
-        return SUCCESS
+        if rospy.Time.now() - self.init_time > rospy.Duration(5.0): 
+            if rospy.Time.now() - self.init_time > rospy.Duration(10.0) and self.arm_straight and self.has_wiggled_1 and self.has_wiggled_2:
+                
+                return SUCCESS
+            else:
+                if not self.arm_straight:
+                    self.speak_publisher.publish("Good morning! I am ready to go!")
+                    self.arm_straight = True
+                    self.straight()
+                    rospy.loginfo('Straight')
+                elif self.arm_straight and not self.has_wiggled_1 and not self.move_is_running().value:
+                    self.wiggle_service_1()
+                    self.has_wiggled_1 = True
+                    rospy.loginfo('Wiggled 1')
+                elif self.has_wiggled_1 and not self.has_wiggled_2 and not self.move_is_running().value:
+                    self.wiggle_service_2()
+                    self.has_wiggled_2 = True
+                    rospy.loginfo('Wiggled 2')
+                
+        return RUNNING
 
 
 class IsLocalized(Leaf):
