@@ -137,6 +137,8 @@ class GridMap():
         grid_map_msg.bbmaxx = self.bounding_box[1]
         grid_map_msg.bbminy = self.bounding_box[2]
         grid_map_msg.bbmaxy = self.bounding_box[3]
+        grid_map_msg.inflation_r_index = int(self.inflation_range/self.resolution)+1
+        grid_map_msg.inflation_r = self.inflation_range
         # Get index of origo
         i = int((self.bounding_box[0])/self.resolution)
         j = int((self.bounding_box[2])/self.resolution)
