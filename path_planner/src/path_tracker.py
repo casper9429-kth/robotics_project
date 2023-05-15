@@ -73,8 +73,7 @@ class PathTracker:
 
     def path_callback(self,msg:Path):
         self.path = msg
-        self.goal.pose.position = self.path.poses[0].pose.position                 # 2D Nav goal in rviz is in odom frame
-        self.goal.pose.orientation = self.path.poses[0].pose.orientation
+        self.goal = self.path.poses[0]
         # TODO check if needed
         self.goal.header.frame_id = 'map'
     

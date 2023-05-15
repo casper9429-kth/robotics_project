@@ -121,15 +121,13 @@ class Explore(Leaf):
         self.object_subscriber = Subscriber('/detection/object_instances', ObjectInstanceArray, self.object_instances_callback, queue_size=1)
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
-        
-       
 
     def run(self):
         rospy.loginfo('Explore')
         if not self.path_tracker_is_running().value:
             self.start_path_tracker()
 
-        self.start_explore() 
+        self.start_explore()
        
         for box_id in range(1,4):
             if self.buffer.can_transform('map', f'aruco/detected{box_id}', rospy.Time(0)) and box_id not in self.context.detected_boxes:

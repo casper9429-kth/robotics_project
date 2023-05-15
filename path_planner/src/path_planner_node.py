@@ -4,12 +4,8 @@ import rospy
 from functools import total_ordering
 import numpy as np
 import math
-import actionlib
 #import move_base_msgs.msg as mb
-import sys
-from collections import defaultdict
 from dataclasses import dataclass,field
-from occupancy_grid import Occupancy_grid
 
 
 from typing import Dict,Tuple
@@ -202,7 +198,7 @@ class A_star():
                 start_index = index
             return False
         # in case of error just return True for recalculation
-        rospy.logwarn('Path Planner: not all points match')    
+        #rospy.logwarn('Path Planner: not all points match')    
         return True
             
 
@@ -232,7 +228,7 @@ class A_star():
             if self.bbminx < node.x < self.bbmaxx:
                 return True
         else:
-            print('Path planner: node is out of bounds')
+            #print('Path planner: node is out of bounds')
             return False
         #self.map.is_point_in_polygon(new_x,new_y,self.map.geofence_list):
 
@@ -281,8 +277,9 @@ class A_star():
     def path(self,goal):
         rospy.loginfo("A* path planning started")   
         start = self.get_robot_pose_in_map()
-        rospy.loginfo(f'Path planner: start {start.pose.position.x} {start.pose.position.y}')
-        rospy.loginfo(f'Path:planner: goal {goal.pose.position.x,goal.pose.position.y}')
+        # For debugging purposes
+        #rospy.loginfo(f'Path planner: start {start.pose.position.x} {start.pose.position.y}')
+        #rospy.loginfo(f'Path:planner: goal {goal.pose.position.x,goal.pose.position.y}')
         if start == None:
             return None,[]
         else: 
@@ -290,7 +287,7 @@ class A_star():
         goal = (goal.pose.position.x,goal.pose.position.y)
         #start = (start.pose.position.x,start.pose.position.y)
         start = self.get_start_in_map()
-        print(f'Path planner: start {start}')
+        #print(f'Path planner: start {start}')
         heap = []
         heapq.heapify(heap)
         openset = {}
@@ -330,7 +327,7 @@ class A_star():
             
             currentlist.append(current.position())
             if abs(current.x-current.goal[0]) <= goal_tolerance and abs(current.y-current.goal[1]) <= goal_tolerance:
-                print(f'diff x {current.x-current.goal[0]}, diffy {current.y-current.goal[1]}')
+               # print(f'diff x {current.x-current.goal[0]}, diffy {current.y-current.goal[1]}')
                 #print(f'Path planner: found path {current.position()}')
                 #print(f'Path planner: found path {currentlist}')
                 return True,self.reconstruct_path(current)
@@ -371,7 +368,7 @@ class A_star():
         #print('no path found')
         #print(f'iter = {iter}')
         #print(f'openset length = {len(openset)}')
-        print('Path planner: Maxed iterations')
+        #print('Path planner: Maxed iterations')
         #print(currentlist)
         return False, self.reconstruct_path(current)
     
@@ -461,10 +458,10 @@ class Path_Planner():
         self.goal = goal
         self.has_recived_goal = True
         self.status,self.path = self.path_planner.path(self.goal)
-        if not self.status:
-            rospy.logerr('Path planner: Could not find path, check submitted goal') 
+        """if not self.status:
+            rospy.logerr('Path planner: Could not find path, check submitted goal') """
         self.path_smooth = self.path_planner.path_smoothing(self.path)
-        print(self.path_smooth )
+       # print(self.path_smooth )
         self.send_path2(self.path_smooth )
 
         
@@ -477,10 +474,10 @@ class Path_Planner():
         # recalculates path around object to start at next point from global path planner
         if self.path_planner.obstacle_on_calc_path(self.path,self.path_smooth):
             self.status,self.path = self.path_planner.path(self.goal)
-            if not self.status:
-                rospy.logerr('Path planner: Could not find path, check submitted goal') 
+            """if not self.status:
+                rospy.logerr('Path planner: Could not find path, check submitted goal') """
             self.path_smooth = self.path_planner.path_smoothing(self.path)
-            print(self.path_smooth )
+            #print(self.path_smooth )
             self.send_path2(self.path_smooth)
         
 
@@ -504,7 +501,7 @@ class Path_Planner():
         # get orientation for each point in relation to the next point
         # and should therefor should the robot always point at next point
         orientations = self.calc_orentation_for_points(path)
-        print(f'orientation {len(orientations)}')
+        #print(f'orientation {len(orientations)}')
         n=len(path)
         
         for i,point in enumerate(path):
@@ -538,7 +535,7 @@ class Path_Planner():
         path_list = self.tranform_path_to_posestamped(path)
         #print(path_list)        
         path_list.pop(0)
-        print('Path planner: goal reched {self.reached_goal}}')
+        #print('Path planner: goal reched {self.reached_goal}}')
         if self.last_msg != path_list[0]:
             print(f'Path planner: reached goal {self.reached_goal}')
             if self.reached_goal == True:
@@ -592,7 +589,7 @@ class Path_Planner():
         
         if self.reached_goal:
             
-            print(f'Path planner: has reached goal = {self.reached_goal}')
+            #print(f'Path planner: has reached goal = {self.reached_goal}')
             self.reached_goal = False
             
         #self.move_to_pub.publish(path_list[0])
@@ -627,7 +624,7 @@ class Path_Planner():
             rospy.logwarn('Path planner: Failed to find path')
             return
         self.local_planner()
-        print(f'Path planner: status {self.status}')
+        #print(f'Path planner: status {self.status}')
         #print(f'Path planner: Goal {self.goal.pose}')
         
         #print('path sent')
