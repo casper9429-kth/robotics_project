@@ -12,6 +12,7 @@ from typing import Dict,Tuple
 from scipy.interpolate import CubicSpline
 from queue import PriorityQueue
 from std_msgs.msg import Bool
+from path_planner.srv import BoolSetter, Bool as BoolSrv, BoolSetterResponse, BoolResponse as BoolSrvResponse
 from geometry_msgs.msg import PoseStamped, PoseArray
 from nav_msgs.msg import Path
 from visualization_msgs.msg import Marker
@@ -75,6 +76,9 @@ class Node:
 class A_star():
 
     def __init__(self):
+        self.current_goal_index = None
+        self.should_uninflate_around_goal = False
+
         #self.client = actionlib.SimpleActionClient('path_tracker', move_base_msgs.msg.MoveBaseAction)
         self.map_coords = None
         self.map_resolution = None
@@ -83,6 +87,7 @@ class A_star():
         self.bbmaxx = None
         self.bbmaxy = None
         self.t_stamp = None
+        self.inflation_r_index = None
         self.origo_index_i = None
         self.origo_index_j = None
 
@@ -128,6 +133,7 @@ class A_star():
         self.bbmaxx = msg.bbmaxx
         self.bbmaxy = msg.bbmaxy
         self.t_stamp = msg.header.stamp
+        self.inflation_r_index = msg.inflation_r_index
         self.origo_index_i = msg.origo_index_i
         self.origo_index_j = msg.origo_index_j
         #print('Path planner: minx = ', self.bbminx, 'miny = ', self.bbminy, 'maxx = ', self.bbmaxx, 'maxy = ', self.bbmaxy)
@@ -160,7 +166,14 @@ class A_star():
             rospy.loginfo('Failed, now printing 1 ')
             return 1
         
+        # if we turn off inflation around target, make sure we return the corrected value
+        if self.should_uninflate_around_goal and self.current_goal_index:
+            # +1 might not be needed
+            if math.dist((i, j), self.current_goal_index) <= self.inflation_r_index + 1:
+                return 0 # 0 is free space
+        
         return self.map_coords[i].data[j]
+    
     def get_pos_of_index(self,i,j):
         """Return position of index in map grid, if not given geofence, return None"""
         """if not self.given_geofence:
@@ -285,6 +298,8 @@ class A_star():
         else: 
             start = (start.pose.position.x,start.pose.position.y)
         goal = (goal.pose.position.x,goal.pose.position.y)
+        self.current_goal_index = self.get_index_of_pos(*goal) # ugly but works, used in get_value_of_index to uninflate around goal
+
         #start = (start.pose.position.x,start.pose.position.y)
         start = self.get_start_in_map()
         #print(f'Path planner: start {start}')
@@ -438,12 +453,23 @@ class Path_Planner():
 
         self.path_planner = A_star()
         self.last_msg = PoseStamped()
+
+        # services
+        self.toggle_uninflation_service = rospy.Service('/path_planner/toggle_uninflation', BoolSetter, self.toggle_uninflation_callback)
+        self.is_uninflating_service = rospy.Service('/path_planner/is_uninflating', BoolSrv, self.is_uninflating_callback)
         
         #print('path planner node started')
         rospy.loginfo('path planner node initialized')
         
         #rospy.roslog('path planner node started')
 ############################################ Callbacks ############################################
+
+    def toggle_uninflation_callback(self, req):
+        self.path_planner.should_uninflate_around_goal = req.data
+        return BoolSetterResponse()
+    
+    def is_uninflating_callback(self, req):
+        return BoolSrvResponse(self.path_planner.should_uninflate_around_goal)
 
     def start_and_goal_callback(self,msg):
         self.goal = msg
