@@ -62,7 +62,7 @@
 	<node name="speaker" pkg="speak" type="speaker.py"/>
 
     <!-- Pathing -->
-    <node name="path_tracker" pkg="path_planner" type="path_tracker.py" >
+    <node name="path_tracker" pkg="path_planner" type="path_tracker.py" output="screen">
 		<param name="in_goal_threshold" type="double" value="0.03" />
 		<param name="close_to_goal_threshold" type="double" value="0.3" />
 		<param name="angular_threshold" type="double" value="0.1" />
@@ -75,7 +75,7 @@
 		<param name="move_duration" type="double" value="2" />
 		<param name="observation_duration" type="double" value="0.5" />
 	</node>
-	<node name="path_planner" pkg="path_planner" type="path_planner_node.py" />
+	<node name="path_planner" pkg="path_planner" type="path_planner_node.py" output="screen"/>
     <node name="workspace_manager" pkg="mapping" type="workspace_manager.py" />
     <node name="static_movement_services" pkg="path_planner" type="static_movement_services.py" />
 
@@ -93,5 +93,5 @@
 	<node name="arm_actions" pkg="arm" type="arm_actions.py" />
 
 	<!-- Brain -->
-	<node name="brain_node" pkg="brain" type="brain_node.py" output="screen"/>
+	<node name="brain_node" pkg="brain" type="brain_node.py" output="screen" />
 </launch>

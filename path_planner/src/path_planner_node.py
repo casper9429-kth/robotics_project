@@ -230,7 +230,7 @@ class A_star():
         pathlist.append(node) 
         path = [(node.x,node.y) for node in pathlist]
         path.reverse()
-        rospy.loginfo(f'FOUND PATH')
+        #rospy.loginfo(f'FOUND PATH')
         return path
     
 
@@ -292,7 +292,7 @@ class A_star():
         start = self.get_robot_pose_in_map()
         # For debugging purposes
         #rospy.loginfo(f'Path planner: start {start.pose.position.x} {start.pose.position.y}')
-        #rospy.loginfo(f'Path:planner: goal {goal.pose.position.x,goal.pose.position.y}')
+        rospy.loginfo(f'Path:planner: goal {goal.pose.position.x,goal.pose.position.y}')
         if start == None:
             return None,[]
         else: 
@@ -327,19 +327,10 @@ class A_star():
             except IndexError:
                 return False,[openset[start_node.position()]]
             current = current[1]
-            #if current.position() == (1.0,1.0):
-            #print(f'Path planner: iter {iter}')
-            #print(openset)
-            #print(current.position())
-            #print(f'current {current}')
-            #print(f'current g,h,f {current.g, current.h,current.f}\n')
-            #print(f'current test {current.f}')
-            #print(current.f)
-            #print(openset[current_pos])
+
             openset.pop(current_pos)
             
-            #print('\n')
-            
+
             currentlist.append(current.position())
             if abs(current.x-current.goal[0]) <= goal_tolerance and abs(current.y-current.goal[1]) <= goal_tolerance:
                # print(f'diff x {current.x-current.goal[0]}, diffy {current.y-current.goal[1]}')
@@ -347,8 +338,6 @@ class A_star():
                 #print(f'Path planner: found path {currentlist}')
                 return True,self.reconstruct_path(current)
                 
-            #if (current.x,current.y) == goal:
-                return True,self.reconstruct_path(current)
             
             closedset[start_node.position()] = start_node
             
@@ -380,11 +369,7 @@ class A_star():
                     heapq.heappush(heap,(neighbournode.f,neighbournode))
             iter +=1
             #print(iter)
-        #print('no path found')
-        #print(f'iter = {iter}')
-        #print(f'openset length = {len(openset)}')
-        #print('Path planner: Maxed iterations')
-        #print(currentlist)
+
         return False, self.reconstruct_path(current)
     
     def path_smoothing(self,path):
@@ -465,7 +450,7 @@ class Path_Planner():
 ############################################ Callbacks ############################################
 
     def toggle_uninflation_callback(self, req):
-        self.path_planner.should_uninflate_around_goal = req.data
+        self.path_planner.should_uninflate_around_goal = req.value
         return BoolSetterResponse()
     
     def is_uninflating_callback(self, req):
@@ -499,6 +484,7 @@ class Path_Planner():
         # if new info affects path, 
         # recalculates path around object to start at next point from global path planner
         if self.path_planner.obstacle_on_calc_path(self.path,self.path_smooth):
+            rospy.loginfo(f'is this always triggering?')
             self.status,self.path = self.path_planner.path(self.goal)
             """if not self.status:
                 rospy.logerr('Path planner: Could not find path, check submitted goal') """

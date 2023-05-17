@@ -77,7 +77,6 @@ class PathTracker:
         # TODO check if needed
         self.goal.header.frame_id = 'map'
     
-    
     def set_next_goal(self):
         if self.path.poses:
             self.goal = self.path.poses.pop(0)
@@ -124,7 +123,6 @@ class PathTracker:
                 if len(self.path.poses) == 0:
                     self.stop()
                 # TODO: publish a message that the goal has been reached
-        
         return cmd_twist
 
     def start(self):
