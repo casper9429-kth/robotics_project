@@ -13,7 +13,7 @@ from tf.transformations import quaternion_from_euler # using original tf is depr
 
 from arm.msg import ArmAction, ArmGoal
 from arm.srv import ArmTrigger
-from path_planner.srv import Bool as BoolSrv
+from path_planner.srv import Bool as BoolSrv, BoolSetter
 from behavior_tree.behavior_tree import BehaviorTree, Selector, Sequence, Inverter, Leaf, SUCCESS, FAILURE, RUNNING
 from detection.msg import ObjectInstanceArray
 from mapping.srv import CheckPolygon
@@ -77,7 +77,6 @@ class Init(Leaf):
         self.wiggle_service_2 = ServiceProxy('move/wiggle_2', Trigger)
         self.move_is_running = ServiceProxy('/move/is_running', BoolSrv)
         self.speak_publisher = Publisher('/speaker/speech', String, queue_size=1) 
-
         
     def run(self):
         rospy.loginfo('Init')
@@ -226,6 +225,7 @@ class GoToPickUp(Leaf):
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
         self.is_inside_workspace = ServiceProxy("/workspace/is_inside", CheckPolygon)
         self.delete_instance_publisher = Publisher('/detection/remove_instance', String, queue_size=1)
+        self.toggle_path_planner_uninflation = ServiceProxy('/path_planner/toggle_uninflation', BoolSetter)
         self.is_running = False
         # listen to tf frame object/detected/instance_name to get target pose
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
@@ -258,9 +258,11 @@ class GoToPickUp(Leaf):
             pass
         
         if not self.is_running:
+            self.toggle_path_planner_uninflation(True) # true = uninflate so we can get close to the object
             self.is_running = True
             self.start()
         elif not self.path_tracker_is_running().value:
+            self.toggle_path_planner_uninflation(False)
             self.is_running = False
             self.context.can_pick_up = True
         return RUNNING
@@ -363,6 +365,7 @@ class GoToDropOff(Leaf):
         self.move_base_simple_publisher = Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
         self.start = ServiceProxy('/path_tracker/start', Trigger)
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
+        self.toggle_path_planner_uninflation = ServiceProxy('/path_planner/toggle_uninflation', BoolSetter)
         self.is_running = False
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
@@ -383,9 +386,11 @@ class GoToDropOff(Leaf):
             pass
 
         if not self.is_running:
+            self.toggle_path_planner_uninflation(True) # true = uninflate so we can get close to the box
             self.is_running = True
             self.start()
         elif not self.path_tracker_is_running().value:
+            self.toggle_path_planner_uninflation(False)
             self.is_running = False
             self.context.can_drop_off = True
                 
