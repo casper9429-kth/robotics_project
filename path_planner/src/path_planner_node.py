@@ -6,7 +6,7 @@ import numpy as np
 import math
 #import move_base_msgs.msg as mb
 from dataclasses import dataclass,field
-
+import time
 
 from typing import Dict,Tuple
 from scipy.interpolate import CubicSpline
@@ -291,7 +291,6 @@ class A_star():
         rospy.loginfo("A* path planning started")   
         start = self.get_robot_pose_in_map()
         # For debugging purposes
-        #rospy.loginfo(f'Path planner: start {start.pose.position.x} {start.pose.position.y}')
         rospy.loginfo(f'Path:planner: goal {goal.pose.position.x,goal.pose.position.y}')
         if start == None:
             return None,[]
@@ -469,13 +468,11 @@ class Path_Planner():
         self.goal = goal
         self.has_recived_goal = True
         self.status,self.path = self.path_planner.path(self.goal)
-        """if not self.status:
-            rospy.logerr('Path planner: Could not find path, check submitted goal') """
         self.path_smooth = self.path_planner.path_smoothing(self.path)
-       # print(self.path_smooth )
+    # print(self.path_smooth )
         self.send_path2(self.path_smooth )
 
-        
+            
 ############################################ Main ############################################
     
     def local_planner(self):
@@ -543,46 +540,7 @@ class Path_Planner():
         return path_list
 
 
-    def send_path(self,path): #TODO  fix to publish
-        path_list = self.tranform_path_to_posestamped(path)
-        #print(path_list)        
-        path_list.pop(0)
-        #print('Path planner: goal reched {self.reached_goal}}')
-        if self.last_msg != path_list[0]:
-            print(f'Path planner: reached goal {self.reached_goal}')
-            if self.reached_goal == True:
-                print('enters loop')
-                print(f'Len before {len(path_list)}')
-                path_list.pop(0)
-                print(f'Len after {len(path_list)}')
-                
-                self.reached_goal = False
-            print(f'Path planner: Published point {path_list[0].pose.position.x,path_list[0].pose.position.y  }')
-            self.move_to_pub.publish(path_list[0])
-            
-            self.last_msg = path_list[0]
-            #print('published')
-        
-        path= Path()
-        path.header.stamp = rospy.Time.now()
-        path.header.frame_id = 'map'
-        
-        for point in path_list:
-            path.poses.append(point)
-        
-        
-        if path_list:
-            
-            #print(path)
-            self.viz_path_pub.publish(path)
-            
-        
-        """for pose_stamped in path_list:
-            goal = mb.MoveBaseGoal()
-            goal.target_pose = pose_stamped
-            client.send_goal(goal,done_cb=self.done_cb,feedback_cb=self.feedback_cb)
-            client.wait_for_result() # result callback 
-            print(client.get_result())"""
+    
         
     def send_path2(self,path):
         path_list = self.tranform_path_to_posestamped(path)
@@ -612,7 +570,7 @@ class Path_Planner():
         path.header.frame_id = 'map'
         for point in path_list:
             path.poses.append(point)
-            
+
         if path_list:
             # print(path)
             self.viz_path_pub.publish(path)
@@ -623,13 +581,16 @@ class Path_Planner():
     
 
     def main(self):
+        
+        
         if self.path_planner.map_coords == None:
             rospy.logwarn('Path planner: No map yet')
             return
         if self.has_recived_goal == False:
             rospy.logwarn('Path planner: No goal yet')
             return
-        
+        start = self.path_planner.get_robot_pose_in_map()
+        rospy.loginfo(f'Path planner: start {start.pose.position.x} {start.pose.position.y}')
         #status,self.path = self.path_planner.path(self.goal)
         
         if not self.status and not self.path:

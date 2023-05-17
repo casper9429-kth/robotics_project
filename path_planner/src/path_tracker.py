@@ -75,18 +75,23 @@ class PathTracker:
         self.path = msg
         self.goal = self.path.poses[0]
         # TODO check if needed
-        self.goal.header.frame_id = 'map'
-    
+        
+        self.goal.header.frame_id = 'map'    
+        
     def set_next_goal(self):
         if self.path.poses:
             self.goal = self.path.poses.pop(0)
+            rospy.loginfo(f'Next goal: {self.goal.pose.position.x}, {self.goal.pose.position.y}')
 
     def calculate_cmd_twist(self):
         goal_in_base_link = None
         try:
+            self.goal: PoseStamped
+            self.goal.header.frame_id = 'map'
+            self.goal.header.stamp = rospy.Time(0)
             goal_in_base_link = self.buffer.transform(self.goal, 'base_link')
-        except: # TODO: catch only relevant exceptions
-            # print(self.buffer.can_transform('base_link', 'map', rospy.Time(0)))
+        except Exception as e: # TODO: catch only relevant exceptions
+            rospy.logerr(f'Could not transform goal to base_link, error: {e}')
             return Twist()
         
         angle_to_goal = atan2(goal_in_base_link.pose.position.y, goal_in_base_link.pose.position.x)
@@ -96,9 +101,11 @@ class PathTracker:
                                                   goal_in_base_link.pose.orientation.z,
                                                   goal_in_base_link.pose.orientation.w])[2]
 
-        cmd_twist = Twist()
-
-        #         
+        cmd_twist = Twist() 
+        rospy.loginfo(f'Path: {[(pose.pose.position.x, pose.pose.position.y) for pose in self.path.poses]}')
+        rospy.loginfo(f'distance_to_goal: {distance_to_goal}')
+        #rospy.loginfo(f'distance_to_goal: {distance_to_goal}')
+        rospy.loginfo(f'entering main logic')
         if distance_to_goal > self.in_goal_threshold:
         
             if angle_to_goal > self.angular_threshold:
@@ -110,9 +117,6 @@ class PathTracker:
             else:
                 cmd_twist.linear.x = self.slow_linear_speed
         
-        
-        
-        
         else:
             if goal_orientation > self.orientation_threshold:
                 cmd_twist.angular.z = self.angular_speed
@@ -120,6 +124,7 @@ class PathTracker:
                 cmd_twist.angular.z = -self.angular_speed
             else:
                 self.set_next_goal()
+                rospy.logerr('Goal reached')
                 if len(self.path.poses) == 0:
                     self.stop()
                 # TODO: publish a message that the goal has been reached
@@ -127,6 +132,11 @@ class PathTracker:
 
     def start(self):
         self.is_running = True
+        self.is_observing = False
+        if self.move_timer:
+            self.move_timer.shutdown()
+        if self.observation_timer:
+            self.observation_timer.shutdown()
         self.move_timer = rospy.Timer(rospy.Duration(self.move_duration),
                                       self.move_timer_callback,
                                       oneshot=True)
@@ -153,12 +163,12 @@ class PathTracker:
     
     def run(self):
         while not rospy.is_shutdown():
-            
             if self.goal and self.is_running:
                 goal_point = self.goal.pose.position.x, self.goal.pose.position.y
                 if self.is_inside_workspace(*goal_point).success:
                     cmd_twist = Twist() if self.is_observing else self.calculate_cmd_twist()
                     self.cmd_vel_publisher.publish(cmd_twist)
+                    rospy.loginfo(f'is_observing: {self.is_observing}')
             self.rate.sleep()
             
           

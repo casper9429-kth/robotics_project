@@ -145,8 +145,6 @@ Visualization Manager:
           Value: true
         marker_belief_500:
           Value: true
-        object/detected/Hugo1:
-          Value: true
         odom:
           Value: false
       Marker Alpha: 1
@@ -164,8 +162,6 @@ Visualization Manager:
           aruco/detected500:
             {}
           marker_belief_500:
-            {}
-          object/detected/Hugo1:
             {}
           odom:
             base_link:
@@ -384,7 +380,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/XYOrbit
-      Distance: 1.881711721420288
+      Distance: 3.12929105758667
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1

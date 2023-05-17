@@ -231,13 +231,13 @@ class GoToPickUp(Leaf):
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
         self.update_distance_threshold = 0.15 # [m]
-
+        
     def run(self):
         rospy.loginfo('GoToPickUp')
         if not self.context.target:
             return FAILURE
         try:
-            # TODO: is it normal that we send a goal if path tracker not running?
+            # TODO: checking if multiple updates are causing problems
             if not self.is_running or distance_to_object(self.context.target.object_position, self.buffer) > self.update_distance_threshold:
                 move_target_pose = calculate_pick_up_target_pose(self.context.target.object_position, self.buffer)
                 
@@ -251,7 +251,6 @@ class GoToPickUp(Leaf):
                     self.delete_instance_publisher.publish(String(self.context.target.instance_name))
                     self.context.target = None
                     return FAILURE
-                
                 self.move_base_simple_publisher.publish(move_target_pose)
         except LookupException:
             # TODO: we lost the target if we ever get here
