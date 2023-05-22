@@ -231,6 +231,8 @@ class GoToPickUp(Leaf):
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
         self.update_distance_threshold = 0.15 # [m]
+        self.update_counter = 0
+        self.max_update_counter = 20 # decides how often we are allowed to update the target pose
         
     def run(self):
         rospy.loginfo('GoToPickUp')
@@ -250,7 +252,9 @@ class GoToPickUp(Leaf):
                     self.delete_instance_publisher.publish(String(self.context.target.instance_name))
                     self.context.target = None
                     return FAILURE
-                self.move_base_simple_publisher.publish(move_target_pose)
+                if self.update_counter == self.max_update_counter:
+                    self.update_counter = 0
+                    self.move_base_simple_publisher.publish(move_target_pose)
         except LookupException:
             # TODO: we lost the target if we ever get here
             pass

@@ -464,10 +464,10 @@ class Path_Planner():
         self.reached_goal = msg.data
 
     # does the initial calculation 
-    def goal_callback(self,goal):
+    def goal_callback(self, goal):
         self.goal = goal
         self.has_recived_goal = True
-        self.status,self.path = self.path_planner.path(self.goal)
+        self.status, self.path = self.path_planner.path(self.goal)
         self.path_smooth = self.path_planner.path_smoothing(self.path)
     # print(self.path_smooth )
         self.send_path2(self.path_smooth )
