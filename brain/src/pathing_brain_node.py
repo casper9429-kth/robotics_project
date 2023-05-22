@@ -42,7 +42,7 @@ class Localize:
         self.slam_ready = slam_ready_msg.data
 
     def run(self):
-        rospy.loginfo('IsLocalized')
+        rospy.loginfo('Localizing')
         return SUCCESS if self.slam_ready else FAILURE
 
     
@@ -61,6 +61,7 @@ class MoveToTarget:
         self.is_running = False
     
     def run(self):
+        rospy.loginfo('Moving to Target')
         if self.goal is None:
             return FAILURE
         if not self.is_running:
@@ -78,3 +79,9 @@ class MoveToTarget:
     
     def goal_callback(self, goal_msg):
         self.goal = goal_msg
+        
+        
+if __name__ == '__main__':
+    node = BrainNode()
+    node.run()
+    
