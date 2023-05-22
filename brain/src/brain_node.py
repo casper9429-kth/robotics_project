@@ -159,7 +159,7 @@ class Explore(Leaf):
        
         for box_id in range(1,4):
             if self.buffer.can_transform('map', f'aruco/detected{box_id}', rospy.Time(0)) and box_id not in self.context.detected_boxes:
-                self.context.detected_boxes.append(box_id)
+                self.context.detected_boxes.append(box_id) # TODO: This should probably not be hidden in Explore
                 
         return RUNNING
     
@@ -195,7 +195,7 @@ def calculate_pick_up_target_pose(object_position, tf_buffer):
     base_link = tf_buffer.lookup_transform('map', 'base_link', rospy.Time(0))
     target_pose = PoseStamped()
     target_pose.header.frame_id = 'map'
-    # get orientation from vector from base_link to target using quaternion_from_euler and math.atan2
+    # get orientation from vector from base_link to target usexplorer/starting quaternion_from_euler and math.atan2
     x = object_position.x - base_link.transform.translation.x
     y = object_position.y - base_link.transform.translation.y
     yaw = atan2(y, x)
@@ -237,7 +237,6 @@ class GoToPickUp(Leaf):
         if not self.context.target:
             return FAILURE
         try:
-            # TODO: checking if multiple updates are causing problems
             if not self.is_running or distance_to_object(self.context.target.object_position, self.buffer) > self.update_distance_threshold:
                 move_target_pose = calculate_pick_up_target_pose(self.context.target.object_position, self.buffer)
                 
