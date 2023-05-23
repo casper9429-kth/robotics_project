@@ -170,6 +170,7 @@ class A_star():
         if self.should_uninflate_around_goal and self.current_goal_index:
             # +1 might not be needed
             if math.dist((i, j), self.current_goal_index) <= self.inflation_r_index + 1:
+                rospy.loginfo('this should print for sure')
                 return 0 # 0 is free space
         
         return self.map_coords[i].data[j]
@@ -410,12 +411,10 @@ class Path_Planner():
         #print('server found')
 
         #subscribers
-        self.sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
-        #self.goal_sub = rospy.Subscriber('/goal', PoseStamped, self.start_and_goal_callback)
-        #self.goal_reached_sub = rospy.Subscriber('/goal_reached',Bool,self.goal_reached_callback)
-        
+        # TODO: change back to /move_base_simple/goal
+        self.sub = rospy.Subscriber('/test/goal', PoseStamped, self.goal_callback)
+
         #publishers
-        #self.move_to_pub = rospy.Publisher('/move_base_simple/goal', PoseStamped, queue_size=10)
         self.viz_path_pub = rospy.Publisher('/viz_path', Path, queue_size = 100)
         self.path_pub = rospy.Publisher('/path',Path,queue_size=100)
 
