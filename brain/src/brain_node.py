@@ -366,7 +366,7 @@ def calculate_drop_off_target_pose(target_tf_frame, tf_buffer):
     target_pose.pose.orientation.w = q[3]
     return target_pose
 
-def calculate_drop_off_target_pose_with_safe_distance(target_tf_frame, tf_buffer,tf_br,safe_distance=0.5):
+def calculate_drop_off_target_pose_with_safe_distance(target_tf_frame, tf_buffer,tf_br,safe_distance=0.3):
     # Create new target frame that is safe_distance away from the target object
     target_tf_frame_safe = target_tf_frame+"_safe"
     safe_target_transform = TransformStamped()    
@@ -486,7 +486,7 @@ class GoToDropOff(Leaf):
         self.br = tf2_ros.TransformBroadcaster()
         self.state = 'safe_box' # safe_box, actual_box
         self.box_frame = None
-        self.threshold_distance_to_safe_box = 0.1
+        self.threshold_distance_to_safe_box = 0.05 # [m], distance to the safe box pose before we use the actual box pose
 
 
     def run(self):
