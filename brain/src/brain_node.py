@@ -368,6 +368,7 @@ def calculate_drop_off_target_pose(target_tf_frame, tf_buffer):
 
 def calculate_drop_off_target_pose_with_safe_distance(target_tf_frame, tf_buffer,tf_br,safe_distance=0.3):
     # Create new target frame that is safe_distance away from the target object
+    time = rospy.Time.now()
     target_tf_frame_safe = target_tf_frame+"_safe"
     safe_target_transform = TransformStamped()    
     safe_target_transform.header.frame_id = target_tf_frame
@@ -382,17 +383,19 @@ def calculate_drop_off_target_pose_with_safe_distance(target_tf_frame, tf_buffer
     safe_target_transform.transform.rotation.w = 1
     tf_br.sendTransform(safe_target_transform)
 
-    try:
-        target_safe = tf_buffer.lookup_transform("map", target_tf_frame_safe, rospy.Time(0), rospy.Duration(1.0))
-    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-        rospy.logwarn("brain_node - GoToDropOf - calculate_drop_off_target_pose_with_safe_distance: Could not find safe target transform: %s", e)
-        return None, None
 
     try:
         target_actual = tf_buffer.lookup_transform("map", target_tf_frame, rospy.Time(0), rospy.Duration(1.0))
     except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+        rospy.logwarn("brain_node - GoToDropOf - calculate_drop_off_target_pose_with_safe_distance: Could not find actual target transform: %s", e)
+        return None, None
+
+    try:
+        target_safe = tf_buffer.lookup_transform("map", target_tf_frame_safe, time, rospy.Duration(1.0))
+    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
         rospy.logwarn("brain_node - GoToDropOf - calculate_drop_off_target_pose_with_safe_distance: Could not find safe target transform: %s", e)
         return None, None
+
 
     # Lookup the actual target transform
     target_actual_return = None
@@ -481,7 +484,7 @@ class GoToDropOff(Leaf):
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
         self.toggle_path_planner_uninflation = ServiceProxy('/path_planner/toggle_uninflation', BoolSetter)
         self.is_running = False
-        self.buffer = Buffer(cache_time=rospy.Duration(60.0))
+        self.buffer = Buffer(rospy.Duration(60))
         self.listener = TransformListener(self.buffer)
         self.br = tf2_ros.TransformBroadcaster()
         self.state = 'safe_box' # safe_box, actual_box
@@ -497,7 +500,7 @@ class GoToDropOff(Leaf):
             box_id = type_to_box_id[object_type]
             if box_id in self.context.detected_boxes:
                 box_frame = f'aruco/detected{box_id}'
-            move_target_pose_actual, move_target_pose_safe = calculate_drop_off_target_pose_with_safe_distance(box_frame, self.buffer,self.br)
+            move_target_pose_actual, move_target_pose_safe = self.calculate_drop_off_target_pose_with_safe_distance(box_frame, self.buffer,self.br)
 
 
             # Check if the box_frame has changed, if so, reset the state machine to safe_box state
@@ -505,6 +508,8 @@ class GoToDropOff(Leaf):
                 self.box_frame = box_frame
                 self.state = 'safe_box'
                 # TODO update the drop off location for planner
+
+            
 
             if move_target_pose_actual != None and move_target_pose_safe != None:
                 # State machine: if robot is close to the safe box, switch to actual box to get closer
@@ -537,6 +542,7 @@ class GoToDropOff(Leaf):
 
         except LookupException:
             # TODO: we forgot the box if we ever get here
+            rospy.logwarn('Brain_node - GoToDropOff: LookupException')
             pass
 
         if not self.is_running:
@@ -549,6 +555,64 @@ class GoToDropOff(Leaf):
             self.context.can_drop_off = True
                 
         return RUNNING
+    
+    def calculate_drop_off_target_pose_with_safe_distance(self,target_tf_frame, tf_buffer,tf_br,safe_distance=0.3):
+        # Create new target frame that is safe_distance away from the target object
+        time = rospy.Time.now()
+        target_tf_frame_safe = target_tf_frame+"_safe"
+        safe_target_transform = TransformStamped()    
+        safe_target_transform.header.frame_id = target_tf_frame
+        safe_target_transform.header.stamp = rospy.Time.now()
+        safe_target_transform.child_frame_id = target_tf_frame_safe
+        safe_target_transform.transform.translation.x = 0
+        safe_target_transform.transform.translation.y = 0
+        safe_target_transform.transform.translation.z = safe_distance
+        safe_target_transform.transform.rotation.x = 0
+        safe_target_transform.transform.rotation.y = 0
+        safe_target_transform.transform.rotation.z = 0
+        safe_target_transform.transform.rotation.w = 1
+        self.br.sendTransform(safe_target_transform)
+
+
+        try:
+            target_actual = self.buffer.lookup_transform("map", target_tf_frame, rospy.Time(0), rospy.Duration(1.0))
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.logwarn("brain_node - GoToDropOf - calculate_drop_off_target_pose_with_safe_distance: Could not find actual target transform: %s", e)
+            return None, None
+
+        try:
+            target_safe = self.buffer.lookup_transform("map", target_tf_frame_safe, rospy.Time(0), rospy.Duration(1.0))
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
+            rospy.logwarn("brain_node - GoToDropOf - calculate_drop_off_target_pose_with_safe_distance: Could not find safe target transform: %s", e)
+            return None, None
+
+
+        # Lookup the actual target transform
+        target_actual_return = None
+        target_safe_return = None
+        for target in [target_actual, target_safe]:
+            base_link = tf_buffer.lookup_transform('map', 'base_link', rospy.Time(0))
+            target_pose = PoseStamped()
+            target_pose.header.frame_id = 'map'
+            target_pose.pose.position.x = target.transform.translation.x
+            target_pose.pose.position.y = target.transform.translation.y
+            target_pose.pose.position.z = target.transform.translation.z
+            # get orientation from vector from base_link to target using quaternion_from_euler and math.atan2
+            x = target.transform.translation.x - base_link.transform.translation.x
+            y = target.transform.translation.y - base_link.transform.translation.y
+            yaw = atan2(y, x)
+            q = quaternion_from_euler(0, 0, yaw)
+            target_pose.pose.orientation.x = q[0]
+            target_pose.pose.orientation.y = q[1]
+            target_pose.pose.orientation.z = q[2]
+            target_pose.pose.orientation.w = q[3]
+            if target == target_actual:
+                target_actual_return = target_pose
+            else:
+                target_safe_return = target_pose
+
+
+        return target_actual_return, target_safe_return
     
 
 class DropOff(Leaf):
