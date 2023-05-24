@@ -1,0 +1,82 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- Hardware -->
+
+	<!-- Include phidgets-->
+	<include file="$(find robp_phidgets)/launch/phidgets.launch" />
+
+	<!-- Include realsense2_camera -->
+	<include file="$(find robp_launch)/launch/rs_camera.launch">
+		<arg name="align_depth" value="true" />
+	</include>
+
+	<!-- run odometry -->
+    <node name="odometry" pkg="odometry" type="ekf_odom.py" />
+
+    <!-- Localization -->
+
+	<node name="ekf_slam" pkg="localization" type="ekf_slam.py">
+		<param name='anchor_id' value='500' />
+	</node>
+
+	<!-- run the motors -->
+    <node name="cmd_vel_to_motors" pkg="cmd_vel_to_motors" type="cmd_vel_to_motors.py" />
+
+	<!-- Rviz -->
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find robp_launch)/config/odometry.rviz" />
+
+	<!-- Aruco Detection -->
+	<node name="display_markers" pkg="detection" type="display_markers.py" />
+
+    <node name="aruco" pkg="aruco_ros" type="marker_publisher">
+		<remap from="/camera_info" to="/camera/color/camera_info" />
+		<remap from="/image" to="/camera/color/image_raw" />
+		
+		<param name="image_is_rectified" value="True" />
+		<param name="marker_size"        value="0.05" />
+		<param name="reference_frame"    value="camera_color_optical_frame" />
+		<param name="camera_frame"       value="camera_color_optical_frame" />
+	</node>
+
+	<node name="aruco_anchor" pkg="aruco_ros" type="marker_publisher">
+		<remap from="/camera_info" to="/camera/color/camera_info" />
+		<remap from="/image" to="/camera/color/image_raw" />
+		
+		<param name="image_is_rectified" value="True" />
+		<param name="marker_size"        value="0.08" /> 
+		<param name="reference_frame"    value="camera_color_optical_frame" />
+		<param name="camera_frame"       value="camera_color_optical_frame" />
+	</node>
+
+	<!-- Object Detection -->
+	<param name="reduce_categories" type="bool" value="False"/>
+
+	<node name="object_classifier" pkg="detection" type="object_classification.py" />
+	<node name="object_computations" pkg="detection" type="object_computations.py" />
+	<node name="remove_old_instances" pkg="detection" type="remove_old_instances.py">
+		<param name="expiration_time" value="60"/> 
+	</node>
+
+    <!-- Pathing -->
+    <node name="path_tracker" pkg="path_planner" type="path_tracker.py">
+		<param name="in_goal_threshold" type="double" value="0.03" />
+		<param name="close_to_goal_threshold" type="double" value="0.3" />
+		<param name="angular_threshold" type="double" value="0.1" />
+		<param name="orientation_threshold" type="double" value="0.1" />
+
+		<param name="fast_linear_speed" type="double" value="0.23" />
+		<param name="slow_linear_speed" type="double" value="0.13" />
+		<param name="angular_speed" type="double" value="0.6" />
+
+		<param name="move_duration" type="double" value="2" />
+		<param name="observation_duration" type="double" value="0.5" />
+	</node>
+	<node name="path_planner" pkg="path_planner" type="path_planner_node.py" />
+    <node name="workspace_manager" pkg="mapping" type="workspace_manager.py" />
+
+	<!-- Mapping -->
+	<node name="mapping" pkg="mapping" type="mapping_node.py"/>
+
+	<!-- Brain -->
+	<node name="pathing_brain_node" pkg="brain" type="pathing_brain_node.py" output="screen" />
+</launch>
