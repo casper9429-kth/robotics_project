@@ -534,11 +534,11 @@ class Path_Planner():
         #end.pose.orientation = self.goal.pose.orientation
         #path_list[-1] = end
         #path_tosend.poses = path_list
+        if len(path_list) > 0:
+            path_list.pop() # replace with goal
         path_list.append(self.goal)
         
         return path_list
-
-
     
         
     def send_path2(self,path):

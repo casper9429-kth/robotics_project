@@ -236,31 +236,31 @@ class GoToPickUp(Leaf):
         # listen to tf frame object/detected/instance_name to get target pose
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
-        self.update_distance_threshold = 0.15 # [m]
-        self.update_counter = 0
-        self.max_update_counter = 50 # decides how often we are allowed to update the target pose
+        self.update_distance_threshold = 0.15 # [m] distance before second goal is sent
+        self.has_updated_target = False
         
     def run(self):
         rospy.loginfo('GoToPickUp')
         if not self.context.target:
             return FAILURE
+        
+        #check if object is in the workspace, if not remove it from the list
+        move_target_pose = calculate_pick_up_target_pose(self.context.target.object_position, self.buffer)
+        x = move_target_pose.pose.position.x
+        y = move_target_pose.pose.position.y
+        if not self.is_inside_workspace(x, y).success:
+            rospy.loginfo("Object is not in the workspace, removing it from the list")
+            self.delete_instance_publisher.publish(String(self.context.target.instance_name))
+            self.context.target = None
+            return FAILURE
+        
         try:
-            if not self.is_running or distance_to_object(self.context.target.object_position, self.buffer) > self.update_distance_threshold:
-                move_target_pose = calculate_pick_up_target_pose(self.context.target.object_position, self.buffer)
-                
-                #check if object is in the workspace, if not remove it from the list
-                object_pos = CheckPolygon()
-                object_pos.x = move_target_pose.pose.position.x
-                object_pos.y = move_target_pose.pose.position.y
-
-                if not self.is_inside_workspace(object_pos.x, object_pos.y).success:
-                    rospy.loginfo("Object is not in the workspace, removing it from the list")
-                    self.delete_instance_publisher.publish(String(self.context.target.instance_name))
-                    self.context.target = None
-                    return FAILURE
-                if self.update_counter == self.max_update_counter:
-                    self.update_counter = 0
-                    self.move_base_simple_publisher.publish(move_target_pose)
+            distance_to_target = distance_to_object(self.context.target.object_position, self.buffer)
+            if not self.is_running:
+                self.move_base_simple_publisher.publish(move_target_pose)
+            elif distance_to_target < self.update_distance_threshold and not self.has_updated_target:
+                self.move_base_simple_publisher.publish(move_target_pose)
+                self.has_updated_target = True
         except LookupException:
             # TODO: we lost the target if we ever get here
             pass
@@ -273,6 +273,7 @@ class GoToPickUp(Leaf):
             self.toggle_path_planner_uninflation(False)
             self.is_running = False
             self.context.can_pick_up = True
+            self.has_updated_target = False
         return RUNNING
     
 
@@ -503,6 +504,7 @@ class GoToDropOff(Leaf):
             if self.box_frame != box_frame:
                 self.box_frame = box_frame
                 self.state = 'safe_box'
+                # TODO update the drop off location for planner
 
             if move_target_pose_actual != None and move_target_pose_safe != None:
                 # State machine: if robot is close to the safe box, switch to actual box to get closer
@@ -594,8 +596,6 @@ class DropOff(Leaf):
             self.context.target = None
         self.speak_publisher.publish("Object is in the box")
     
-#TODO: we want to go to the anchor only if not explored
-
 
 class ReturnToAnchor(Leaf):
     def __init__(self):
@@ -607,20 +607,23 @@ class ReturnToAnchor(Leaf):
         self.is_running = False
         self.is_finished = False
 
+    # TODO: if we see new objects, we will not go back to the anchor, which
+    # will cause problems next time we get to go_to_anchor since it will
+    # already be running
     def run(self):
         rospy.loginfo('ReturnToAnchor')
         if self.is_finished:
             return SUCCESS
-        pick_up_pose = PoseStamped()
-        pick_up_pose.header.frame_id = 'map'
-        pick_up_pose.pose.position.x = 0.0
-        pick_up_pose.pose.position.y = 0.0
-        pick_up_pose.pose.position.z = 0.0
-        pick_up_pose.pose.orientation.x = 0.0
-        pick_up_pose.pose.orientation.y = 0.0
-        pick_up_pose.pose.orientation.z = 0.0
-        pick_up_pose.pose.orientation.w = 1.0
-        self.move_base_simple_publisher.publish(pick_up_pose)
+        anchor_pose = PoseStamped()
+        anchor_pose.header.frame_id = 'map'
+        anchor_pose.pose.position.x = 0.0
+        anchor_pose.pose.position.y = 0.0
+        anchor_pose.pose.position.z = 0.0
+        anchor_pose.pose.orientation.x = 0.0
+        anchor_pose.pose.orientation.y = 0.0
+        anchor_pose.pose.orientation.z = 0.0
+        anchor_pose.pose.orientation.w = 1.0
+        self.move_base_simple_publisher.publish(anchor_pose)
         if not self.is_running:
             self.is_running = True
             self.start()
