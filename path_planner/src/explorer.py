@@ -111,7 +111,14 @@ class Explorer():
         if len(self.cells) > 0:
             self.cells = np.array(self.cells)
             distances = self.cells - self.position_in_gridmap
-            min_distance_index = np.argmin(np.linalg.norm(distances, axis=1))
+            distances = np.linalg.norm(distances, axis=1)
+            new_distances = []
+            for distance in distances:
+                if distance > np.sqrt(8):
+                    new_distances.append(distance)
+            distances = np.array(new_distances)
+            min_distance_index = np.argmin(distances)
+            
             self.nearest_goal = self.cells[min_distance_index]
 
     def publish_goal(self):      
