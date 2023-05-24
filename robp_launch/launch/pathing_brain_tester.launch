@@ -60,6 +60,7 @@
     <!-- Pathing -->
     <node name="path_tracker" pkg="path_planner" type="path_tracker.py">
 		<param name="in_goal_threshold" type="double" value="0.03" />
+		<param name="in_subgoal_threshold" type="double" value="0.07" />
 		<param name="close_to_goal_threshold" type="double" value="0.3" />
 		<param name="angular_threshold" type="double" value="0.1" />
 		<param name="orientation_threshold" type="double" value="0.1" />
@@ -69,7 +70,7 @@
 		<param name="angular_speed" type="double" value="0.6" />
 
 		<param name="move_duration" type="double" value="2" />
-		<param name="observation_duration" type="double" value="0.5" />
+		<param name="observation_duration" type="double" value="0.1" />
 	</node>
 	<node name="path_planner" pkg="path_planner" type="path_planner_node.py" />
     <node name="workspace_manager" pkg="mapping" type="workspace_manager.py" />

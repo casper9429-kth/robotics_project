@@ -75,7 +75,7 @@
 		<param name="move_duration" type="double" value="2" />
 		<param name="observation_duration" type="double" value="0.5" />
 	</node>
-	<node name="path_planner" pkg="path_planner" type="path_planner_node.py" output="screen" />
+	<node name="path_planner" pkg="path_planner" type="path_planner_node.py" />
     <node name="workspace_manager" pkg="mapping" type="workspace_manager.py" />
     <node name="static_movement_services" pkg="path_planner" type="static_movement_services.py" />
 
@@ -93,5 +93,5 @@
 	<node name="arm_actions" pkg="arm" type="arm_actions.py" />
 
 	<!-- Brain -->
-	<node name="brain_node" pkg="brain" type="brain_node.py" />
+	<node name="brain_node" pkg="brain" type="brain_node.py" output="screen" />
 </launch>

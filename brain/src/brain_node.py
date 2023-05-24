@@ -163,7 +163,6 @@ class Explore(Leaf):
             self.start_path_tracker()
 
         self.start_explore()
-       
         for box_id in range(1,4):
             if self.buffer.can_transform('map', f'aruco/detected{box_id}', rospy.Time(0)) and box_id not in self.context.detected_boxes:
                 self.context.detected_boxes.append(box_id) # TODO: This should probably not be hidden in Explore
@@ -239,7 +238,7 @@ class GoToPickUp(Leaf):
         self.listener = TransformListener(self.buffer)
         self.update_distance_threshold = 0.15 # [m]
         self.update_counter = 0
-        self.max_update_counter = 20 # decides how often we are allowed to update the target pose
+        self.max_update_counter = 50 # decides how often we are allowed to update the target pose
         
     def run(self):
         rospy.loginfo('GoToPickUp')

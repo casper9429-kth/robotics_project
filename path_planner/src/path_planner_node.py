@@ -411,8 +411,8 @@ class Path_Planner():
         #print('server found')
 
         #subscribers
-        # TODO: change back to /move_base_simple/goal
-        self.sub = rospy.Subscriber('/test/goal', PoseStamped, self.goal_callback)
+        # TODO: change to /test/goal for pathing_brain_tester, else use /move_base_simple/goal
+        self.sub = rospy.Subscriber('/move_base_simple/goal', PoseStamped, self.goal_callback)
 
         #publishers
         self.viz_path_pub = rospy.Publisher('/viz_path', Path, queue_size = 100)

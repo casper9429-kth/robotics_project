@@ -19,6 +19,7 @@ class PathTracker:
         # Parameters
         self.close_to_goal_threshold = rospy.get_param('~close_to_goal_threshold', 0.3)
         self.in_goal_threshold = rospy.get_param('~in_goal_threshold', 0.03)
+        self.in_subgoal_threshold = rospy.get_param('~in_subgoal_threshold', 0.05)
         self.angular_threshold = rospy.get_param('~angular_threshold', 0.16)
         self.orientation_threshold = rospy.get_param('~orientation_threshold', 0.1)
 
@@ -102,8 +103,7 @@ class PathTracker:
         # rospy.loginfo(f'{euler}, poses: {len(self.path.poses)}')
 
         cmd_twist = Twist() 
-        if distance_to_goal > self.in_goal_threshold:
-        
+        if distance_to_goal > self.in_goal_threshold or (distance_to_goal > self.in_subgoal_threshold and len(self.path.poses) > 0):
             if angle_to_goal > self.angular_threshold:
                 cmd_twist.angular.z = self.angular_speed
             elif angle_to_goal < -self.angular_threshold:
@@ -115,16 +115,12 @@ class PathTracker:
         elif len(self.path.poses) > 0:
             self.set_next_goal()
         else:
-            # rospy.loginfo(f'Goal orientation: {goal_orientation}')
-            if goal_orientation > self.orientation_threshold:
-                # rospy.loginfo('PathTracker: adjusting orientation left')
-                cmd_twist.angular.z = self.angular_speed
-            elif goal_orientation < -self.orientation_threshold:
-                # rospy.loginfo('PathTracker: adjusting orientation right')
-                cmd_twist.angular.z = -self.angular_speed
-            else:
-                # rospy.loginfo('PathTracker: Final goal reached')
-                self.stop()
+            # if goal_orientation > self.orientation_threshold:
+            #     cmd_twist.angular.z = self.angular_speed
+            # elif goal_orientation < -self.orientation_threshold:
+            #     cmd_twist.angular.z = -self.angular_speed
+            # else:
+            self.stop()
         return cmd_twist
 
     def start(self):
