@@ -347,24 +347,24 @@ class CanDropOff(Leaf):
         return SUCCESS if self.context.can_drop_off else FAILURE
 
 
-def calculate_drop_off_target_pose(target_tf_frame, tf_buffer):
-    target = tf_buffer.lookup_transform('map', target_tf_frame, rospy.Time(0))
-    base_link = tf_buffer.lookup_transform('map', 'base_link', rospy.Time(0))
-    target_pose = PoseStamped()
-    target_pose.header.frame_id = 'map'
-    target_pose.pose.position.x = target.transform.translation.x
-    target_pose.pose.position.y = target.transform.translation.y
-    target_pose.pose.position.z = target.transform.translation.z
-    # get orientation from vector from base_link to target using quaternion_from_euler and math.atan2
-    x = target.transform.translation.x - base_link.transform.translation.x
-    y = target.transform.translation.y - base_link.transform.translation.y
-    yaw = atan2(y, x)
-    q = quaternion_from_euler(0, 0, yaw)
-    target_pose.pose.orientation.x = q[0]
-    target_pose.pose.orientation.y = q[1]
-    target_pose.pose.orientation.z = q[2]
-    target_pose.pose.orientation.w = q[3]
-    return target_pose
+# def calculate_drop_off_target_pose(target_tf_frame, tf_buffer):
+#     target = tf_buffer.lookup_transform('map', target_tf_frame, rospy.Time(0))
+#     base_link = tf_buffer.lookup_transform('map', 'base_link', rospy.Time(0))
+#     target_pose = PoseStamped()
+#     target_pose.header.frame_id = 'map'
+#     target_pose.pose.position.x = target.transform.translation.x
+#     target_pose.pose.position.y = target.transform.translation.y
+#     target_pose.pose.position.z = target.transform.translation.z
+#     # get orientation from vector from base_link to target using quaternion_from_euler and math.atan2
+#     x = target.transform.translation.x - base_link.transform.translation.x
+#     y = target.transform.translation.y - base_link.transform.translation.y
+#     yaw = atan2(y, x)
+#     q = quaternion_from_euler(0, 0, yaw)
+#     target_pose.pose.orientation.x = q[0]
+#     target_pose.pose.orientation.y = q[1]
+#     target_pose.pose.orientation.z = q[2]
+#     target_pose.pose.orientation.w = q[3]
+#     return target_pose
 
 
 # Old but gold implementation
@@ -443,8 +443,6 @@ class GoToDropOff(Leaf):
                 box_frame = f'aruco/detected{box_id}'
             move_target_pose_actual, move_target_pose_safe = self.calculate_drop_off_target_pose_with_safe_distance(box_frame, self.buffer)
 
-            print('print 1')
-
             # Check if the box_frame has changed, if so, reset the state machine to safe_box state
             if self.previous_box_frame != box_frame:
                 self.previous_box_frame = box_frame
@@ -453,8 +451,6 @@ class GoToDropOff(Leaf):
 
             if move_target_pose_actual and move_target_pose_safe:
                 # State machine: if robot is close to the safe box, switch to actual box to get closer
-                
-                print('print 2')
                 
                 if self.state == 'safe_box':
                     # check if we are close to the safe box
@@ -479,7 +475,6 @@ class GoToDropOff(Leaf):
                         # Return success, but wait because maybe there is more than my eye can see # TODO: fix this
                         pass
                     
-                print('print 3')
             else:
                 # No target found, print error message
                 rospy.logwarn('Brain_node - GoToDropOff: No target found')
@@ -489,8 +484,6 @@ class GoToDropOff(Leaf):
             rospy.logwarn('Brain_node - GoToDropOff: LookupException')
             pass
         
-        print('print 4')
-
         if not self.is_running:
             self.toggle_path_planner_uninflation(True) # true = uninflate so we can get close to the box
             self.is_running = True
@@ -499,9 +492,8 @@ class GoToDropOff(Leaf):
             self.toggle_path_planner_uninflation(False)
             self.is_running = False
             self.context.can_drop_off = True
+            self.state = 'safe_box'
             
-        print('print 5')
-                
         return RUNNING
     
     def calculate_drop_off_target_pose_with_safe_distance(self,target_tf_frame, tf_buffer):
