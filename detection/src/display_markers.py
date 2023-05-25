@@ -57,6 +57,17 @@ class Display_Markers():
                 transformed_pose.id = id
                 transformed_pose.header.frame_id = "base_link"
                 transformed_pose.confidence = marker.confidence
+        
+                pose_safe = PoseStamped()
+                pose_safe.header.frame_id = frame_id
+                pose_safe.header.stamp = stamp
+                pose_safe.pose.orientation.x = pose.pose.orientation.x
+                pose_safe.pose.orientation.y = pose.pose.orientation.y
+                pose_safe.pose.orientation.z = pose.pose.orientation.z
+                pose_safe.pose.orientation.w = pose.pose.orientation.w
+                pose_safe.pose.position.x = pose.pose.position.x
+                pose_safe.pose.position.y = pose.pose.position.y
+                pose_safe.pose.position.z = pose.pose.position.z - 0.15
 
                 # Transform pose from camera_color_optical_frame to map 
                 pose_map.pose.orientation = pose.pose.orientation
@@ -66,6 +77,7 @@ class Display_Markers():
                 try:
                     transformed_pose.pose.pose = self.tfBuffer.transform(pose_map, "base_link", rospy.Duration(1.0)).pose
                     pose_map = self.tfBuffer.transform(pose_map, "map", rospy.Duration(1.0)) 
+                    pose_safe_map = self.tfBuffer.transform(pose_safe, "map", rospy.Duration(1.0))
                 except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                     rospy.logwarn(e)
                     return   
@@ -90,20 +102,29 @@ class Display_Markers():
                 br.sendTransform(t)
                 
                 
-                t2 = TransformStamped()
-                t2.header.frame_id = "map"
-                t2.child_frame_id = "aruco/detected/box" 
-                t2.child_frame_id = t2.child_frame_id + str(id)
+                # t2 = TransformStamped()
+                # t2.header.frame_id = "map"
+                # t2.child_frame_id = "aruco/detected/box" 
+                # t2.child_frame_id = t2.child_frame_id + str(id)
 
-                t2.header.stamp = stamp
+                # t2.header.stamp = stamp
             
-                t2.transform.rotation = pose_map.pose.orientation
-                t2.transform.translation = pose_map.pose.position
-
+                # t2.transform.rotation = pose_map.pose.orientation
+                # t2.transform.translation = pose_map.pose.position
                 
-                t2.transform.translation.x += 0.08
+                # t2.transform.translation.x += 1
+                
+                # br.sendTransform(t2)
+                
+    
+                t3 = TransformStamped()
+                t3.header.frame_id = "map"
+                t3.child_frame_id = "aruco/detected" + str(id) + "_safe"
+                t3.header.stamp = stamp
+                t3.transform.rotation = pose_safe_map.pose.orientation
+                t3.transform.translation = pose_safe_map.pose.position
 
-                br.sendTransform(t2)
+                br.sendTransform(t3)
                 
                 if id == 1 and not self.box_1_detected:
                     to_speech = "Cubes box detected"
