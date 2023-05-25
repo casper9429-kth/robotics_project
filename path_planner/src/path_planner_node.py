@@ -288,11 +288,12 @@ class A_star():
         
     ############################## Main Function #################################
     
-    def path(self,goal):
+    def path(self,goal,start = None):
         rospy.loginfo("A* path planning started")   
         start = self.get_robot_pose_in_map()
         # For debugging purposes
-        rospy.loginfo(f'Path:planner: goal {goal.pose.position.x,goal.pose.position.y}')
+        #rospy.loginfo(f'Path:planner: goal {goal.pose.position.x,goal.pose.position.y}')
+
         if start == None:
             return None,[]
         else: 
@@ -301,7 +302,10 @@ class A_star():
         self.current_goal_index = self.get_index_of_pos(*goal) # ugly but works, used in get_value_of_index to uninflate around goal
 
         #start = (start.pose.position.x,start.pose.position.y)
-        start = self.get_start_in_map()
+        if start == None: # if no start is given use regular
+            start = self.get_start_in_map()
+        else:
+            start = start # This is for recalculation of path from first node
         #print(f'Path planner: start {start}')
         heap = []
         heapq.heapify(heap)
@@ -476,17 +480,26 @@ class Path_Planner():
     
     def local_planner(self):
         # needs to check if new information
-        
-        # if new info affects path, 
-        # recalculates path around object to start at next point from global path planner
-        if self.path_planner.obstacle_on_calc_path(self.path,self.path_smooth):
-            rospy.loginfo(f'is this always triggering?')
+
+        # First point calculations.
+        # does local planning but with the fixed point
+        Fixedpoint = [self.path[0]]
+        if self.path_planner.obstacle_on_calc_path(Fixedpoint,self.path):
             self.status,self.path = self.path_planner.path(self.goal)
-            """if not self.status:
-                rospy.logerr('Path planner: Could not find path, check submitted goal') """
             self.path_smooth = self.path_planner.path_smoothing(self.path)
-            #print(self.path_smooth )
             self.send_path2(self.path_smooth)
+        else: 
+            # Start is the first point, which is fixed
+        # Recalculates path around object to start at next point from global path planner
+            if self.path_planner.obstacle_on_calc_path(self.path,self.path_smooth):
+                rospy.loginfo(f'is this always triggering?')
+                self.status,self.path = self.path_planner.path(self.goal,Fixedpoint)
+                """if not self.status:
+                    rospy.logerr('Path planner: Could not find path, check submitted goal') """
+                self.path.insert(0,Fixedpoint[0])
+                self.path_smooth = self.path_planner.path_smoothing(self.path)
+
+                self.send_path2(self.path_smooth)
         
 
     def calc_orentation_for_points(self, path):
