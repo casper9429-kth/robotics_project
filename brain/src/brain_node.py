@@ -366,64 +366,6 @@ def calculate_drop_off_target_pose(target_tf_frame, tf_buffer):
     target_pose.pose.orientation.w = q[3]
     return target_pose
 
-def calculate_drop_off_target_pose_with_safe_distance(target_tf_frame, tf_buffer,tf_br,safe_distance=0.3):
-    # Create new target frame that is safe_distance away from the target object
-    time = rospy.Time.now()
-    target_tf_frame_safe = target_tf_frame+"_safe"
-    safe_target_transform = TransformStamped()    
-    safe_target_transform.header.frame_id = target_tf_frame
-    safe_target_transform.header.stamp = rospy.Time.now()
-    safe_target_transform.child_frame_id = target_tf_frame_safe
-    safe_target_transform.transform.translation.x = 0
-    safe_target_transform.transform.translation.y = 0
-    safe_target_transform.transform.translation.z = safe_distance
-    safe_target_transform.transform.rotation.x = 0
-    safe_target_transform.transform.rotation.y = 0
-    safe_target_transform.transform.rotation.z = 0
-    safe_target_transform.transform.rotation.w = 1
-    tf_br.sendTransform(safe_target_transform)
-
-
-    try:
-        target_actual = tf_buffer.lookup_transform("map", target_tf_frame, rospy.Time(0), rospy.Duration(1.0))
-    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-        rospy.logwarn("brain_node - GoToDropOf - calculate_drop_off_target_pose_with_safe_distance: Could not find actual target transform: %s", e)
-        return None, None
-
-    try:
-        target_safe = tf_buffer.lookup_transform("map", target_tf_frame_safe, time, rospy.Duration(1.0))
-    except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
-        rospy.logwarn("brain_node - GoToDropOf - calculate_drop_off_target_pose_with_safe_distance: Could not find safe target transform: %s", e)
-        return None, None
-
-
-    # Lookup the actual target transform
-    target_actual_return = None
-    target_safe_return = None
-    for target in [target_actual, target_safe]:
-        base_link = tf_buffer.lookup_transform('map', 'base_link', rospy.Time(0))
-        target_pose = PoseStamped()
-        target_pose.header.frame_id = 'map'
-        target_pose.pose.position.x = target.transform.translation.x
-        target_pose.pose.position.y = target.transform.translation.y
-        target_pose.pose.position.z = target.transform.translation.z
-        # get orientation from vector from base_link to target using quaternion_from_euler and math.atan2
-        x = target.transform.translation.x - base_link.transform.translation.x
-        y = target.transform.translation.y - base_link.transform.translation.y
-        yaw = atan2(y, x)
-        q = quaternion_from_euler(0, 0, yaw)
-        target_pose.pose.orientation.x = q[0]
-        target_pose.pose.orientation.y = q[1]
-        target_pose.pose.orientation.z = q[2]
-        target_pose.pose.orientation.w = q[3]
-        if target == target_actual:
-            target_actual_return = target_pose
-        else:
-            target_safe_return = target_pose
-
-
-    return target_actual_return, target_safe_return
-
 
 # Old but gold implementation
 # # TODO: box orientation is not accounted for, pathplanning problem.
