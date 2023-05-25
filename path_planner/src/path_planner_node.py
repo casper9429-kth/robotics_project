@@ -289,7 +289,7 @@ class A_star():
     ############################## Main Function #################################
     
     def path(self,goal):
-        rospy.loginfo("A* path planning started")   
+        rospy.loginfo("A* path planning started")
         start = self.get_robot_pose_in_map()
         # For debugging purposes
         rospy.loginfo(f'Path:planner: goal {goal.pose.position.x,goal.pose.position.y}')
@@ -479,7 +479,7 @@ class Path_Planner():
         
         # if new info affects path, 
         # recalculates path around object to start at next point from global path planner
-        if self.path_planner.obstacle_on_calc_path(self.path,self.path_smooth):
+        if self.path_planner.obstacle_on_calc_path(self.path_smooth, self.path):
             rospy.loginfo(f'is this always triggering?')
             self.status,self.path = self.path_planner.path(self.goal)
             """if not self.status:

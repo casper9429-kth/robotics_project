@@ -486,11 +486,10 @@ class GoToDropOff(Leaf):
         self.is_running = False
         self.buffer = Buffer(rospy.Duration(60))
         self.listener = TransformListener(self.buffer)
-        self.br = tf2_ros.TransformBroadcaster()
+        self.tf_broadcaster = tf2_ros.TransformBroadcaster()
         self.state = 'safe_box' # safe_box, actual_box
-        self.box_frame = None
-        self.threshold_distance_to_safe_box = 0.05 # [m], distance to the safe box pose before we use the actual box pose
-
+        self.previous_box_frame = None
+        self.threshold_distance_to_safe_box = 0.15 # [m], distance to the safe box pose before we use the actual box pose
 
     def run(self):
         rospy.loginfo('GoToDropOff')
@@ -500,19 +499,21 @@ class GoToDropOff(Leaf):
             box_id = type_to_box_id[object_type]
             if box_id in self.context.detected_boxes:
                 box_frame = f'aruco/detected{box_id}'
-            move_target_pose_actual, move_target_pose_safe = self.calculate_drop_off_target_pose_with_safe_distance(box_frame, self.buffer,self.br)
+            move_target_pose_actual, move_target_pose_safe = self.calculate_drop_off_target_pose_with_safe_distance(box_frame, self.buffer)
 
+            print('print 1')
 
             # Check if the box_frame has changed, if so, reset the state machine to safe_box state
-            if self.box_frame != box_frame:
-                self.box_frame = box_frame
+            if self.previous_box_frame != box_frame:
+                self.previous_box_frame = box_frame
                 self.state = 'safe_box'
                 # TODO update the drop off location for planner
 
-            
-
-            if move_target_pose_actual != None and move_target_pose_safe != None:
+            if move_target_pose_actual and move_target_pose_safe:
                 # State machine: if robot is close to the safe box, switch to actual box to get closer
+                
+                print('print 2')
+                
                 if self.state == 'safe_box':
                     # check if we are close to the safe box
                     base_link_map_fram = self.buffer.lookup_transform('map', 'base_link', rospy.Time(0))
@@ -535,15 +536,18 @@ class GoToDropOff(Leaf):
                     else:
                         # Return success, but wait because maybe there is more than my eye can see # TODO: fix this
                         pass
+                    
+                print('print 3')
             else:
                 # No target found, print error message
                 rospy.logwarn('Brain_node - GoToDropOff: No target found')
-
 
         except LookupException:
             # TODO: we forgot the box if we ever get here
             rospy.logwarn('Brain_node - GoToDropOff: LookupException')
             pass
+        
+        print('print 4')
 
         if not self.is_running:
             self.toggle_path_planner_uninflation(True) # true = uninflate so we can get close to the box
@@ -553,27 +557,15 @@ class GoToDropOff(Leaf):
             self.toggle_path_planner_uninflation(False)
             self.is_running = False
             self.context.can_drop_off = True
+            
+        print('print 5')
                 
         return RUNNING
     
-    def calculate_drop_off_target_pose_with_safe_distance(self,target_tf_frame, tf_buffer,tf_br,safe_distance=0.3):
-        # Create new target frame that is safe_distance away from the target object
-        time = rospy.Time.now()
-        target_tf_frame_safe = target_tf_frame+"_safe"
-        safe_target_transform = TransformStamped()    
-        safe_target_transform.header.frame_id = target_tf_frame
-        safe_target_transform.header.stamp = rospy.Time.now()
-        safe_target_transform.child_frame_id = target_tf_frame_safe
-        safe_target_transform.transform.translation.x = 0
-        safe_target_transform.transform.translation.y = 0
-        safe_target_transform.transform.translation.z = safe_distance
-        safe_target_transform.transform.rotation.x = 0
-        safe_target_transform.transform.rotation.y = 0
-        safe_target_transform.transform.rotation.z = 0
-        safe_target_transform.transform.rotation.w = 1
-        self.br.sendTransform(safe_target_transform)
-
-
+    def calculate_drop_off_target_pose_with_safe_distance(self,target_tf_frame, tf_buffer):
+        
+        target_tf_frame_safe = target_tf_frame + '_safe'
+      
         try:
             target_actual = self.buffer.lookup_transform("map", target_tf_frame, rospy.Time(0), rospy.Duration(1.0))
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
@@ -585,7 +577,6 @@ class GoToDropOff(Leaf):
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
             rospy.logwarn("brain_node - GoToDropOf - calculate_drop_off_target_pose_with_safe_distance: Could not find safe target transform: %s", e)
             return None, None
-
 
         # Lookup the actual target transform
         target_actual_return = None
