@@ -100,31 +100,17 @@ class Display_Markers():
                 t.transform.rotation = pose_map.pose.orientation
                 t.transform.translation = pose_map.pose.position
                 br.sendTransform(t)
-                
-                
-                # t2 = TransformStamped()
-                # t2.header.frame_id = "map"
-                # t2.child_frame_id = "aruco/detected/box" 
-                # t2.child_frame_id = t2.child_frame_id + str(id)
 
-                # t2.header.stamp = stamp
-            
-                # t2.transform.rotation = pose_map.pose.orientation
-                # t2.transform.translation = pose_map.pose.position
-                
-                # t2.transform.translation.x += 1
-                
-                # br.sendTransform(t2)
                 
     
-                t3 = TransformStamped()
-                t3.header.frame_id = "map"
-                t3.child_frame_id = "aruco/detected" + str(id) + "_safe"
-                t3.header.stamp = stamp
-                t3.transform.rotation = pose_safe_map.pose.orientation
-                t3.transform.translation = pose_safe_map.pose.position
+                t2 = TransformStamped()
+                t2.header.frame_id = "map"
+                t2.child_frame_id = "aruco/detected" + str(id) + "_safe"
+                t2.header.stamp = stamp
+                t2.transform.rotation = pose_safe_map.pose.orientation
+                t2.transform.translation = pose_safe_map.pose.position
 
-                br.sendTransform(t3)
+                br.sendTransform(t2)
                 
                 if id == 1 and not self.box_1_detected:
                     to_speech = "Cubes box detected"

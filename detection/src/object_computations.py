@@ -33,7 +33,7 @@ class Object_computations():
 
         self.directory = "/home/robot/dd2419_ws/src/detection/src/saved_instances"
         self.bridge = CvBridge()
-        self.threshold = 8
+        self.threshold = 15
         self.id = 0
         
         self.reduce_categories = rospy.get_param('reduce_categories')
