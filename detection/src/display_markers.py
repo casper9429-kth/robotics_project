@@ -51,6 +51,7 @@ class Display_Markers():
 
                 id = marker.id
                 pose = marker.pose
+                rospy.loginfo(marker)
 
                 transformed_pose = Marker()
                 transformed_pose.header.stamp = stamp
@@ -58,16 +59,16 @@ class Display_Markers():
                 transformed_pose.header.frame_id = "base_link"
                 transformed_pose.confidence = marker.confidence
         
-                pose_safe = PoseStamped()
-                pose_safe.header.frame_id = frame_id
-                pose_safe.header.stamp = stamp
-                pose_safe.pose.orientation.x = pose.pose.orientation.x
-                pose_safe.pose.orientation.y = pose.pose.orientation.y
-                pose_safe.pose.orientation.z = pose.pose.orientation.z
-                pose_safe.pose.orientation.w = pose.pose.orientation.w
-                pose_safe.pose.position.x = pose.pose.position.x
-                pose_safe.pose.position.y = pose.pose.position.y
-                pose_safe.pose.position.z = pose.pose.position.z - 0.15
+                # pose_safe = PoseStamped()
+                # pose_safe.header.frame_id = frame_id
+                # pose_safe.header.stamp = stamp
+                # pose_safe.pose.orientation.x = pose.pose.orientation.x
+                # pose_safe.pose.orientation.y = pose.pose.orientation.y
+                # pose_safe.pose.orientation.z = pose.pose.orientation.z
+                # pose_safe.pose.orientation.w = pose.pose.orientation.w
+                # pose_safe.pose.position.x = pose.pose.position.x
+                # pose_safe.pose.position.y = pose.pose.position.y
+                # pose_safe.pose.position.z = pose.pose.position.z - 0.15
 
                 # Transform pose from camera_color_optical_frame to map 
                 pose_map.pose.orientation = pose.pose.orientation
@@ -77,7 +78,7 @@ class Display_Markers():
                 try:
                     transformed_pose.pose.pose = self.tfBuffer.transform(pose_map, "base_link", rospy.Duration(1.0)).pose
                     pose_map = self.tfBuffer.transform(pose_map, "map", rospy.Duration(1.0)) 
-                    pose_safe_map = self.tfBuffer.transform(pose_safe, "map", rospy.Duration(1.0))
+                    # pose_safe_map = self.tfBuffer.transform(pose_safe, "map", rospy.Duration(1.0))
                 except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException) as e:
                     rospy.logwarn(e)
                     return   
@@ -101,14 +102,17 @@ class Display_Markers():
                 t.transform.translation = pose_map.pose.position
                 br.sendTransform(t)
 
-                
-    
                 t2 = TransformStamped()
-                t2.header.frame_id = "map"
+                t2.header.frame_id = t.child_frame_id
                 t2.child_frame_id = "aruco/detected" + str(id) + "_safe"
                 t2.header.stamp = stamp
-                t2.transform.rotation = pose_safe_map.pose.orientation
-                t2.transform.translation = pose_safe_map.pose.position
+                t2.transform.rotation.x = 0
+                t2.transform.rotation.y = 0
+                t2.transform.rotation.z = 0
+                t2.transform.rotation.w = 1
+                t2.transform.translation.x = 0
+                t2.transform.translation.y = 0
+                t2.transform.translation.z = 0.15
 
                 br.sendTransform(t2)
                 

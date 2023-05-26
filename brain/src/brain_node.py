@@ -265,11 +265,6 @@ class GoToPickUp(Leaf):
             if not self.is_running:
                 self.move_base_simple_publisher.publish(move_target_pose)
             elif self.update_distance - distance_to_target > self.update_distance_threshold:
-                rospy.logerr("Sending second goal")
-                rospy.logerr("Sending second goal")
-                rospy.logerr("Sending second goal")
-                rospy.logerr("Sending second goal")
-                rospy.logerr("Sending second goal")
                 self.update_distance = distance_to_target
                 self.move_base_simple_publisher.publish(move_target_pose)
         except LookupException:
