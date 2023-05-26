@@ -61,12 +61,15 @@ class BrainNode:
             self.target = None
             self.detected_boxes = []
             self.object_instances = []
+            self.debug_messages = []
 
     def run(self):
         rate = rospy.Rate(10)
         result = RUNNING
         while not rospy.is_shutdown() and result != SUCCESS:
+            self.behavior_tree.context.debug_messages = []
             result = self.behavior_tree.run()
+            print(*self.behavior_tree.context.debug_messages, sep=' -> ')
             rate.sleep()
             
             
@@ -86,7 +89,7 @@ class Init(Leaf):
         self.speak_publisher = Publisher('/speaker/speech', String, queue_size=1) 
         
     def run(self):
-        rospy.loginfo('Init')
+        self.context.debug_messages.append(type(self).__name__)
         if rospy.Time.now() - self.init_time > rospy.Duration(10.0): 
             if rospy.Time.now() - self.init_time > rospy.Duration(12.0) and self.arm_straight and self.has_wiggled_1 and self.has_wiggled_2:
                 
@@ -116,13 +119,13 @@ class IsLocalized(Leaf):
         self.slam_ready = slam_ready_msg.data
 
     def run(self):
-        rospy.loginfo('IsLocalized')
+        self.context.debug_messages.append(type(self).__name__)
         return SUCCESS if self.slam_ready else FAILURE
 
 
 class Localize(Leaf):
     def run(self):
-        rospy.loginfo('Localize')
+        self.context.debug_messages.append(type(self).__name__)
         return RUNNING
     
 
@@ -133,7 +136,7 @@ class IsExplored(Leaf):
         self.is_explored = ServiceProxy("explorer/is_explored", Trigger)
 
     def run(self):
-        rospy.loginfo(f'IsExplored')
+        self.context.debug_messages.append(type(self).__name__)
         
         if self.context.target is not None and len(self.context.detected_boxes) > 0:
             self.stop_explore()
@@ -158,7 +161,7 @@ class Explore(Leaf):
         self.listener = TransformListener(self.buffer)
 
     def run(self):
-        rospy.loginfo('Explore')
+        self.context.debug_messages.append(type(self).__name__)
         if not self.path_tracker_is_running().value:
             self.start_path_tracker()
 
@@ -180,20 +183,20 @@ class Explore(Leaf):
 
 class ObjectsRemaining(Leaf):
     def run(self):
-        rospy.loginfo('ObjectsRemaining')
+        self.context.debug_messages.append(type(self).__name__)
         objects_remaining = len(self.context.object_instances)
         return SUCCESS if objects_remaining > 0 else FAILURE
     
 
 class IsHoldingObject(Leaf):
     def run(self):
-        rospy.loginfo('IsHoldingObject')
+        self.context.debug_messages.append(type(self).__name__)
         return SUCCESS if self.context.is_holding_object else FAILURE
     
 
 class CanPickUp(Leaf):
     def run(self):
-        rospy.loginfo('CanPickUp')
+        self.context.debug_messages.append(type(self).__name__)
         return SUCCESS if self.context.can_pick_up else FAILURE
 
 
@@ -236,11 +239,12 @@ class GoToPickUp(Leaf):
         # listen to tf frame object/detected/instance_name to get target pose
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
-        self.update_distance_threshold = 0.15 # [m] distance before second goal is sent
+        self.update_distance_threshold = 0.1 # [m] distance before second goal is sent
+        self.initial_distance = 0
         self.has_updated_target = False
         
     def run(self):
-        rospy.loginfo('GoToPickUp')
+        self.context.debug_messages.append(type(self).__name__)
         if not self.context.target:
             return FAILURE
         
@@ -259,6 +263,11 @@ class GoToPickUp(Leaf):
             if not self.is_running:
                 self.move_base_simple_publisher.publish(move_target_pose)
             elif distance_to_target < self.update_distance_threshold and not self.has_updated_target:
+                rospy.logerr("Sending second goal")
+                rospy.logerr("Sending second goal")
+                rospy.logerr("Sending second goal")
+                rospy.logerr("Sending second goal")
+                rospy.logerr("Sending second goal")
                 self.move_base_simple_publisher.publish(move_target_pose)
                 self.has_updated_target = True
         except LookupException:
@@ -308,7 +317,7 @@ class PickUp(Leaf):
         self.move_is_running = ServiceProxy('/move/is_running', BoolSrv)
 
     def run(self):
-        rospy.loginfo('PickUp')
+        self.context.debug_messages.append(type(self).__name__)
         if not self.has_moved_forward:
             self.forward_service()
             self.has_moved_forward = True
@@ -343,7 +352,7 @@ class PickUp(Leaf):
 
 class CanDropOff(Leaf):
     def run(self):
-        rospy.loginfo('CanDropOff')
+        self.context.debug_messages.append(type(self).__name__)
         return SUCCESS if self.context.can_drop_off else FAILURE
 
 
@@ -434,7 +443,7 @@ class GoToDropOff(Leaf):
         self.threshold_distance_to_safe_box = 0.15 # [m], distance to the safe box pose before we use the actual box pose
 
     def run(self):
-        rospy.loginfo('GoToDropOff')
+        self.context.debug_messages.append(type(self).__name__)
         try:
             box_frame = f'aruco/detected{self.context.detected_boxes[0]}'
             object_type = category_name_to_type(self.context.target.category_name)
@@ -552,7 +561,7 @@ class DropOff(Leaf):
         self.has_reversed = False
 
     def run(self):
-        rospy.loginfo('DropOff')
+        self.context.debug_messages.append(type(self).__name__)
         if not self.is_running:
             self.is_running = True
             goal = ArmGoal()
@@ -600,7 +609,7 @@ class ReturnToAnchor(Leaf):
     # will cause problems next time we get to go_to_anchor since it will
     # already be running
     def run(self):
-        rospy.loginfo('ReturnToAnchor')
+        self.context.debug_messages.append(type(self).__name__)
         if self.is_finished:
             return SUCCESS
         anchor_pose = PoseStamped()
