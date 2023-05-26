@@ -67,9 +67,13 @@
 		<param name="angular_threshold" type="double" value="0.1" />
 		<param name="orientation_threshold" type="double" value="0.1" />
 
-		<param name="fast_linear_speed" type="double" value="0.23" />
+		<!-- <param name="fast_linear_speed" type="double" value="0.23" />
 		<param name="slow_linear_speed" type="double" value="0.13" />
-		<param name="angular_speed" type="double" value="0.6" />
+		<param name="angular_speed" type="double" value="0.6" /> -->
+
+		<param name="fast_linear_speed" type="double" value="0.18" />
+		<param name="slow_linear_speed" type="double" value="0.10" />
+		<param name="angular_speed" type="double" value="0.5" />
 
 		<param name="move_duration" type="double" value="2" />
 		<param name="observation_duration" type="double" value="0.5" />

@@ -61,6 +61,7 @@ class BrainNode:
             self.target = None
             self.detected_boxes = []
             self.object_instances = []
+            self.anchor_is_running = False
             self.debug_messages = []
 
     def run(self):
@@ -231,6 +232,7 @@ class GoToPickUp(Leaf):
         super().__init__()
         self.move_base_simple_publisher = Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
         self.start = ServiceProxy('/path_tracker/start', Trigger)
+        self.stop = ServiceProxy('/path_tracker/stop', Trigger)
         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
         self.is_inside_workspace = ServiceProxy("/workspace/is_inside", CheckPolygon)
         self.delete_instance_publisher = Publisher('/detection/remove_instance', String, queue_size=1)
@@ -244,6 +246,12 @@ class GoToPickUp(Leaf):
 
     def run(self):
         self.context.debug_messages.append(type(self).__name__)
+        
+        # This is to fix a bug where we have started returning to anchor but see a new object to pick up
+        if self.context.anchor_is_running:
+            self.context.anchor_is_running = False
+            self.stop()
+        
         if not self.context.target:
             return FAILURE
         
@@ -330,9 +338,9 @@ class PickUp(Leaf):
             goal = ArmGoal()
             goal.action = 'pick_up'
             goal.type = category_name_to_type(self.context.target.category_name)
-            # TODO: maybe get these from perception
+            # TODO: maybe get these from perception :'(
             goal.x = -0.145
-            goal.y = -0.04
+            goal.y = -0.02
             goal.z = -0.14 if goal.type == 'animal' else -0.13
             goal.yaw = 1.57 if goal.type == 'animal' else 0.0
 
@@ -352,65 +360,6 @@ class CanDropOff(Leaf):
         self.context.debug_messages.append(type(self).__name__)
         return SUCCESS if self.context.can_drop_off else FAILURE
 
-
-# def calculate_drop_off_target_pose(target_tf_frame, tf_buffer):
-#     target = tf_buffer.lookup_transform('map', target_tf_frame, rospy.Time(0))
-#     base_link = tf_buffer.lookup_transform('map', 'base_link', rospy.Time(0))
-#     target_pose = PoseStamped()
-#     target_pose.header.frame_id = 'map'
-#     target_pose.pose.position.x = target.transform.translation.x
-#     target_pose.pose.position.y = target.transform.translation.y
-#     target_pose.pose.position.z = target.transform.translation.z
-#     # get orientation from vector from base_link to target using quaternion_from_euler and math.atan2
-#     x = target.transform.translation.x - base_link.transform.translation.x
-#     y = target.transform.translation.y - base_link.transform.translation.y
-#     yaw = atan2(y, x)
-#     q = quaternion_from_euler(0, 0, yaw)
-#     target_pose.pose.orientation.x = q[0]
-#     target_pose.pose.orientation.y = q[1]
-#     target_pose.pose.orientation.z = q[2]
-#     target_pose.pose.orientation.w = q[3]
-#     return target_pose
-
-
-# Old but gold implementation
-# # TODO: box orientation is not accounted for, pathplanning problem.
-# class GoToDropOff(Leaf):
-#     def __init__(self):
-#         super().__init__()
-#         self.move_base_simple_publisher = Publisher('/move_base_simple/goal', PoseStamped, queue_size=1)
-#         self.start = ServiceProxy('/path_tracker/start', Trigger)
-#         self.path_tracker_is_running = ServiceProxy('/path_tracker/is_running', BoolSrv)
-#         self.toggle_path_planner_uninflation = ServiceProxy('/path_planner/toggle_uninflation', BoolSetter)
-#         self.is_running = False
-#         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
-#         self.listener = TransformListener(self.buffer)
-
-#     def run(self):
-#         rospy.loginfo('GoToDropOff')
-#         try:
-#             box_frame = f'aruco/detected{self.context.detected_boxes[0]}'
-#             object_type = category_name_to_type(self.context.target.category_name)
-#             box_id = type_to_box_id[object_type]
-#             if box_id in self.context.detected_boxes:
-#                 box_frame = f'aruco/detected{box_id}'
-#             move_target_pose = calculate_drop_off_target_pose(box_frame, self.buffer)
-
-#             self.move_base_simple_publisher.publish(move_target_pose)
-#         except LookupException:
-#             # TODO: we forgot the box if we ever get here
-#             pass
-
-#         if not self.is_running:
-#             self.toggle_path_planner_uninflation(True) # true = uninflate so we can get close to the box
-#             self.is_running = True
-#             self.start()
-#         elif not self.path_tracker_is_running().value:
-#             self.toggle_path_planner_uninflation(False)
-#             self.is_running = False
-#             self.context.can_drop_off = True
-                
-#         return RUNNING
 
 class GoToDropOff(Leaf):
     """
@@ -437,7 +386,9 @@ class GoToDropOff(Leaf):
         self.tf_broadcaster = tf2_ros.TransformBroadcaster()
         self.state = 'safe_box' # safe_box, actual_box
         self.previous_box_frame = None
-        self.threshold_distance_to_safe_box = 0.15 # [m], distance to the safe box pose before we use the actual box pose
+        self.threshold_distance_to_safe_box = 0.05 # [m], distance to the safe box pose before we use the actual box pose
+        self.update_distance_threshold = 0.1 # [m]
+        self.update_distance = None
 
     def run(self):
         self.context.debug_messages.append(type(self).__name__)
@@ -457,29 +408,29 @@ class GoToDropOff(Leaf):
 
             if move_target_pose_actual and move_target_pose_safe:
                 # State machine: if robot is close to the safe box, switch to actual box to get closer
-                
+                                
                 if self.state == 'safe_box':
                     # check if we are close to the safe box
                     base_link_map_fram = self.buffer.lookup_transform('map', 'base_link', rospy.Time(0))
-                    dx = base_link_map_fram.transform.translation.x - move_target_pose_safe.pose.position.x
-                    dy = base_link_map_fram.transform.translation.y - move_target_pose_safe.pose.position.y
-                    distance = np.sqrt(dx**2 + dy**2)
+                    x = base_link_map_fram.transform.translation.x - move_target_pose_safe.pose.position.x
+                    y = base_link_map_fram.transform.translation.y - move_target_pose_safe.pose.position.y
+                    distance = np.sqrt(x**2 + y**2)
+                    if self.update_distance is None:
+                        self.update_distance = distance
                     if distance > self.threshold_distance_to_safe_box:
-                        self.move_base_simple_publisher.publish(move_target_pose_safe)
+                        if self.update_distance - distance > self.update_distance_threshold:
+                            self.move_base_simple_publisher.publish(move_target_pose_safe)
+                            self.update_distance = distance
                     else:
                         self.state = 'actual_box'
 
                 elif self.state == 'actual_box':
                     # check if we are close to the safe box
                     base_link_map_fram = self.buffer.lookup_transform('map', 'base_link', rospy.Time(0))
-                    dx = base_link_map_fram.transform.translation.x - move_target_pose_actual.pose.position.x
-                    dy = base_link_map_fram.transform.translation.y - move_target_pose_actual.pose.position.y
-                    distance = np.sqrt(dx**2 + dy**2)
-                    if distance > self.threshold_distance_to_safe_box:
-                        self.move_base_simple_publisher.publish(move_target_pose_actual)
-                    else:
-                        # Return success, but wait because maybe there is more than my eye can see # TODO: fix this
-                        pass
+                    x = base_link_map_fram.transform.translation.x - move_target_pose_actual.pose.position.x
+                    y = base_link_map_fram.transform.translation.y - move_target_pose_actual.pose.position.y
+                    distance = np.sqrt(x**2 + y**2)
+                    self.move_base_simple_publisher.publish(move_target_pose_actual)
                     
             else:
                 # No target found, print error message
@@ -499,7 +450,7 @@ class GoToDropOff(Leaf):
             self.is_running = False
             self.context.can_drop_off = True
             self.state = 'safe_box'
-            
+            self.update_distance = None
         return RUNNING
     
     def calculate_drop_off_target_pose_with_safe_distance(self,target_tf_frame, tf_buffer):
@@ -619,11 +570,11 @@ class ReturnToAnchor(Leaf):
         anchor_pose.pose.orientation.z = 0.0
         anchor_pose.pose.orientation.w = 1.0
         self.move_base_simple_publisher.publish(anchor_pose)
-        if not self.is_running:
-            self.is_running = True
+        if not self.context.anchor_is_running:
+            self.context.anchor_is_running = True
             self.start()
         elif not self.path_tracker_is_running().value:
-            self.is_running = False
+            self.context.anchor_is_running = False
             self.context.can_drop_off = True
             self.is_finished = True
             self.speak_publisher.publish("I am done! Sleepy is going to sleep now.")

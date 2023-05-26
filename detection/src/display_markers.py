@@ -112,7 +112,7 @@ class Display_Markers():
                 t2.transform.rotation.w = 1
                 t2.transform.translation.x = 0
                 t2.transform.translation.y = 0
-                t2.transform.translation.z = 0.15
+                t2.transform.translation.z = 0.2
 
                 br.sendTransform(t2)
                 

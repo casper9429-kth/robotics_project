@@ -75,7 +75,7 @@ class Explorer():
         self.origo_index_j = msg.origo_index_j
         self.grid_size = (self.bbmaxx-self.bbminx)/self.map_resolution * (self.bbmaxy-self.bbminy)/self.map_resolution
 
-        if rospy.Time.now() - self.timer > rospy.Duration(1.5):
+        if rospy.Time.now() - self.timer > rospy.Duration(2.5):
             self.timer = rospy.Time.now()
             self.transforms()
             self.find_goal()
