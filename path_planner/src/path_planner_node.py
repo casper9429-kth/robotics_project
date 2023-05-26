@@ -636,16 +636,16 @@ class Path_Planner():
         start = self.path_planner.get_robot_pose_in_map()
         rospy.loginfo(f'Path planner: start {start.pose.position.x} {start.pose.position.y}')
         #status,self.path = self.path_planner.path(self.goal)
-        
+        pos_in_map = self.path_planner.get_start_in_map()
         if not self.status and not self.path:
             rospy.logwarn('Path planner: Failed to find path')
             return
         # If we are inside a wall. Just go to the nearest point that has a 0 value
-        if self.path_planner.get_value_of_pos(self.path_planner.get_start_in_map()) >0.8:
+        if self.path_planner.get_value_of_pos(pos_in_map[0],pos_in_map[1]) >0.8:
             # use exporer to find the closest point to the robot
             self.find_goal()
             if self.nearest_goal is not None:
-                self.send_path2([self.nearest_goal])
+                self.send_path2([start,self.nearest_goal])
         else:
             self.local_planner()
         #print(f'Path planner: status {self.status}')
