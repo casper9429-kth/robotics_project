@@ -240,9 +240,8 @@ class GoToPickUp(Leaf):
         self.buffer = Buffer(cache_time=rospy.Duration(60.0))
         self.listener = TransformListener(self.buffer)
         self.update_distance_threshold = 0.1 # [m] distance before second goal is sent
-        self.initial_distance = 0
-        self.has_updated_target = False
-        
+        self.update_distance = None
+
     def run(self):
         self.context.debug_messages.append(type(self).__name__)
         if not self.context.target:
@@ -258,21 +257,24 @@ class GoToPickUp(Leaf):
             self.context.target = None
             return FAILURE
         
+        distance_to_target = None
         try:
             distance_to_target = distance_to_object(self.context.target.object_position, self.buffer)
+            if self.update_distance is None:
+                self.update_distance = distance_to_target
             if not self.is_running:
                 self.move_base_simple_publisher.publish(move_target_pose)
-            elif distance_to_target < self.update_distance_threshold and not self.has_updated_target:
+            elif self.update_distance - distance_to_target > self.update_distance_threshold:
                 rospy.logerr("Sending second goal")
                 rospy.logerr("Sending second goal")
                 rospy.logerr("Sending second goal")
                 rospy.logerr("Sending second goal")
                 rospy.logerr("Sending second goal")
+                self.update_distance = distance_to_target
                 self.move_base_simple_publisher.publish(move_target_pose)
-                self.has_updated_target = True
         except LookupException:
-            # TODO: we lost the target if we ever get here
-            pass
+            # TODO: we lost the target if we ever get here. We should reset things but this has never happened so whatever
+            return FAILURE
         
         if not self.is_running:
             self.toggle_path_planner_uninflation(True) # true = uninflate so we can get close to the object
@@ -282,7 +284,7 @@ class GoToPickUp(Leaf):
             self.toggle_path_planner_uninflation(False)
             self.is_running = False
             self.context.can_pick_up = True
-            self.has_updated_target = False
+            self.update_distance = None
         return RUNNING
     
 
