@@ -579,12 +579,13 @@ class ReturnToAnchor(Leaf):
         anchor_pose.pose.orientation.y = 0.0
         anchor_pose.pose.orientation.z = 0.0
         anchor_pose.pose.orientation.w = 1.0
-        self.move_base_simple_publisher.publish(anchor_pose)
+        
         rospy.loginfo(f"anchor is running: {self.context.anchor_is_running}")
         rospy.loginfo(f"path tracker is running: {self.path_tracker_is_running().value}")
         if not self.context.anchor_is_running:
             self.context.anchor_is_running = True
             self.start()
+            self.move_base_simple_publisher.publish(anchor_pose)
         elif not self.path_tracker_is_running().value:
             self.context.anchor_is_running = False
             self.context.can_drop_off = True
