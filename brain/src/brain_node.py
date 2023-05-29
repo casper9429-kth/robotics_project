@@ -339,8 +339,8 @@ class PickUp(Leaf):
             goal.action = 'pick_up'
             goal.type = category_name_to_type(self.context.target.category_name)
             # TODO: maybe get these from perception :'(
-            goal.x = -0.145
-            goal.y = -0.02
+            goal.x = -0.148
+            goal.y = -0.03
             goal.z = -0.14 if goal.type == 'animal' else -0.13
             goal.yaw = 1.57 if goal.type == 'animal' else 0.0
 
@@ -389,6 +389,8 @@ class GoToDropOff(Leaf):
         self.threshold_distance_to_safe_box = 0.05 # [m], distance to the safe box pose before we use the actual box pose
         self.update_distance_threshold = 0.1 # [m]
         self.update_distance = None
+        self.first_run = True
+        self.first_run_actual_box = True
 
     def run(self):
         self.context.debug_messages.append(type(self).__name__)
@@ -398,14 +400,16 @@ class GoToDropOff(Leaf):
             box_id = type_to_box_id[object_type]
             if box_id in self.context.detected_boxes:
                 box_frame = f'aruco/detected{box_id}'
+            else:
+                for box_id in range(1,4):
+                    if self.buffer.can_transform('map', f'aruco/detected{box_id}', rospy.Time(0)) and box_id not in self.context.detected_boxes:
+                        self.context.detected_boxes.append(box_id) # TODO: This should probably not be hidden in Explore
             move_target_pose_actual, move_target_pose_safe = self.calculate_drop_off_target_pose_with_safe_distance(box_frame, self.buffer)
-
             # Check if the box_frame has changed, if so, reset the state machine to safe_box state
             if self.previous_box_frame != box_frame:
                 self.previous_box_frame = box_frame
                 self.state = 'safe_box'
                 # TODO update the drop off location for planner
-
             if move_target_pose_actual and move_target_pose_safe:
                 # State machine: if robot is close to the safe box, switch to actual box to get closer
                                 
@@ -418,11 +422,13 @@ class GoToDropOff(Leaf):
                     if self.update_distance is None:
                         self.update_distance = distance
                     if distance > self.threshold_distance_to_safe_box:
-                        if self.update_distance - distance > self.update_distance_threshold:
+                        if self.first_run or self.update_distance - distance > self.update_distance_threshold:
                             self.move_base_simple_publisher.publish(move_target_pose_safe)
                             self.update_distance = distance
+                            self.first_run = False
                     else:
                         self.state = 'actual_box'
+                        print('GoToDropOff: I am close to the safe box, I switch to actual box')
 
                 elif self.state == 'actual_box':
                     # check if we are close to the safe box
@@ -430,7 +436,9 @@ class GoToDropOff(Leaf):
                     x = base_link_map_fram.transform.translation.x - move_target_pose_actual.pose.position.x
                     y = base_link_map_fram.transform.translation.y - move_target_pose_actual.pose.position.y
                     distance = np.sqrt(x**2 + y**2)
-                    self.move_base_simple_publisher.publish(move_target_pose_actual)
+                    if self.first_run_actual_box or distance > 0.8:
+                        self.move_base_simple_publisher.publish(move_target_pose_actual)
+                        self.first_run_actual_box = False
                     
             else:
                 # No target found, print error message
@@ -451,6 +459,8 @@ class GoToDropOff(Leaf):
             self.context.can_drop_off = True
             self.state = 'safe_box'
             self.update_distance = None
+            self.first_run = True
+            self.first_run_actual_box = True
         return RUNNING
     
     def calculate_drop_off_target_pose_with_safe_distance(self,target_tf_frame, tf_buffer):
@@ -570,6 +580,8 @@ class ReturnToAnchor(Leaf):
         anchor_pose.pose.orientation.z = 0.0
         anchor_pose.pose.orientation.w = 1.0
         self.move_base_simple_publisher.publish(anchor_pose)
+        rospy.loginfo(f"anchor is running: {self.context.anchor_is_running}")
+        rospy.loginfo(f"path tracker is running: {self.path_tracker_is_running().value}")
         if not self.context.anchor_is_running:
             self.context.anchor_is_running = True
             self.start()

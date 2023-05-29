@@ -54,26 +54,27 @@
 	<node name="object_classifier" pkg="detection" type="object_classification.py" />
 	<node name="object_computations" pkg="detection" type="object_computations.py" />
 	<node name="remove_old_instances" pkg="detection" type="remove_old_instances.py">
-		<param name="expiration_time" value="60"/> 
+		<param name="expiration_time" value="90"/> 
 	</node>
 
 	<!-- Speaker -->
 	<node name="speaker" pkg="speak" type="speaker.py"/>
 
     <!-- Pathing -->
-    <node name="path_tracker" pkg="path_planner" type="path_tracker.py">
+    <node name="path_tracker" pkg="path_planner" type="path_tracker.py" output="screen">
 		<param name="in_goal_threshold" type="double" value="0.03" />
 		<param name="close_to_goal_threshold" type="double" value="0.3" /> 
 		<param name="angular_threshold" type="double" value="0.1" />
 		<param name="orientation_threshold" type="double" value="0.1" />
+		<param name="in_subgoal_threshold" type="double" value="0.15" />
 
 		<!-- <param name="fast_linear_speed" type="double" value="0.23" />
 		<param name="slow_linear_speed" type="double" value="0.13" />
 		<param name="angular_speed" type="double" value="0.6" /> -->
 
-		<param name="fast_linear_speed" type="double" value="0.18" />
+		<param name="fast_linear_speed" type="double" value="0.14" />
 		<param name="slow_linear_speed" type="double" value="0.10" />
-		<param name="angular_speed" type="double" value="0.5" />
+		<param name="angular_speed" type="double" value="0.48" />
 
 		<param name="move_duration" type="double" value="2" />
 		<param name="observation_duration" type="double" value="0.5" />

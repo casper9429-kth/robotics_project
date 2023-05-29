@@ -19,7 +19,7 @@ class PathTracker:
         # Parameters
         self.close_to_goal_threshold = rospy.get_param('~close_to_goal_threshold', 0.3)
         self.in_goal_threshold = rospy.get_param('~in_goal_threshold', 0.03)
-        self.in_subgoal_threshold = rospy.get_param('~in_subgoal_threshold', 0.05)
+        self.in_subgoal_threshold = rospy.get_param('~in_subgoal_threshold', 0.1)
         self.angular_threshold = rospy.get_param('~angular_threshold', 0.16)
         self.orientation_threshold = rospy.get_param('~orientation_threshold', 0.1)
 

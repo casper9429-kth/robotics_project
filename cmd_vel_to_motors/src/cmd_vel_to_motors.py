@@ -63,7 +63,7 @@ class cmd_vel_to_motors:
         while not rospy.is_shutdown():
             # Convert the desired linear and angular velocity to the desired wheel velocities
             v_left, v_right = self.transform_v_omega_to_v_left_v_right(self.linear_velocity, self.angular_velocity)
-
+            v_right = v_right + 0.01 * np.sign(v_right)
             # Limit the duty cycle to be between -1 and 1
             if np.abs(v_left) > 1 or np.abs(v_right) > 1:
                 v_left = v_left / np.abs(v_left)

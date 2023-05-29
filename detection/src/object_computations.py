@@ -154,8 +154,8 @@ class Object_computations():
 
             if nb_instances == 0:
                 
-                # Is there an object instance closer than 5cm to the new instance ?
-                found_close, old_instance_key = self.found_close(list(self.objects_dict.keys()), point_map, 0.05, self.objects_dict)
+                # Is there an object instance closer than 20cm to the new instance ?
+                found_close, old_instance_key = self.found_close(list(self.objects_dict.keys()), point_map, 0.2, self.objects_dict)
                 new_instance_key = new_instance[0]+str(1)
 
                 if not found_close:
@@ -181,7 +181,7 @@ class Object_computations():
                     if len(temp_instances) > 0:
                         
                         # check if there is a close instance in the temp memory
-                        found_close, tmp_old_instance_key = self.found_close(temp_instances, point_map, 0.05, self.temp_dict)
+                        found_close, tmp_old_instance_key = self.found_close(temp_instances, point_map, 0.2, self.temp_dict)
 
                         if found_close:
                             instance_temp = self.temp_dict[tmp_old_instance_key]
@@ -219,8 +219,8 @@ class Object_computations():
             else:
                 
                
-                # Is the old instance closer than 30cm to the new one ?
-                found_close, old_instance_key = self.found_close(instances, point_map, 0.3, self.objects_dict)
+                # Is the old instance closer than 40cm to the new one ?
+                found_close, old_instance_key = self.found_close(instances, point_map, 0.4, self.objects_dict)
             
                 if found_close: 
 
